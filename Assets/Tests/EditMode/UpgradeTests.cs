@@ -77,8 +77,8 @@ public class UpgradeTests
         for (int i = 0; i < 10; i++) sim.Step();
         Assert.AreEqual(2.2f, zy.PosF.X - 113.5f, 0.2f, "升级镇岳 10 tick 位移约 2.2 格(2.2 格/s)");
 
-        var rzy = SpawnHero(Side.Red, HeroId.ZhenYue, new GridPos(15, 113));
-        sim.SetMoveTarget(rzy.Id, new GridPos(15, 123));
+        var rzy = SpawnHero(Side.Red, HeroId.ZhenYue, new GridPos(5, 113)); // 第 5 行,避开蓝镇岳行军路径(射程 2 下 2.2 格即接战)
+        sim.SetMoveTarget(rzy.Id, new GridPos(5, 123));
         for (int i = 0; i < 10; i++) sim.Step();
         Assert.AreEqual(1.4f, rzy.PosF.X - 113.5f, 0.2f, "未升级镇岳 10 tick 位移约 1.4 格(1.4 格/s)");
     }

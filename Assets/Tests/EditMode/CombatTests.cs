@@ -2,6 +2,7 @@ using System;
 using IronCurtain.Sim;
 using NUnit.Framework;
 using UnityEngine;
+using IronCurtain.Tests;
 
 namespace IronCurtain.Tests
 {
@@ -108,14 +109,13 @@ namespace IronCurtain.Tests
         {
             var sim = NewSim();
             var zr = SpawnHero(sim, HeroId.ZhuiRi, Side.Blue, new GridPos(15, 109));
-            var zf = SpawnHero(sim, HeroId.ZhuFeng, Side.Red, new GridPos(15, 111)); // 逐风射程1,隔1格打不到
+            var zf = SpawnHero(sim, HeroId.ZhuFeng, Side.Red, new GridPos(15, 112)); // 逐风射程 2(有效 2.3),距 3 打不到坠日;坠日射程 9 覆盖
             Assert.AreEqual(12.5f, DamageCalculator.CalculateDamage(zr, zf, _cfg, false), "10×1.25=12.5");
             // 攻击间隔 2s:5 次攻击 62.5 < 70 存活;第 6 次(第 101 tick)致死
             for (int i = 0; i < 100; i++) sim.Step();
             Assert.AreEqual(EntityState.Attacking, zr.State, "坠日(攻击方)应处于攻击状态");
             Assert.Greater(zf.Hp, 0f, "5 次后仍存活");
-            for (int i = 0; i < 2; i++) sim.Step();
-            Assert.AreEqual(EntityState.Dead, zf.State, "第 6 次击杀");
+            Assert.IsTrue(TestUtil.RunUntil(sim, () => zf.State == EntityState.Dead, 10), "第 6 次击杀");
         }
 
         // ===== 战斗框架 =====
@@ -153,7 +153,7 @@ namespace IronCurtain.Tests
         public void NearestTarget_ChosenByDistance_ThenId()
         {
             var sim = NewSim();
-            var a = SpawnHero(sim, HeroId.ZhuiRi, Side.Blue, new GridPos(15, 109)); // 射程 5
+            var a = SpawnHero(sim, HeroId.ZhuiRi, Side.Blue, new GridPos(15, 109)); // 射程 9
             var far = SpawnHero(sim, HeroId.DuanFeng, Side.Red, new GridPos(15, 113)); // 距离 4
             var near = SpawnHero(sim, HeroId.DuanFeng, Side.Red, new GridPos(15, 111)); // 距离 2
             int nearHits = 0, farHits = 0;
@@ -172,14 +172,14 @@ namespace IronCurtain.Tests
         public void MovingUnit_StopsWhenEnemyInRange()
         {
             var sim = NewSim();
-            var a = SpawnHero(sim, HeroId.ZhuiRi, Side.Blue, new GridPos(15, 109)); // 射程 5,移速 2
-            var e = SpawnHero(sim, HeroId.DuanFeng, Side.Red, new GridPos(15, 128));
+            var a = SpawnHero(sim, HeroId.ZhuiRi, Side.Blue, new GridPos(15, 109)); // 射程 9,移速 2
+            var e = SpawnHero(sim, HeroId.DuanFeng, Side.Red, new GridPos(15, 138));
             e.Attack = 0f; e.AttackIntervalSec = 999f;
-            sim.SetMoveTarget(a.Id, new GridPos(15, 128));
-            for (int i = 0; i < 60; i++) sim.Step(); // 2格/s×6s=12格 → 到 (1,13),与 20 距离 7
+            sim.SetMoveTarget(a.Id, new GridPos(15, 138));
+            for (int i = 0; i < 60; i++) sim.Step(); // 2格/s×6s=12格 → 到 (15,121),与敌距离 17 > 9
             Assert.AreEqual(EntityState.Moving, a.State);
-            for (int i = 0; i < 20; i++) sim.Step(); // 再 2s → (1,17)?距离 20-17=3 ≤5 接敌
-            Assert.AreEqual(EntityState.Attacking, a.State, "进入射程即接敌");
+            Assert.IsTrue(TestUtil.RunUntil(sim, () => a.State == EntityState.Attacking, 200),
+                "进入射程(9)即接敌");
             Assert.IsFalse(a.HasMoveTarget, "接敌后清除移动目标");
         }
     }

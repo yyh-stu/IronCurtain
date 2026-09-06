@@ -198,6 +198,11 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出文件>
 检查:命名空间白名单(IronCurtain.Sim)/Sim 层禁 UnityEngine/重复类型定义/FILE 路径白名单。5ms 拦截退化重写类输出,通过后再 parse_files.py。
 
+## 8a. 版本库(2026-09-06 起)
+- 项目根 `D:\DevTools\IronCurtain` 已 git init(main 分支,tag m8.4d=首个基线)。
+- **约定:全绿即 commit**(每个模块/修复轮测试全绿后立刻提交,信息注明模块与测试数);GLM 落盘后、测试未绿前**禁止 commit**;事故恢复=`git checkout -- <文件>` 或 `git reset --hard`(以最后一次全绿 commit 为锚)。
+- .gitignore 已排除 Library/Temp/日志/TestResults;Assets(含 .meta)与 docs 全部入库。
+
 ## 8. 已知坑(务必遵守)
 - cmd 管道喂中文给 python 会变锟斤拷 → 中文一律走文件,脚本读文件
 - cmd 不支持 heredoc/单行多引号 python → 写 .py 文件执行

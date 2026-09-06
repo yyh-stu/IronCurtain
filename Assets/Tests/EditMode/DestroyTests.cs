@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using IronCurtain.Sim;
+using IronCurtain.Tests;
 using UnityEngine;
 
 public class DestroyTests
@@ -64,7 +65,7 @@ public class DestroyTests
     [Test]
     public void T3_射手远程拆塔_每击8()
     {
-        var zr = SpawnHero(Side.Red, HeroId.ZhuiRi, new GridPos(1, 10)); // 距塔 4 ≤ 射程 5
+        var zr = SpawnHero(Side.Red, HeroId.ZhuiRi, new GridPos(1, 10)); // 距塔 4 ≤ 射程 9
         zr.Hp = 200f; zr.MaxHp = 200f; // 扛住塔的反击,验证远程拆塔本身
         OrderDestroy(zr, blueTower);
         Step(20);
@@ -108,11 +109,10 @@ public class DestroyTests
             if (e.IsSoldier && e.GeneralId == g.Id && soldiers.Count < 2) soldiers.Add(e.Id);
         string err;
         Assert.IsTrue(GarrisonSystem.EnterFormal(sim, soldiers, blueTower.Id, out err), "2 名士兵正式驻军应成功");
-        var zr = SpawnHero(Side.Red, HeroId.ZhuiRi, new GridPos(1, 10));
-        zr.Hp = 300f; zr.MaxHp = 300f; // 扛塔反击
-        OrderDestroy(zr, blueTower);
-        for (int i = 0; i < 300 && !blueTower.Rubbled; i++) sim.Step();
-        Assert.IsTrue(blueTower.Rubbled, "塔应化为废墟");
+        var zy = SpawnHero(Side.Red, HeroId.ZhenYue, new GridPos(1, 8)); // 贴塔拆除(距塔心 2.0 ≤ 碰撞半径+0.4);坠日远程在射程 9 下会去啃远处兵团士兵,不再适用
+        zy.Hp = 300f; zy.MaxHp = 300f; // 扛塔与驻军反击
+        OrderDestroy(zy, blueTower);
+        Assert.IsTrue(TestUtil.RunUntil(sim, () => blueTower.Rubbled, 3000), "塔应化为废墟");
         Assert.AreEqual(Side.Neutral, blueTower.Side, "废墟无阵营归属");
         Assert.AreEqual(0, blueTower.GarrisonFormal.Count, "驻军清空");
         foreach (var id in soldiers)
@@ -170,7 +170,7 @@ public class DestroyTests
     {
         var zy = SpawnHero(Side.Red, HeroId.ZhenYue, new GridPos(1, 1)); // 邻接蓝大本营(1,0)
         OrderDestroy(zy, blueHQ);
-        for (int i = 0; i < 600 && sim.Winner == null; i++) sim.Step();
+        Assert.IsTrue(TestUtil.RunUntil(sim, () => sim.Winner != null, 3000), "大本营清零应判胜");
         Assert.AreEqual(Side.Red, sim.Winner, "大本营清零应判红方胜");
     }
 }

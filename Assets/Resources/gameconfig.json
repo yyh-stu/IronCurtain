@@ -9,7 +9,7 @@
       "AttackIntervalSec": 2.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 1,
+      "Range": 2,
       "Population": 1,
       "Shield": 140,
       "PassiveText": "护盾:非破防攻击仅70%伤害;星落打盾再减半"
@@ -23,7 +23,7 @@
       "AttackIntervalSec": 2.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 1,
+      "Range": 2,
       "Population": 2,
       "Shield": 0,
       "PassiveText": "基础免伤20%;对磐石破防×2.5且无视护盾减免;受远程0.7"
@@ -37,7 +37,7 @@
       "AttackIntervalSec": 2.5,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 2,
+      "Range": 3,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "拒马:打断逐风冲锋并施加迟滞(移速-30%、攻速-10%,3秒)"
@@ -51,7 +51,7 @@
       "AttackIntervalSec": 2.0,
       "MoveSpeed": 3.0,
       "ChargeSpeed": 4.0,
-      "Range": 1,
+      "Range": 2,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "冲锋移速4格/s,冲锋伤害翻倍;对远程后排收割;受远程1.25"
@@ -65,7 +65,7 @@
       "AttackIntervalSec": 2.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 5,
+      "Range": 9,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "攻击镇岳无视其20%基础免伤,附加重伤(全属性-15%,3秒)"
@@ -79,7 +79,7 @@
       "AttackIntervalSec": 1.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 5,
+      "Range": 9,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "沉默非镇岳单位禁止冲锋;攻击磐石护盾伤害减半"
