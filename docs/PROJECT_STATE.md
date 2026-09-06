@@ -110,7 +110,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - 手册:`D:\DevTools\设置手册_Unity_MCP与引擎安装.md`(引擎/MCP/视觉系统全部文档)
 
 ## 5. 工作流协议(每模块)
-- **美术管线(TokenHub,2026-09-05 已建)**:`D:/DevTools/team-pipeline/`(config.json 存 key + tokenhub.py 核心库 + gen_image.py/gen_3d.py CLI + README.md)。任何会话照 README 即可调用:生图(POST /v1/images/generations)、3D 提交(POST /v1/api/3d/submit)、3D 查询(POST /v1/api/3d/query,必须带 model)、完成后 data[].url 下载 glb。性价比档位:3D 默认 hy-3d-3.0(草稿 express,高配 3.1 除非必要不用);生图默认 seedream-image-v5.0-lite。生图需用户在控制台开"在线推理服务"后付费才可用(401007);key 建议用户重建专属后替换 config.json。
+- **美术管线(TokenHub,2026-09-05 已建;生图端点 2026-09-07 修正)**:`D:/DevTools/team-pipeline/`(config.json 存 key + tokenhub.py 核心库 + gen_image.py/gen_3d.py CLI + README.md)。任何会话照 README 即可调用:生图(POST `/v1/wand/si-image/generation`,响应 `data[].url` 直链 2048×2048;**旧 `/v1/images/generations` 会把正确模型名误报「服务ID不存在」假象,已废弃**)、3D 提交(POST /v1/api/3d/submit)、3D 查询(POST /v1/api/3d/query,必须带 model)、完成后 data[].url 下载 glb。性价比档位:3D 默认 hy-3d-3.0(草稿 express,高配 3.1 除非必要不用);生图默认 seedream-image-v5.0-lite。key 已于 2026-09-07 按用户提供的新 key 更新(config.json)。
 - **专家团架构(2026-09-05 用户拍板)**:三层结构——总监层(制作人=用户终审/技术总监=编排)、专家层(主策划/美术总监/资产生成/程序主程=GLM-5.3/音效)、验收层(视觉=**内置 4.5v(2026-09-06 起独占)**/测试=断言体系/逻辑挑刺=deepseek)。角色卡在 `docs/team/agents/`,编排协议+验收矩阵+分权红线在 `docs/team/PROTOCOL.md`,花名册在 `docs/team/ROSTER.md`。每个专家=模型+角色卡;待接入模型由用户提供 API 后登记。**总监不写业务代码,代码全交 GLM-5.3;验收只查输入对输出对(黑盒),不审实现;审美/手感终审永远在用户。**
 1. 提示词在 `D:\DevTools\IronCurtain\docs\prompts\m<X>.<Y>-*.md`(六段式:GDD 摘录/接口契约/现状/硬验收/输出格式)
 2. `python glm_call.py <prompt> -o <out>` → 解析 `// FILE: <path>` 标记落盘到 Assets
@@ -223,4 +223,5 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - **Sim 行为改动必须配"长线冒烟"**:AI 波次门槛回归(8→2)潜伏于 M8.4b→M6.2 才被截图暴露,期间 160/188/198/200/216 全绿——单步断言测不出"AI 是否真的会推进";临时 DiagAI 编辑器脚本(逐 10s 打印兵力/位置/State/生产槽/池,跑完删)模式已沉淀,凡动 AiSystem/ProductionSystem/MatchSetup 应顺手跑一次
 - **batchmode 跑测试必核对 error CS + testcasecount(M6.4a 新坑)**:编译错误时 Unity 会用旧 DLL 跑旧测试并以 exit 0 退出——`-runTests` 结果 XML 全绿、exit 0,是**伪绿**;真信号=editmode.log 里 `error CS` 条数≠0 且 results.xml 的 testcasecount 没涨。每次跑测试后两个都查:先 `grep -c "error CS"`,再核对 testcasecount 等于预期总数。
 - **Sim 单向状态机不可手动回设做对照(M6.4a 新坑)**:MatchPhase 之类单向时钟(已过 600s 即恒回 Overtime)手动 `sim.Phase = Normal` 后下一 Step 就被时钟推回,对照组走错分支;对照实验一律**独立新 SimCore**(new SimCore+Game 注入)。
+- **TokenHub 生图端点坑(2026-09-07)**:OpenAI 兼容 `/v1/images/generations` 在 TokenHub 上会把**正确的模型名**误报为「model or service ID does not exist」,排查方向全歪(以为是控制台未开通/模型下线);真因是端点错。正确端点=`/v1/wand/si-image/generation`(响应 `data[].url` 直链,2048×2048,单张约 22000 tokens)。**凡 TokenHub 报错,先对端点,再查计费。**
 - Sim 连续坐标规则速查:`SimVec2{X=列米,Y=行米}`;`Entity.PosF`=单位权威位置;`Entity.Pos`=格(建筑);世界坐标 x=X,z=3−Y;碰撞半径 `SimCore.BuildingCollisionRadius`;单位不占格;测试模板布局(6×255 下):兵营(1,8)/蓝塔(1,16)/红塔(1,24)/蓝基地(1,0)
