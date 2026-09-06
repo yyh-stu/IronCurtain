@@ -11,12 +11,12 @@
 > 3. 从「进度」节第一个未完成项继续,按既有协议(门禁→GLM→测试→全绿即 commit→归档本文件);
 > 4. 只读下一个模块**需要的**文件(grep 定位优先),不要整库通读,防上下文再次膨胀;
 > 5. 每个模块收口后主动提示用户"可以开新窗",由用户决定。
-> 红线速查:GLM 消耗必须有收益/生图必人工复核后才生3D/编排者非必要不下场/全绿即 commit 未测绿禁止 commit/Sim 禁 UnityEngine/**多模态预检必做且风险点必主动上报原因**(2026-09-06 新增)。
+> 红线速查:GLM 消耗必须有收益/生图必人工复核后才生3D/编排者非必要不下场/全绿即 commit 未测绿禁止 commit/Sim 禁 UnityEngine/**多模态预检必做且风险点必主动上报原因**(2026-09-06 新增)/**凡涉"看"必走内置 4.5v,其他易幻觉视觉模型不入验收管线**(2026-09-06 拍板,hy-vision 退役验收岗)。
 >
 > ## ★ 2026-09-05 新 Agent 流程(换窗后生效,用户拍板)
 > - **deepseek-v4-pro(结构化转述)**:阅读用户报告/拍板内容,结构化输出给主编排;**输出必须严格贴合原文意思**,不增删改动。
 > - **GPT(主编排,用户拟接入 GPT-6 Astra / GPT-5.6 Sol)**:拆解需求、规划整体、分发任务、检查验收。
-> - **美术与代码模型不变**:程序主程=GLM-5.3(glm_call.py);视觉验收=hy-vision-2.0-instruct(TokenHub);生图/3D/动画=TokenHub 管线(team-pipeline);审美终审=用户。
+> - **美术与代码模型不变**:程序主程=GLM-5.3(glm_call.py);视觉验收=**ZCode 内置 4.5v 视觉 MCP(2026-09-06 拍板独占非人工视觉验收:凡涉"看"必经它,易幻觉视觉模型不入管线)**;生图/3D/动画=TokenHub 管线(team-pipeline);审美终审=用户。
 
 ## 1. 任务与目标
 把《铁幕:前线》GDD v1.6 做成**单线闭环可玩 Demo**,完成度=产品级与 demo 之间(打磨后可发布)。
@@ -92,7 +92,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 | 角色 | 模型 | 调用方式 |
 |---|---|---|
 | 代码主力 | GLM-5.3 | **Anthropic 兼容端点**:`https://open.bigmodel.cn/api/anthropic/v1/messages`,header `x-api-key: <key>`,`anthropic-version: 2023-06-01`,必须 `"thinking":{"type":"disabled"}` |
-| 视觉验收 | **hy-vision-2.0-instruct**(TokenHub) | OpenAI 兼容 /v1/chat/completions + image_url(base64);flash 已弃用 |
+| 视觉验收 | **ZCode 内置 4.5v 视觉 MCP**(`mcp__4_5v_mcp__analyze_image`;**2026-09-06 拍板独占非人工视觉验收**:凡涉"看"的环节——测试取画面/截图验收/向主编排反馈视觉信息——必经 4.5v;原图分辨率、不耗项目任何 key;**hy-vision-2.0-instruct 同日退役验收岗**(M6.2 盲测 3 错 2:缩图幻觉/编造第一印象),其 TokenHub 管线保留仅作生图链路配套,不再进验收管线) | ZCode 客户端内置,`mcp__4_5v_mcp__analyze_image` 只吃远程 URL(先 Read 本地图得 CDN URL 再喂);与程序化打点互补:小文字 UI 仍以程序化计数为最终裁决 |
 | 结构化转述→逻辑挑刺 | deepseek-v4-pro | **挑刺岗常驻(2026-09-06 拍板)**:ZCode provider 直连 `deepseek_review.py`+`review_check.py` 门禁;窄口径=逻辑/时序/状态类;**v4-pro 须 thinking disabled**(默认开思考吃光 max_tokens);兼结构化转述(无视觉) |
 | 总编排候选 | Kimi K3(待用户接入) | 2.8T MoE/1M ctx/Agent 强(Tau2);API ¥20 输入(缓存命中 ¥2)/¥100 输出 per 1M;**Kimi Coding Plan ¥49-699 五档,K3 需 Moderato(¥99)起**;社区已有"K3 主编排+GLM 主程序"同构实践;接入路径=Anthropic 兼容端点进 ZCode(同 bigmodel 模式) |
 | 主编排(换窗后) | GPT(6 Astra / 5.6 Sol,待用户接入) | 拆解/规划/分发/验收 |
@@ -103,13 +103,13 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 
 ## 4. 基础设施
 - **Unity MCP**:服务端 `D:\DevTools\unity-mcp-main\Server\.venv\Scripts\mcp-for-unity.exe`,HTTP 模式常驻 `http://127.0.0.1:8080`(启动脚本 `D:\DevTools\start-mcp-server.cmd`);插件 com.coplaydev.unity-mcp v10.2 已挂进项目 manifest(file: 相对 Packages 目录);编辑器内 **Ctrl+Alt+M 开窗口点 Start** 才连接(每次新项目/重开编辑器都要点)
-- **视觉验收 CLI**:`glm_vision.py <图> [问]`(旧,flash,备用);首选 hy-vision-2.0-instruct 走 TokenHub(见 team-pipeline README)
+- **视觉验收(2026-09-06 起)**:**ZCode 内置 4.5v 独占**——需要"看"时:Read 工具打开 PNG(自动上传得 CDN URL)→ `mcp__4_5v_mcp__analyze_image` 分析;免费、原图分辨率。旧 CLI `glm_vision.py`/`vision_qa.py`(hy-vision)已退役验收岗,仅存档
 - 截屏:`powershell Add-Type System.Windows.Forms...CopyFromScreen` 存 PNG(见历史会话,或写脚本)
 - 手册:`D:\DevTools\设置手册_Unity_MCP与引擎安装.md`(引擎/MCP/视觉系统全部文档)
 
 ## 5. 工作流协议(每模块)
 - **美术管线(TokenHub,2026-09-05 已建)**:`D:/DevTools/team-pipeline/`(config.json 存 key + tokenhub.py 核心库 + gen_image.py/gen_3d.py CLI + README.md)。任何会话照 README 即可调用:生图(POST /v1/images/generations)、3D 提交(POST /v1/api/3d/submit)、3D 查询(POST /v1/api/3d/query,必须带 model)、完成后 data[].url 下载 glb。性价比档位:3D 默认 hy-3d-3.0(草稿 express,高配 3.1 除非必要不用);生图默认 seedream-image-v5.0-lite。生图需用户在控制台开"在线推理服务"后付费才可用(401007);key 建议用户重建专属后替换 config.json。
-- **专家团架构(2026-09-05 用户拍板)**:三层结构——总监层(制作人=用户终审/技术总监=编排 deepseek)、专家层(主策划/美术总监/资产生成/程序主程=GLM-5.3/音效)、验收层(视觉=hy-vision-2.0-instruct/测试=断言体系)。角色卡在 `docs/team/agents/`,编排协议+验收矩阵+分权红线在 `docs/team/PROTOCOL.md`,花名册在 `docs/team/ROSTER.md`。每个专家=模型+角色卡;待接入模型由用户提供 API 后登记。**总监不写业务代码,代码全交 GLM-5.3;验收只查输入对输出对(黑盒),不审实现;审美/手感终审永远在用户。**
+- **专家团架构(2026-09-05 用户拍板)**:三层结构——总监层(制作人=用户终审/技术总监=编排)、专家层(主策划/美术总监/资产生成/程序主程=GLM-5.3/音效)、验收层(视觉=**内置 4.5v(2026-09-06 起独占)**/测试=断言体系/逻辑挑刺=deepseek)。角色卡在 `docs/team/agents/`,编排协议+验收矩阵+分权红线在 `docs/team/PROTOCOL.md`,花名册在 `docs/team/ROSTER.md`。每个专家=模型+角色卡;待接入模型由用户提供 API 后登记。**总监不写业务代码,代码全交 GLM-5.3;验收只查输入对输出对(黑盒),不审实现;审美/手感终审永远在用户。**
 1. 提示词在 `D:\DevTools\IronCurtain\docs\prompts\m<X>.<Y>-*.md`(六段式:GDD 摘录/接口契约/现状/硬验收/输出格式)
 2. `python glm_call.py <prompt> -o <out>` → 解析 `// FILE: <path>` 标记落盘到 Assets
 3. 编辑器自动编译(或 batchmode)→ 读 `C:\Users\HP\AppData\Local\Unity\Editor\Editor.log` 找 `error CS`
@@ -242,6 +242,6 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - **glm_call.py -o 输出路径的父目录必须已存在**(不会自动建目录;M6.1 首跑 -o out/xx.md → 生成 12 分钟 75k tokens 全部丢失只剩 FileNotFoundError,重烧一轮)。惯例:输出直接放 glm-pipeline/ 根(m6.x.out.md),用前 ls 确认
 - **IMGUI 纹理上下颠倒坑**:GUI.DrawTexture 把纹理 v=0(=SetPixels32 第 0 行)画在 rect 底部;Sim row0=北=顶部 → 直接画必颠倒。修法:像素行序翻转 或 GUI.DrawTextureWithTexCoords(rect, tex, Rect(0,1,1,-1)) 垂直翻转(MinimapPanel 已两处落地)
 - **batchmode 跑测试禁止带 -quit**:`-runTests -quit` 组合会启动即退出、测试全跳过且 exit 0(伪绿);不带 -quit 测试完自动退出,失败 exit 2。编译检查可用 `-quit -executeMethod` 但跑测试绝不能加
-- **小文字 UI(飘字/血条数字)的 vision 验收分辨率局限**:1920p 原图里十几像素高的 TextMesh,经 vision_qa 缩图 1600px JPEG 后基本不可读(hy-vision 两次矛盾回答);裁决顺序=程序化计数(ActiveCount 打点)>原图高分辨率多模态>缩图 vision。字号根治待 M6.6 新相机(单位放大 ~3 倍)
+- **小文字 UI(飘字/血条数字)的视觉验收局限**:1920p 原图里十几像素高的 TextMesh,缩图压缩后基本不可读;**2026-09-06 起 4.5v 原图验收已覆盖此场景(hy-vision 缩图管线退役)**;最终裁决顺序仍=程序化计数(打点)>4.5v 原图识别>人眼。字号根治待 M6.6 新相机(单位放大 ~3 倍)
 - **Sim 行为改动必须配"长线冒烟"**:AI 波次门槛回归(8→2)潜伏于 M8.4b→M6.2 才被截图暴露,期间 160/188/198/200/216 全绿——单步断言测不出"AI 是否真的会推进";临时 DiagAI 编辑器脚本(逐 10s 打印兵力/位置/State/生产槽/池,跑完删)模式已沉淀,凡动 AiSystem/ProductionSystem/MatchSetup 应顺手跑一次
 - Sim 连续坐标规则速查:`SimVec2{X=列米,Y=行米}`;`Entity.PosF`=单位权威位置;`Entity.Pos`=格(建筑);世界坐标 x=X,z=3−Y;碰撞半径 `SimCore.BuildingCollisionRadius`;单位不占格;测试模板布局(6×255 下):兵营(1,8)/蓝塔(1,16)/红塔(1,24)/蓝基地(1,0)
