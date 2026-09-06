@@ -30,7 +30,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
    - v1 误实现:整线 3×30(GDD 2.2 本意是"相邻建筑之间每段线空间",实现误读);
    - v2(2026-09-04):6 排×255 列长条 + 连续坐标自由移动(红警式:直线+建筑碰撞圆+单位软碰撞,1 格=1 米,欧氏索敌);
    - **v3(2026-09-05,当前)**:椭圆形大地图 + 楚河汉界河(宽 10,上下各 5 格桥,涉水×0.5)+ 河中央岛。详见 `docs/大地图改造拆解.md` 与 `docs/连续坐标改造.md`。
-4. **美术路线(迭代史→当前)**:程序化自建网格(否决)→ Kenney CC0 卡通低模(过渡资产,已导入 `Assets/Resources/Models`,当前画面用它)→ **终版方向:TokenHub AI 管线(生图 Seedream → 3D 混元 hy-3d-3.0 → 动画 hy-3d-motion),风格待定稿**(部落冲突风已弃,那只是降低实现难度的临时选择;地形风格方向=英雄联盟式石路+少量草地)。六英雄正式模型尚未生成。
+4. **美术路线(迭代史→当前)**:程序化自建网格(否决)→ Kenney CC0 卡通低模(过渡资产,已导入 `Assets/Resources/Models`,当前画面用它)→ TokenHub AI 管线(生图 Seedream → 3D 混元 hy-3d-3.0 → 动画 hy-3d-motion,已降级为概念/风格/有机粗模支路,生图→3D 红线不变)→ **2026-09-06 用户新路线(当前,权威):AI 底模 → 人工复核调优(认为无需修改可跳过)→ 入库**,详见 `docs/美术底模管线.md`;原 M6.0d Quaternius 下载作废;风格方向待定:古代将领(东西方皆可)或英雄联盟式怪物形象。
 5. **交换规则(2026-09-05 编排修复,已入测试)**:交换只消耗正式驻军,**正式守军被肃清即城池易主**(临时驻军溃逃);敌方攻城意图存续期间临时驻军不转正式。D18 城门=建筑朝敌侧碰撞半径+0.6 米起向外延展(椭圆内、非水域)。
 6. **2026-09-05 用户拍板·操作 UI**:兵营**总览面板**(通用多兵营,每兵营一区块:3 队列+头像产兵+取消;边界态=被摧毁/被占领)。
 7. **2026-09-05 用户拍板·美术红线**:生图结果在**生 3D 前必须人工复核**——把图片在对话框展示或告知存储路径,制作人明确确认后才允许图生 3D。未确认生 3D = 流程事故。已写入 `team-pipeline/README.md` 顶部红线节。
@@ -85,6 +85,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 ## 2. 环境事实(本机)
 - OS:Win11 专业版;32GB 内存;RTX 5060 Ti(驱动 32.0.16.1656,与 Unity Hub Chromium 硬件加速冲突→Hub 需 --disable-gpu 启动,桌面快捷方式已建)
 - Unity 6000.0.30f1 LTS 装在 `D:\Unity\Editor`(注意:是 2024-12 的 LTS 补丁,不是最新;国内 CDN 只镜像到这个版本)
+- **Blender(美术底模管线,2026-09-06 引入)**:4.5.9 便携版解压 `D:\DevTools\Blender`(免安装免管理员);下载源 mirrors.aliyun.com/blender(国内可达,替代 Google Drive);无头用法 `blender.exe --background --python <脚本> -o <渲染输出>`;路线详见 `docs/美术底模管线.md`
 - **项目:`D:\DevTools\IronCurtain`**(Unity -createProject 生成,完整标准骨架);旧实验工程 `D:\DevTools\IronCurtainDemo` 是备份
 - Python:`C:\Users\HP\AppData\Local\Programs\Python\Python312\python.exe`;有 venv 在 `D:\DevTools\unity-mcp-main\Server\.venv`(含 fastmcp/pillow/pypdf,优先用它跑脚本)
 
@@ -130,8 +131,8 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - [ ] **M6.4 特效+音效**(冲锋残影/死亡消散/占领特效/破盾特效/胜利失败演出;程序化音效无 BGM;受击闪白已在 M6.2)
 - [ ] M6.5 新手浮层(3 步极简引导,可跳过)
 - [ ] M6.3 操作 UI(底部栏:EP 存量与获取进度/海克斯手牌/升级/道具;点选框选指挥已在 M8.6 落地)
-- [ ] M6.0d 六英雄模型替换(等 Quaternius 机甲,用户下载→Assets/Models/)
-- [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
+- [ ] M6.0e 美术底模管线首模验证(装 Blender 4.x LTS 便携版→无头渲染冒烟→GLM 首模脚本→四视图→4.5v→用户复核;风格方向待用户拍板:古代将领东/西 或 LoL 风怪物;详见 docs/美术底模管线.md)
+- [ ] 美术风格定稿(Seedream 批量概念图候选→用户挑方向,再启动底模生成)
 - [ ] M7 收口打包 / 新手教学内容(待用户定稿)
 - [ ] GPT 总编排交接准备(交接载体=本文件+docs/team/+team-pipeline README)
 - [ ] **待用户编辑器 Play 审(累积)**:M6.2 顶栏/飘字/射程圈/路径线 + M6.1 小地图/雾/镜头手感 + M8.6 框选/行军/占地底板 + M8.7 撤退按钮
