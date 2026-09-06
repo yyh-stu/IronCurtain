@@ -14,13 +14,16 @@ namespace IronCurtain.Sim
 
         public static SimVec2 FacingOf(Entity g)
         {
-            var def = g.Side == Side.Blue ? new SimVec2(1f, 0f) : new SimVec2(-1f, 0f);
+            if (g.FacingOverride.HasValue) return g.FacingOverride.Value;
+            SimVec2 enemyDir = g.Side == Side.Blue ? new SimVec2(1f, 0f) : new SimVec2(-1f, 0f);
             if (g.HasMoveTarget)
             {
-                var d = (SimVec2.FromGrid(g.MoveTarget) - g.PosF).Normalized();
-                if (d.SqrMagnitude > 1e-8f) return d;
+                var dir = (SimVec2.FromGrid(g.MoveTarget) - g.PosF).Normalized();
+                bool toward = (g.Side == Side.Blue && dir.X > 0.05f) || (g.Side == Side.Red && dir.X < -0.05f);
+                if (toward) return dir;       // 前进方向(朝敌)→用之(斜向前进阵型随之斜)
+                return enemyDir;              // 后撤/横移 → 保持面朝敌不转身(规则③)
             }
-            return def;
+            return enemyDir;
         }
 
         public static SimVec2 SlotOffset(Entity g, int slot)

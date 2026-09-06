@@ -77,6 +77,9 @@ namespace IronCurtain.Sim
         public byte SupKind;       // 被玩家打断而失效的自动决策(防复读)
         public int SupTargetId;
 
+        // 布阵朝向覆盖(M8.5c 规划器设置;null=默认规则)
+        public SimVec2? FacingOverride;
+
         public Entity(int id, Side side, EntityKind kind, GridPos pos, float hp)
         {
             Id = id;
