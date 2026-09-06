@@ -18,7 +18,8 @@
 *.pidb
 *.booproj
 
-# 测试与日志(TestResults 在项目根)
+# 测试与日志
+[Tt]est[Rr]esults/
 TestResults*.xml
 *.log
 

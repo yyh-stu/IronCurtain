@@ -20,6 +20,9 @@ namespace IronCurtain.View
             new Color(0.90f, 0.60f, 0.25f), new Color(0.50f, 0.45f, 0.85f),
         };
 
+        /// <summary>M8.6 面板包围盒(GUI 坐标系,y 从顶起),供 SelectionSystem 判断点击是否落在面板上。</summary>
+        public static Rect LastPanelRect = new Rect(10f, 10f, 360f, 0f);
+
         private BarracksOverviewModel _model;
         private string _lastError;
         private float _errorUntil;
@@ -36,6 +39,7 @@ namespace IronCurtain.View
 
             var blocks = _model.DescribeBlocks();
             float height = 84f + blocks.Count * 158f;
+            LastPanelRect = new Rect(10f, 10f, 360f, height);
             GUI.Box(new Rect(10f, 10f, 360f, height), "", MakeBoxStyle());
             GUILayout.BeginArea(new Rect(18f, 16f, 344f, height - 12f));
 

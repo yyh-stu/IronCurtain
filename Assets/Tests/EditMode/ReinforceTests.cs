@@ -163,5 +163,74 @@ namespace IronCurtain.Tests
             Assert.IsFalse(ok);
             StringAssert.Contains("无主将", error);
         }
+
+        [Test]
+        public void T7_MarchOriginNearestBarracks()
+        {
+            var sim = NewSim();
+            var barracks = sim.SpawnBuilding(Side.Blue, BuildingId.Barracks, new GridPos(15, 105));
+            sim.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(15, 100));
+            var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 110));
+            for (int i = 0; i < 40; i++) sim.Step();
+            var soldiers = SoldiersOf(sim, a.Id);
+            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
+            sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
+            string error;
+            Assert.IsTrue(ReinforceSystem.RequestReinforce(sim, Side.Blue, out error), error);
+            bool any = false;
+            foreach (var s in SoldiersOf(sim, a.Id))
+                if (s.FormationSlot >= 0 && s.MarchOrigin != null) { any = true; break; }
+            Assert.IsTrue(any, "新兵应有行军源");
+            // 断言:所有带 MarchOrigin 的新兵,源=兵营中心(距主将最近的兵营,非基地)
+            foreach (var s in SoldiersOf(sim, a.Id))
+                if (s.MarchOrigin != null)
+                {
+                    Assert.AreEqual(barracks.Pos.Col, s.MarchOrigin.Value.X, 1e-4f);
+                    Assert.AreEqual(barracks.Pos.Row, s.MarchOrigin.Value.Y, 1e-4f);
+                }
+        }
+
+        [Test]
+        public void T8_MarchOriginFallsBackToBase()
+        {
+            var sim = NewSim();
+            var baseB = sim.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(15, 100));
+            var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 110));
+            for (int i = 0; i < 40; i++) sim.Step();
+            var soldiers = SoldiersOf(sim, a.Id);
+            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
+            sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
+            string error;
+            Assert.IsTrue(ReinforceSystem.RequestReinforce(sim, Side.Blue, out error), error);
+            bool any = false;
+            foreach (var s in SoldiersOf(sim, a.Id))
+                if (s.MarchOrigin != null)
+                {
+                    any = true;
+                    Assert.AreEqual(baseB.Pos.Col, s.MarchOrigin.Value.X, 1e-4f, "无兵营应回退到基地中心");
+                    Assert.AreEqual(baseB.Pos.Row, s.MarchOrigin.Value.Y, 1e-4f, "无兵营应回退到基地中心");
+                }
+            Assert.IsTrue(any, "新兵应有行军源(回退基地)");
+        }
+
+        [Test]
+        public void T9_MarchOriginNullWithoutBuildings()
+        {
+            var sim = NewSim(); // 空场(现状 T2 场景),无任何建筑
+            var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 100));
+            var b = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhenYue, new GridPos(15, 140));
+            for (int i = 0; i < 40; i++) sim.Step();
+            var aSoldiers = SoldiersOf(sim, a.Id);
+            for (int i = 0; i < 15; i++) sim.RemoveEntity(aSoldiers[i].Id);
+            a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
+            sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
+            string error;
+            Assert.IsTrue(ReinforceSystem.RequestReinforce(sim, Side.Blue, out error), error);
+            Assert.AreEqual(15, SoldiersOf(sim, a.Id).Count, "补入 10 后共 15");
+            foreach (var s in SoldiersOf(sim, a.Id))
+                Assert.IsNull(s.MarchOrigin, "无建筑时新兵应即时落位(MarchOrigin=null)");
+        }
     }
 }

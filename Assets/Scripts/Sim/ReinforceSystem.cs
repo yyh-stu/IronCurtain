@@ -84,7 +84,8 @@ namespace IronCurtain.Sim
                     {
                         if (SlotCellFree(sim, pos.ToGrid()))
                         {
-                            RegimentSystem.SpawnSoldier(sim, g, slot, pos);
+                            var s = RegimentSystem.SpawnSoldier(sim, g, slot, pos);
+                            s.MarchOrigin = MarchSource(sim, side, g.PosF);
                             sim.ReinforcePool[side]--;
                             give--;
                             anyGiven = true;
@@ -96,6 +97,34 @@ namespace IronCurtain.Sim
             }
             if (!anyGiven) { error = "补兵池为空"; return false; }
             return true;
+        }
+
+        /// <summary>行军源=距主将最近的己方存活非废墟兵营;无兵营则己方主基地;再无则 null(即时落位)。</summary>
+        private static SimVec2? MarchSource(SimCore sim, Side side, SimVec2 from)
+        {
+            Entity best = null;
+            float bestD = 0f;
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e.Kind != EntityKind.Building || e.Side != side || e.State == EntityState.Dead || e.Rubbled) continue;
+                if (e.Building != BuildingId.Barracks) continue;
+                float dx = e.Pos.Col - from.X;
+                float dy = e.Pos.Row - from.Y;
+                float d = dx * dx + dy * dy;
+                if (best == null || d < bestD) { best = e; bestD = d; }
+            }
+            if (best != null) return new SimVec2(best.Pos.Col, best.Pos.Row);
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e.Kind != EntityKind.Building || e.Side != side || e.State == EntityState.Dead || e.Rubbled) continue;
+                if (e.Building != BuildingId.Base) continue;
+                float dx = e.Pos.Col - from.X;
+                float dy = e.Pos.Row - from.Y;
+                float d = dx * dx + dy * dy;
+                if (best == null || d < bestD) { best = e; bestD = d; }
+            }
+            if (best != null) return new SimVec2(best.Pos.Col, best.Pos.Row);
+            return null;
         }
 
         /// <summary>落格是否可出生:不在任何非废墟建筑占地内、距存活露天猫单位 ≥0.5m(镜像 SpawnEntity 校验)。</summary>

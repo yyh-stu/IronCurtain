@@ -33,6 +33,8 @@ namespace IronCurtain.View
             var overview = gameObject.AddComponent<BarracksOverviewPanel>();
             overview.Init(Sim, Side.Blue);
             gameObject.AddComponent<CaptureRunner>();
+            var selection = gameObject.AddComponent<SelectionSystem>();
+            selection.Init(Sim, Cam);
 
             Debug.Log("[GameBootstrap] Match started");
         }
@@ -104,4 +106,3 @@ namespace IronCurtain.View
         }
     }
 }
-

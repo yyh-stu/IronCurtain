@@ -35,7 +35,12 @@ namespace IronCurtain.View
             {
                 case SimEventType.EntitySpawned:
                     var e = _sim.GetEntity(ev.SubjectId);
-                    if (e != null) CreateView(e);
+                    if (e != null)
+                    {
+                        var v = CreateView(e); // CreateView 返回类型改为 EntityView(现状已建视图后存 _views,改成 return 即可)
+                        if (e.IsSoldier && e.MarchOrigin != null && v != null)
+                            v.gameObject.AddComponent<ReinforceMarchView>().Init(v, e, WorldPos(e.MarchOrigin.Value));
+                    }
                     break;
                 case SimEventType.EntityRemoved:
                     EntityView rv;
@@ -70,9 +75,9 @@ namespace IronCurtain.View
             }
         }
 
-        private void CreateView(Entity e)
+        private EntityView CreateView(Entity e)
         {
-            if (_views.ContainsKey(e.Id)) return;
+            if (_views.ContainsKey(e.Id)) return null;
             var ent = e;
             var go = new GameObject("Entity_" + e.Id);
             go.transform.SetParent(transform, false);
@@ -85,6 +90,7 @@ namespace IronCurtain.View
                 return c;
             }) : null);
             _views[e.Id] = view;
+            return view;
         }
 
         private void BuildBoard()

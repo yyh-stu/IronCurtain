@@ -86,6 +86,9 @@ namespace IronCurtain.Sim
         // 布阵朝向覆盖(M8.5c 规划器设置;null=默认规则)
         public SimVec2? FacingOverride;
 
+        // 补兵行军源(M8.6b:出生生产点;null=无行军表现,View 即时落位)
+        public SimVec2? MarchOrigin;
+
         public Entity(int id, Side side, EntityKind kind, GridPos pos, float hp)
         {
             Id = id;

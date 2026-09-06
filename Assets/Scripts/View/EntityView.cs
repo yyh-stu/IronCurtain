@@ -22,6 +22,9 @@ namespace IronCurtain.View
         private float _countRefresh;
         private System.Func<int> _soldierCountOf;
 
+        // M8.6b 行军组件接管位:为 true 时 Tick 跳过位置同步(外部组件驱动 transform)
+        public bool MarchHold;
+
         public void Bind(Entity e, Side side, HeroId? hero, BuildingId? building, System.Func<int> soldierCountOf = null)
         {
             _e = e; _side = side;
@@ -130,7 +133,7 @@ namespace IronCurtain.View
             bool hidden = !isB && _e.GarrisonBuildingId != 0;
             bool vis = !hidden && !_rubbled;
             if (_model != null && _model.activeSelf != vis) { _model.SetActive(vis); _hpRoot.gameObject.SetActive(!hidden); }
-            if (!hidden)
+            if (!hidden && !MarchHold)
             {
                 Vector3 target = isB ? BoardView.WorldPos(_e.Pos) : BoardView.WorldPos(_e.PosF);
                 if (isB) transform.position = target;
@@ -319,6 +322,11 @@ namespace IronCurtain.View
         private void BuildBuilding(BuildingId type)
         {
             _model = NewModelRoot();
+            // M8.6 占地底板:半透明阵营色,占地可视化(建筑多格占用)
+            Material pm = ViewAssets.Flat(_side == Side.Blue ? new Color(0.35f, 0.55f, 0.95f, 0.35f)
+                : (_side == Side.Red ? new Color(0.95f, 0.4f, 0.3f, 0.35f) : new Color(0.75f, 0.75f, 0.7f, 0.35f)));
+            ViewAssets.DecoBox(Instantiate(pm), new Vector3(0f, 0.015f, 0f),
+                new Vector3(BuildingFootprint.HalfW(_e) * 2f, 0.02f, BuildingFootprint.HalfH(_e) * 2f), _model.transform, "Footprint");
             bool neutral = _side == Side.Neutral;
             bool fort = _e.IsFort && type == BuildingId.ResourcePoint;
             switch (type)
