@@ -124,75 +124,45 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - 命名空间 `IronCurtain.Sim` / `IronCurtain.View`
 - 单文件 ≤300 行;Sim 内禁用 UnityEngine/Mathf(用自建结构)
 
-## 7. 进度
-- [x] 2026-09-05 M6.5 椭圆大地图(Sim)✅ **135/135 全绿**:椭圆 286×30 包围盒(长半轴143/短半轴15)、河宽10(x∈[138,148))、上下桥 5 格、中央岛 8×8、涉水×0.5/桥正常、椭圆边界 Clamp、建筑布局(蓝Base15/兵营46/资源点77/箭塔108/中立岛143/红箭塔178/红资源点209/红兵营240/红Base271,全部 Row15)、rally(15,270)/(15,16)。见 `大地图改造拆解.md`。
-- [x] 2026-09-05 GLM 幻想 API 事故与恢复:GLM-5.3 修改类任务违反协议(凭空编造 Entity.InGarrison 等 API 重写 8 个 Sim 文件),编排者漏跑 api_gate 放大事故;已从上下文重建全部 8 文件并带地形适配,135 测试全绿。**教训入协议:修改类任务强制内联现状全文+强制跑 api_gate+落盘后核对文件行数**。
-- [x] 2026-09-05 TokenHub 美术管线(team-pipeline)+ 专家团(ROSTER/PROTOCOL/9 角色卡)+ 视觉验收换 hy-vision-2.0-instruct(flash 弃用,描述质量不足)
-- [~] M6.6 View 椭圆地形渲染:结构验收通过(编译绿/135 测试绿/离屏截图 4 张),hy-vision 视觉验收 3 轮修复后主要客观项通过(河蓝可见/虚空暗/草地散点/桥岛/建筑×2.5 阵营 tint+旗帜/单位 2.4m 可见);**审美终审待用户**(待看 D:/DevTools/shots/m6.6_*.png;vision 对"石路纹理感/建筑高瘦感/草地占比"仍有主观性 FAIL 描述,shot1 左尖端构图偏空)。**新增 CaptureBatch 验收通道**(batchmode 离屏渲染截图,全程不抢前台,见 §8)
-- [x] 2026-09-05 M6.7 兵营总览面板 ✅ **145/145 全绿**(135+10 新):BarracksOverviewModel(纯逻辑,无 UnityEngine)+BarracksOverviewPanel(IMGUI)+GameBootstrap 接线+Tests asmdef 加 View 引用。边界态:被摧毁→区块红字"已摧毁 · 不可生产";被占领→Side 翻转自动从总览消失;多兵营自动多区块;3 槽进度/等位/取消/6 英雄按钮/人口。**IMGUI 不入离屏截图,面板视觉请用户在编辑器 Play 时查看。** GLM 本轮 4 处小错(缺 using/light.rotation/cfg.Game→cfg.Production/残留围栏)已由编排者自修;parse_files.py 已加围栏过滤根治。
-- [x] 2026-09-05 **M8.1 建筑多格占用 ✅ 150/150**(将兵化专项第一批,拆解见 `docs/将兵化改造拆解.md`):BuildingFootprint(占地表:基地5×5/箭塔4×4/兵营5×4/资源点4×4/堡垒3×3,米制半宽半高、中心锚定、配置化)+矩形碰撞推出(幂等)+出生点贴前缘+城门格(D18 敌缘+0.6)+攻城前排+视野标记占地化(建筑视野圆盘恢复且不过滤椭圆)。**过程中修复 3 个 Sim 真 bug**:①FindGateCell 敌侧方向反了(蓝建筑门开在自家后方,目标落在占地矩形内不可达);②溃逃起点落在失守建筑占地内(推出+软碰撞边缘振荡);③多溃逃单位同门堆叠(软碰撞 0.9m>抵达阈值 0.15m 永远到不了)→溃逃单位分派不同城门格。诊断手段:临时诊断测试+TestContext 输出定位(已删)。
-- [x] 2026-09-05 **M8.2 兵团底座 ✅ 157/157**(155+2):Entity 加 IsSoldier/GeneralId/FormationSlot;RegimentSystem(SpawnGeneral 满编 20 兵/4×5 阵型跟随/蓝面(1,0)红面(-1,0)/主将死士兵无将续战就近逐杀至死/同兵团软碰撞豁免);士兵平伤(任一为士兵→攻击方 Attack 原值,无英雄克制规则);士兵视野近战 3/远程 6;AI 不指挥士兵。编排者修正 GLM 自写 T7 两处(手摆士兵未冻结被阵型拉回、视野 3s 保鲜期未过期)。
-- [x] 2026-09-05 **M8.3 驻军/交换士兵口径 ✅ 158/158**:仅士兵可驻军(主将城外);容量 30/30(兵营/箭塔/资源点,基地 0,堡垒 3);临时驻军=城后等候(TempGarrisonId 登记不冻结移动,主将死/距城>15m 自动解除=截击调遣的自然结果);交换 1:1 兵/次、攻方主将免疫;易主/废墟士兵只清登记不溃逃;占领后幸存士兵自动驻军。**编排者接管 5 红**(GLM 修复轮超时+输出失格满 3 轮):资源点容量 0→30、AI 防守改调兵站前(士兵驻军防御留 M8.5)、DestroyTests T6 士兵化重写、SiegeTests T4 矛盾断言清理、临时满员 30 兵。
-- [x] 2026-09-06 **M8.4 补兵池+主基地产将+名额制 ✅ 158/158**(M8.4a/b/c + 并行 M8.6a View 兵团渲染):ReinforceSystem(池 60、2s/兵、SJF 最缺先补、交战排除脱战 3s、变装=主将 Hero、槽位唯一);主基地产将 20s(镇岳迅捷 7.5s 保留)、名额 4(测试版;正式 8)、产将自带满编 20 兵、出生点列螺旋外扩(避紧邻建筑)+兵团整体出生校验(阵型不压建筑/不贴单位);MatchSetup 开局 3 将(磐石/断峰/坠日,红蓝对称);AI 产将(简单满产/普通配比);总览面板改版(主基地将生产区块+补兵池显示+补兵按钮);EntityView 士兵占位小体+主将"兵力 X/20"标签。**编排者修复**:出生距阵型纵深让 4 格、列螺旋、死亡单位不挡出生、单位出生默认脱战(SecondsSinceCombat=99)、多个测试节奏账(20s 产速+错峰出生)与场景隔离。
-- [x] 2026-09-06 **M8.4d 回归修复 ✅ 160/160**(GLM-5.3 接任主编排后首单,一轮过):①资源点驻军 30→**0**(撤销 deepseek 越权改动,恢复原设计"资源点不可驻军";中立点占领后士兵不再自动驻入,T1 语义翻转);②**士兵不继承英雄被动**(HeroAbilitySystem 三处守卫:攻击附带被动任一方士兵即跳过/磐石士兵不回盾/士兵不构成逐风冲锋阻断源;新增 T8 攻击无被动、T9 士兵不回盾+主将对照 2 条断言)。glm_call 默认 max_tokens 已提 64000(本单起)。
-- **主编排已换 GLM-5.3**(2026-09-06 用户拍板,deepseek 有降智迹象):代码与编排同模型,接口契约零转译损耗;执行原则=GLM 用量需有效益+编排者非必要不下场。
-- [x] 2026-09-06 **M8.5a 射程体系 ✅ 160/160**:近战(磐石/镇岳/逐风)=2、断峰=3、射手(坠日/星落)=9;建筑 Range 未动;**TestUtil.RunUntil 测试基建落地**(Combat/Destroy 已用,新测试一律用它,节奏账根治)。测试几何适配 2 处(射程变长改变索敌边界:T3 红镇岳隔行、T6 改镇岳贴塔拆除)。
-- [x] 2026-09-06 **M8.5b 兵团自主行为层 ✅ 166/166**:RegimentBehaviorSystem(SimConfig.AutoBehavior 开关,默认 false,MatchSetup 开;手动命令永不覆盖;索敌进攻(兵团视野:主将视野表+士兵 3/6)>支援(友军主将 15 格内交战);手动打断写 Sup 防复读,新事件可再触发)+AI 每 5s 自动补兵(池≥10)+**补兵槽位防崩**(出生格被占则沿槽向外推 1m×3 次,再堵跳过不耗池——修复路过建筑旁补兵抛异常)。行为测试补 TearDown 复位静态系统(修复跨测试污染)。
-- [x] 2026-09-06 **M8.5c 自动布阵规划器 ✅ 172/172**:RegimentFormationSystem(HeroClass 三分类;PlanFormation:质心→框选内视野找敌→朝向(敌质心/敌大本营/前进向)→常规三排(前重装/中战士/后射手,横距 6 排距 6)或屏风模式(方位差 >120°:射手居质心,近战按敌簇分向弧半径 4);Apply=设 FacingOverride+手动级移动);FacingOf 升级(规则③:后撤/横移不转身,面朝敌方向;FacingOverride 最优先)。Entity 加 FacingOverride。View 接线(T 键/框选)在 M8.6。编排者修:GLM 测试文件路径写错(门禁拦截后归位)、HeroCfg.Vision 假字段(对齐视野口径)、2 处测试布局(阵型压格/对向穿廊死锁)。
-- [x] 2026-09-06 **M8.6 View 指挥大块 ✅ 179/179**(GLM-5.3 一版过+编排者 3 小修):①**补兵行军表现**(纯表现不可截击):Entity.MarchOrigin(出生源)+ReinforceSystem.MarchSource(距主将最近己方存活非废墟兵营→无兵营 fallback 主基地→再无 null 即时落位)+ReinforceMarchView(View 组件:士兵模型自生产点以 MoveSpeed 走向活目标 e.PosF,<0.5m 入队交接;EntityView.MarchHold 跳过位置同步);②**点选/框选指挥**(SelectionSystem,新):左键点选(3m 命中,士兵点击映射其主将)/拖框选蓝方主将、右键手动级移动(SetMoveTarget manual:true,含防拉回语义)、绿色选中圈、点击标记、BarracksOverviewPanel.LastPanelRect 避让;③**T 键自动布阵接线**:选中≥2 兵团→屏幕中央"按 T 键自动布阵"提示 2.5s 渐隐,T=RegimentFormationSystem.Apply;④**建筑占地底板**:EntityView.BuildBuilding 按 BuildingFootprint.HalfW/H 画阵营色薄板(多格占地可视化)。新增 T7(最近兵营)/T8(fallback 主基)/T9(空场 null)行军源测试。**编排者自修 3 处**:提示文字每帧重置永不满淡(→仅选择变化瞬间重置)、SelectionRings 空根节点泄漏、不透明材质下点击标记 alpha 淡出无效(加缩放消退兜底);gitignore TestResults 目录规则修正(原 `TestResults*.xml` 不匹配子目录文件)。**api_gate 符号库缺口备案**:`const` 成员/Unity View 类型/Tuple.Item/注释内版本号共 15 模式全误报(330 条),人工 triage 无幻想 API 后放行——下次 Sim 大改前值得给 api_gate 补 const 提取与 View 白名单。**视觉验收待用户编辑器 Play 审**(框选手感/行军观感/占地底板/提示文字)。
-- [x] 2026-09-06 **M8.5d 卡死自动绕行 ✅ 176/176**(用户拍板:卡死 1.5s 自动寻路绕开):NavigationAid(前向探测 1.2m 找阻挡建筑→外扩 1.5m 矩形较近角为旁路点;单位互堵→垂直让位 2m 按 id 奇偶定侧);主将(MoveUnits)/士兵(RegimentSystem)/溃逃同路径接入;停滞判定=位移<期望步长×0.25 连续 15 tick;旁路 0.8m 清障/45 tick 超时保险。**编排者修 1 个顺序 bug**:GLM 把 PrevPosF 采样写在移动后,检查时距离恒 0→全员假卡死全员绕路(诊断测试定位);BuildingRectPush 断言随新语义更新(贴边滑动/绕行合法,穿透>0.05 违规)。
-- [x] 2026-09-06 **M8.7 撤退 13c ✅ 188/188**(GLM-5.3 一版过+编排者修 4 处幻想 API):①**RetreatSystem.OrderRetreat**(玩家授意撤退:最近己方非废墟据点、站定点=建筑边缘外 1.2m、兵团原子=同兵团非驻军士兵同步 Routing、清自动决策);②**溃逃系数统一 −0.3/+0.3 → −0.25/+0.25**(SimCore 4 处含断峰扇形分支;"撤退期间血量与攻击力−25%"按乘区近似:输出−25%/承伤+25%,撤退结束自动消失——待确认①按此落地);③**防拉回 RetreatHold**:OrderRetreat 置位→RegimentBehaviorSystem 跳过(索敌/支援均压制,被迫接战保留),玩家 manual SetMoveTarget 解除→自动层恢复接管;④士兵撤退态自动复位 2 处(主将到站/被打断、无将续战清除);⑤**View 撤退按钮**(SelectionSystem:选中≥1 主将底部中央"撤退"按钮,MouseOverPanel 防点击穿透)。新增 RetreatTests T1-T9(基本/输出比 0.75/承伤比 1.25/到达站定/防拉回+解除/撤退中不覆盖/士兵复位/边界×4/最近据点)。**编排者修 GLM 4 处幻想 API**:GameConfig.LoadDefault→GameConfigParser.FromJson、ClearEventListeners→TearDown 四系统复位、SimConfig{TickRate=30}→默认 10Hz(防节奏崩)、SimEvent.Id→SubjectId(属性链漏检);**新坑根治**:GLM 末块尾部无围栏 markdown 摘要被 parse_files 写入 cs 尾部→parse_files.py 加行首 `**` 截断(.cs,自测过)。api_gate 117 条全为符号库缺口误报(m8.7.allowed.txt 备案)。**M8.6+M8.7 View 视觉验收待用户编辑器 Play 审**(撤退按钮+框选/行军/底板/提示文字一并)。
-- [x] 2026-09-06 **deepseek 挑刺岗盲测 + M8.7fix ✅ 188/188**(流程实验):通道打通=ZCode config 里已有 deepseek provider(`api.deepseek.com/anthropic`,deepseek-v4-pro;**v4-pro 默认开思考会吃光 max_tokens,须 thinking disabled**);新工具 `glm-pipeline/deepseek_review.py`(挑刺 runner,泛化任务单内嵌)+`review_check.py`(裁决硬门禁:报告+「## 裁决」段齐才放行落盘)。盲测=挑 M8.7 原始输出:严格分 1/5 未过线(漏检 4 处全为 API 存在性类=api_gate 强项),但计划外 3 真刺全中机械门禁盲区——**修复 2 个真 bug:①撤退按钮 Rect 残留(清空选择后旧按钮区域左键永久失效→拦截加选中守卫)②交换中士兵被误置撤退态(→Exchanging 排除)**;误报 2/24 零顺着说,成本 ≈¥0.55/次。**待用户拍板**:窄口径上岗(逻辑/时序/状态类审查岗,嵌入"GLM 输出落盘前+提示词定稿前"两节点)或按盲测规则换 Kimi(K2.5,¥27 全程)。→ **2026-09-06 制作人拍板:deepseek 挑刺岗常驻(窄口径)**,已入 PROTOCOL 验收矩阵与 ROSTER(LogicAuditor);Kimi K3(非 K2.5,2.8T/7 月发布)列为总编排首选候选,档位建议 Moderato ¥99 起(详见模型管线表)。
-- [x] 2026-09-06 **M6.1 镜头/迷雾/小地图 ✅ 198/198**(GLM 一版过三门禁+编排者自修;提示词 `docs/prompts/m6.1-camera-fog-minimap.md`):①**CameraRig(D18)** 鼠标贴边(12px)匀速平移 28m/s 公开可配置、焦点钳制包围盒 6m 余量、悬停 IMGUI 面板停滚、开局聚焦 (40,15);CaptureRunner 截图改走 rig.SetFocus 防打架;②**FogView(D34)** 286×30 纹理贴 y=0.25 地面四边形(URP Unlit 透明配方),IsFresh→alpha 0/160 双线性平滑,0.5s 刷新+CaptureBatch 手动 RefreshNow;**敌实体信息过滤**:敌露天单位不可见=模型/血条/兵力标签全隐;敌建筑未见过=全隐、失视=冻结快照(血条冻结+驻军点=LastKnownGarrison+归侧按快照),Sim 纯增量 `VisionSystem.LastKnownBuilding`;③**MinimapPanel(D19)** 右下角 440×90(点采样背景:椭圆/河/桥/岛/虚空),雾叠加(纹理垂直翻转:GUI v=0=底部=南)、己方全量+敌方仅可见/快照、相机取景白框(4 屏角射线投地面)、点击/拖动=SetFocus+防穿透,SelectionSystem 守卫加小地图 Rect;MinimapLayout/FogRules 纯逻辑可测。新增 MinimapFogTests 9 条。**编排者自修 5 处**:FogView 幻想 API ViewAssets.CreateMesh(Vector3[],uv,trys) 重载→自建 Mesh;FogView 枚举未限定(Bilinear/Clamp);小地图背景+雾上下颠倒(GUI 纹理 v=0=rect 底部=南与 row0=北相反→背景行序翻转+DrawTextureWithTexCoords 垂直翻转);T4 出生点越界(300→250);**MatchSetup 潜伏崩溃修复**(M8.4d 起 MatchSetup.Build 零覆盖:开局 3 将位差 2 列,4×5 士兵阵型块大面积压叠→SpawnEntity 抛"出生点过近";CaptureBatch 是 M8.4 后首跑当场暴露):SpawnSoldier 加出生防崩(沿槽外推 1m×3 次,口径=格心判定与 SlotCellFree 同构;首版误用落点判定与 SpawnEntity 格心口径不一致致 AiTests T4 红,对齐后绿)+开局将位重排(蓝 24/30/36、红 263/257/251,将间距 ≥6 列=阵型块互不压叠且避基地/兵营占地)+SimSmokeTests 补 MatchSetup 冒烟(6 将 120 兵)。api_gate 25 条全为符号库缺口误报(m6.1.allowed.txt)。**hy-vision 客观项过**:雾罩未探区/己方清晰/平滑渐变/无渲染错;30s 中线雾封 vs 60s 随军清晰=视野联动正确;敌区无任何单位建筑细节=过滤生效。截图 `D:/DevTools/shots/m6.1_1..4_*.png`(旧 m6.6 备份 backup_m66/);**小地图/雾审美+镜头手感终审待用户编辑器 Play 审**(IMGUI 不入离屏截图,同总览面板惯例)。
-- [x] 2026-09-06 **fix(AI):将兵制下两处潜伏回归(216/216)**(M6.2 截图通道暴露,均非 M6.2 引入):①**AI 永不推进**——TryLaunchWave 旧口径"场上 ≥8 只"在 4 名额制下永不满足(M8.4b 引入,AiTests 只测产将/驻防零覆盖推进路径)→ 门槛改 **2 兵团**、波次 Take(10)→Take(4);②**第 4 将出生死锁**——出生螺旋 d≤8 被 M6.1 开局将位(24/30/36)兵团阵型块全堵 → TrySpawnGeneral 恒败 → WaitingForSpawn 占槽死循环(AI 与**玩家产将同受影响**)→ 螺旋 d≤40(有近位仍优先)。AiTests T4 放宽时序+兜底场上断言、T7 改"1 兵团不触发/2 兵团触发"。**诊断手段沉淀:临时 DiagAI 编辑器脚本逐 10s 打印兵力/位置/状态/生产槽/池,实证 AI 完整战争弧线(30s 产 4 将→50s 集结→100s 接敌→120s 激战将损)后删除**。视野翻倍已排除嫌疑(新旧视野同全停)。
-- [x] 2026-09-06 **M6.2 战斗 UI ✅ 216/216**(GLM 一版过三门禁+编排者修 4 处;提示词 `docs/prompts/m6.2-combat-ui.md`):①**顶栏 TopBarPanel**(IMGUI 全宽 40px:左己方大本营血条+数字+人口"将 n/m"、中对局时间 MM:SS(tick/TickRate 派生,正式倒计时等 Match 时钟模块)+"对战中"、右**敌方大本营雾口径**(LastKnownBuilding 快照,未侦察显示 ???——敌方信息走视野规则红线;基地查询 0.5s 缓存);TopBarModel 纯逻辑可测);②**伤害飘字 FloatingTextView**(sim.AddEventListener 监听 DamageDealt(SubjectId=受击者/Amount)→FloatingTextModel(TryAdd 可见性门控:己方恒显/敌方 IsUnitVisible/建筑 IsBuildingKnown;池上限 40 挤最旧;寿命 1s/上浮 1.2m/0.7s 后缩放消退)→TextMesh 对象池(己方受击红字/敌方金黄);**RenderFrame(dt) 公开给 CaptureBatch 喂 dt**;ActiveCount 供程序化核对);③**血条受击闪白**(EntityView.FlashHit 实装 0.18s 背板实例材质 Lerp 白;**士兵无背板守卫**——无守卫则 Play 必炸 NRE,截图通道先抓住);④**单选射程圈**(SelectionSystem:选中恰 1 主将时 AddRing 半径 e.Range/宽 0.35/48 段淡青自发光,每帧跟单位);⑤**移动路径线**(Dictionary<id,LineRenderer> 绿色 0.15m 宽,Update 自管建/刷/拆,**右键下令即现线**;首版 GLM 列表下标对齐在部分有目标时错位,编排者改字典重写);CameraRig/SelectionSystem 悬停顶栏停滚+防穿透。新增 TopBarTests T1-T5/FloatingTextTests T1-T9。**编排者修 GLM 4 处**:BuildingSnapshot 是 namespace 级非 VisionSystem 嵌套(提示词契约笔误,GLM 照抄)、FloatingTextTests 尾部无围栏中文摘要污染(parse_files 补丁:行首中文/行首"- "一并截断,自测过)、ray.GetGet 笔误、路径线下标错位。**CaptureBatch 升级**:镜头战线跟随(FindBattleFocus:Attacking 主将>士兵,无交战 fallback 固定机位)+渲染前持续 Step 5 tick 喂新鲜 DamageDealt(否则停机渲染错过 1s 寿命飘字)。**验收**:216/216 全绿;120s 激战图程序化 floatTexts=40(满池)+4.5v 原图识别"-2/-7"双证飘字在画;**hy-vision 客观项过(无白块/黑块/穿模/悬空/过曝)**;**风险点主动上报(多模态预检)**:①飘字/血条在 1920p 原图仅十几像素高,hy-vision 1600px 缩图验收看不到(两次矛盾回答定位为分辨率局限,最终以程序化计数+原图高分辨率识别裁决)——M6.6 已规划新相机(单位放大 ~3 倍)落地后一并解决,当前过渡态可接受;②10/30/60s 三张固定机位图无信息量(AI 100s 才接敌),战线跟随已解 120s,后续可考虑全部 Mark 跟随。**顶栏(IMGUI)/射程圈/路径线/撤退按钮交互不入离屏截图,待用户编辑器 Play 审(惯例)**。
-- [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
-- [ ] GPT 总编排交接准备(用户拟接入 GPT-6 Astra/5.6 Sol 任总编排;交接载体=本文件+docs/team/+team-pipeline README)
+## 7. 进度(已完成模块为一行式索引;完整细节见各模块 commit message 与提示词 docs/prompts/;归因见 7.5)
 
-
-- [x] 环境全通:引擎/Unity MCP/vision-eyes/GLM-5.3 API 直连
-- [x] 计划批准(v1.1,设计变更 #1)
-- [x] M0.1 分层骨架+Sim 核心
-- [x] M0.2 数值配置 JSON
-- [x] M0.3 确定性验证
-- [x] M1.x 战斗核心 ✅ 42/42 断言全绿(移动/伤害公式/六英雄机制/克制链)
-- [x] M2 生产与资源 ✅ 52/52 全绿(GDD 55人口110秒断言通过)
-
-- [x] M3.1 占领核心 ✅ 62/62(意图存建筑/封城锁/交换1:1与1:2/增援/自动驻军)
-- [x] M3.2 箭塔战斗 ✅ 70/70(溅射半径1满9+1/驻军强化+2封顶12/修正系数)
-- [x] M3.3 驻军完整 83/83(含 2026-09-04 用户新规修订:废除10秒计时/正式优先覆盖GDD2.4.1/易主溃逃/满员路过站定)
-- [x] M3.4 摧毁废墟重建 93/93(拆塔节奏/冲锋首击5/废墟化+守军后撤/D26优先级/中立免疫/重建归重建者/大本营判负)
-- [x] M4.1 升级被动 102/102(2EP一次性/磐石免疫/镇岳迅捷2.2+7.5s产速+D11衰减/断峰破军扇形/飞掠拆塔7/s不锁塔/诛心脆弱/诛灭6+1%)
-- [x] D28 伤害叠算公式拍板并落地 102/102:基础×(1+Σ输出增幅)×(1+Σ承伤增幅)×∏(1−免伤)+附加项;增益加算/免伤乘算。规范文档 `伤害叠算公式.md`(重构 GDD 引用)
-- [x] M4.2 海克斯+道具 112/112(8 卡全效果/节点抽取 3/5/7/9 分钟/三选一/后选覆盖/已用-50%/堡垒/攻城锥/临时阵地;D29-D33 已入档)
-- [x] M5.0 视野/迷雾 VisionSystem 120/120(近战6/射手9/断峰鹰眼10/塔12→**24**/大本营20→**40**/其他10→**20**[2026-09-06 扩大一倍];精灵每30s扫掠首发作第30秒;信息3s保鲜/据点冻结/露天消失;双方对称纯信息层)
-- [x] M5 AI 简单+普通 130/130(决策 2s 节奏/简单满产+被动回防/普通集结≥8 波次+挑弱侧+占中立优先+主动防守+规律抽卡+镇岳配比+受挫撤退;只读 VisionSystem)
-- [x] 2026-09-05 连续坐标大改造 ✅ **130/130 全绿**(SimVec2/6×255/建筑碰撞圆/软碰撞/欧氏索敌/全系统米制适配;交换规则修复见变更#5)
-- [x] 2026-09-05 URP 17.0.3 管线升级(manifest+UrpSetup.cs+View asmdef 引用 Core/Universal Runtime)
-- [x] M6.0c Kenney 卡通资产绑定(编译绿+截图验收:城堡塔/风车/角色/草地画风确认可用;细节:光环盘已改亮、天空0x79b5ea、草地棋盘)
+### 待办(按优先级)
+- [ ] **M6.4 特效+音效 / M6.5 新手浮层 / 对局计时+加时+积分结算**(Sim 无 Match 时钟,待补;下一模块)
+- [ ] M6.3 操作 UI(底部栏:EP 存量与获取进度/海克斯手牌/升级/道具;点选框选指挥已在 M8.6 落地)
 - [ ] M6.0d 六英雄模型替换(等 Quaternius 机甲,用户下载→Assets/Models/)
-- [ ] M6.1 镜头边缘滑动+迷雾渲染+小地图(D18/D19/D34)
-- [ ] M6.2 战斗 UI(顶栏/飘字/血条/选中/射程)
-- [ ] M6.3 操作 UI(生产/海克斯/升级/道具/点选框选指挥/驻军面板 D24)
-- [ ] M6.4 特效+音效 / M6.5 新手浮层 / 对局计时+加时+积分结算(Sim 无 Match 时钟,待补)
-- [ ] M7 收口打包
-- [ ] 新手教学/智能决策体(内容待用户定稿)
-- [ ] M6 UI 表现(迷雾渲染/镜头/小地图/驻军面板/操作 UI)
-- [ ] M6 UI 迷雾渲染(平安京/LOL 风)
-- [ ] M6 UI 表现(交互规格 D18-D24)/ M7 收口打包
-- [ ] M5 AI / M6 UI 表现 / M7 收口打包
-- [ ] M4-M7(见计划文件)
+- [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
+- [ ] M7 收口打包 / 新手教学内容(待用户定稿)
+- [ ] GPT 总编排交接准备(交接载体=本文件+docs/team/+team-pipeline README)
+- [ ] **待用户编辑器 Play 审(累积)**:M6.2 顶栏/飘字/射程圈/路径线 + M6.1 小地图/雾/镜头手感 + M8.6 框选/行军/占地底板 + M8.7 撤退按钮
 
-## 7.6 M3.3 驻军完整契约要点(续工据此写提示词)
-- 正式驻军 ≤9(配置 GarrisonFormal);临时驻军 ≤9;双满不可入(报错)
-- D28(编排默认,待用户确认):行军途经己方建筑=自动临时驻军,10 秒后强制继续行军;正式有空缺则转正式
-- 远程驻军依托建筑射击:以建筑格为原点,射程=单位自身射程,间隔=单位间隔,走统一伤害公式
-- 近战驻军出击:敌单位曼哈顿≤2 时出城迎击(城门格)
-- 交换消耗顺序:敌方优先消耗临时驻军(SiegeSystem.KillDefenders 需改,编排者负责)
-- D24 Exit API:GarrionSystem.Exit(sim, buildingId, HeroId, out error) 每次放一只到城门 Idle
-- D26 攻击优先级:单位优先于建筑(单位自动索敌+M3.4 摧毁循环都要遵守)
-- D27 建筑回复:非大本营,SecondsSinceCombat≥20 后 4/s 回血(建筑自身 tick 由 GarrisonSystem 维护)
-- 撤退(废墟后撤-30%)挂 M3.4,由 GarrisonSystem 提供 EvacuateAll(building, retreatDebuff)
+### 已完成(细节见 git log 各 commit;★=含独有教训)
+- [x] 2026-09-06 **M6.2 战斗 UI ✅ 216/216**:顶栏(基地血量/人口/时间/敌方雾口径快照)+伤害飘字(DamageDealt 驱动,池 40,己红敌金)+血条受击闪白+单选射程圈+移动路径线;TopBarModel/FloatingTextModel 纯逻辑可测。★CaptureBatch 升级战线跟随+渲染前持续 Step 喂飘字;飘字双证验收法(程序化计数+4.5v 原图);GLM 4 错(BuildingSnapshot 嵌套前缀/尾部中文摘要/GetGet 笔误/路径线下标错位→字典重写)
+- [x] 2026-09-06 **fix(AI) 两处潜伏回归 ★ 216/216**:①波次门槛"≥8 只"在 4 名额制永不满足→AI 自 M8.4b 起永不推进(改 2 兵团);②出生螺旋 d≤8 被开局兵团块全堵→第 4 将 WaitingForSpawn 死锁(玩家产将同卡,改 d≤40)。诊断法=临时 DiagAI 脚本逐 10s 打点跑完即删;视野翻倍已排除嫌疑
+- [x] 2026-09-06 **M6.1 镜头/迷雾/小地图 ✅ 198/198**:CameraRig 边缘滑动/FogView 迷雾+敌实体信息过滤(快照冻结)/MinimapPanel 点击跳转;VisionSystem 纯增量 LastKnownBuilding。★MatchSetup 潜伏崩溃修复(开局将位重排 24/30/36+SpawnSoldier 出生防崩);IMGUI 纹理 v=0=南颠倒坑(§8)
+- [x] 2026-09-06 **M8.7 撤退 13c ✅ 188/188**:RetreatSystem(最近据点/兵团原子/防拉回 RetreatHold)+溃逃系数统一 −0.25/+0.25+View 撤退按钮。★GLM 末块尾部无围栏摘要污染→parse_files 截断根治(§8)
+- [x] 2026-09-06 **deepseek 挑刺岗常驻(LogicAuditor 窄口径)**:盲测 1/5 过线但 3 真刺中机械门禁盲区(撤退按钮 Rect 残留/交换中士兵误置撤退态),误报 2/24,≈¥0.55/次;工具=deepseek_review.py+review_check.py;★v4-pro 必须 thinking disabled
+- [x] 2026-09-06 **M8.6 View 指挥大块 ✅ 179/179**:补兵行军表现(纯表现不可截击)+点选/框选/右键指挥(SelectionSystem)+T 键自动布阵接线+建筑占地底板
+- [x] 2026-09-06 **M8.5d 卡死自动绕行 ✅ 176/176**:NavigationAid 前向探测+旁路点+让位。★PrevPosF 采样必须写在移动前(写后=恒 0=全员假卡死)
+- [x] 2026-09-06 **M8.5c 自动布阵规划器 ✅ 172/172**:RegimentFormationSystem(三分类/三排/屏风 >120°/FacingOverride);View 接线 T 键在 M8.6
+- [x] 2026-09-06 **M8.5b 兵团自主行为层 ✅ 166/166**:RegimentBehaviorSystem(索敌进攻>支援;手动命令永不覆盖;打断防复读)+AI 每 5s 自动补兵+补兵槽位防崩。★行为测试必须 TearDown 复位静态系统
+- [x] 2026-09-06 **M8.5a 射程体系 ✅ 160/160**:近战 2/断峰 3/射手 9,士兵继承主将。★TestUtil.RunUntil 测试基建落地(新测试一律用它,节奏账根治)
+- [x] 2026-09-06 **M8.4 补兵池+主基地产将+名额制 ✅ 158→160**:ReinforceSystem(池 60/2s/SJF/交战排除)+产将 20s 满编自带+名额 4+开局 3 将+AI 产将+总览面板改版
+- [x] 2026-09-06 **M8.4d 回归修复 ✅ 160/160**:资源点驻军 30→0(撤销越权改动)+士兵不继承英雄被动(三处守卫);glm_call max_tokens 提 64000
+- [x] 2026-09-05 **M8.3 驻军/交换士兵口径 ✅ 158/158**:仅士兵可驻军(30/30,基地 0,堡垒 3)/临时驻军=城后等候/交换 1:1 兵、主将免疫/易主只清登记(旧 M3.3 契约已被取代,细节见 git)
+- [x] 2026-09-05 **M8.2 兵团底座 ✅ 157/157**:Entity+RegimentSystem(满编 20 兵 4×5 阵型/主将死士兵续战/同兵团软碰撞豁免)/士兵平伤/士兵视野 3·6
+- [x] 2026-09-05 **M8.1 建筑多格占用 ✅ 150/150**:BuildingFootprint 占地表+矩形碰撞推出+出生贴前缘+城门格。★修 3 个 Sim 真 bug(城门方向反/溃逃起点入占地/同门堆叠)
+- [x] 2026-09-05 **M6.7 兵营总览面板 ✅ 145/145**:BarracksOverviewModel+Panel(IMGUI);IMGUI 不入离屏截图(惯例)
+- [x] 2026-09-05 **M6.6 View 椭圆地形渲染(结构过)**:Kenney 过渡资产+CaptureBatch 离屏截图通道;审美终审待用户(m6.6_*.png)
+- [x] 2026-09-05 TokenHub 美术管线(team-pipeline)+专家团(ROSTER/PROTOCOL/9 角色卡)
+- [x] 2026-09-05 ★GLM 幻想 API 事故与恢复:修改类任务凭空编 API 重写 8 文件;**教训已入协议:修改类强制内联现状全文+跑门禁+落盘核对行数**
+- [x] 2026-09-05 M6.5 椭圆大地图(Sim)✅ 135/135:规格并入「当前统一规格」节
+- [x] M5.0 视野/迷雾 VisionSystem 120/120(半径 2026-09-06 扩大一倍:塔 24/大本营 40/其他 20)/ M5 AI 简单+普通 130/130(只读 VisionSystem;★波次门槛 2026-09-06 已改兵团制)
+- [x] M4.2 海克斯+道具 112/112 / D28 伤害叠算公式落地(`伤害叠算公式.md`)/ M4.1 升级被动 102/102
+- [x] M3.1-M3.4 占领/箭塔/驻军/摧毁 62→93 / M2 生产与资源 52/52 / M1.x 战斗核心 42/42 / M0.x 骨架+配置+确定性 / 计划批准(v1.1) / 环境全通
+- [x] 2026-09-05 连续坐标大改造 130/130(SimVec2/碰撞圆/欧氏索敌)+ URP 17.0.3 管线升级 + M6.0c Kenney 资产绑定
+
+## 7.6 驻军契约(历史备注)
+M3.3 时代契约(正式 ≤9/D24 Exit/D26 优先级/D27 回血等)已被 **M8.3 士兵口径**取代(仅士兵可驻军、容量 30/30、交换 1:1 兵/次、主将免疫);现行语义见「当前统一规格」与 M8.3/M8.7 commit,旧细节查 git 历史(M3.3/M3.4/M8.3)。
 
 ## 7.5 归因台账(新分工自 M2 起,每模块更新)
 | 模块 | GLM 交付 | 编排者接管 | 结果 |
@@ -216,7 +186,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 ## 7.75 三层门禁(已上线)
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
 2.  重写检测:改动>70% 打回(修改类任务)
-3.  API 门禁:未知类型构造/枚举成员/已知类型成员对照拦截(注释剥离+属性链白名单)
+3.  API 门禁 **v3(2026-09-06 升级)**:未知类型构造/枚举成员/已知类型成员对照拦截;扫描范围=Sim+View+Editor+Tests 全符号库(含 const 带初始化值/泛型多 token 字段);Unity/URP 类型与静态类白名单;输出内类型与字段/局部变量链豁免(编译器兜底);输出剥注释/字符串/尾部摘要。**历史五大输出 875 条误报归零、负样本(幻想类型/枚举/成员)全拦、m8.7 真拦截保留**——每模块不再需要人工 triage 与 allowed.txt 备案
 执行顺序:GLM 输出 → api_gate → static_gate → rewrite_detector(修改类)→ parse_files → 编译 → 测试
 GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出文件>
 检查:命名空间白名单(IronCurtain.Sim)/Sim 层禁 UnityEngine/重复类型定义/FILE 路径白名单。5ms 拦截退化重写类输出,通过后再 parse_files.py。
