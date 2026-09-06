@@ -18,5 +18,16 @@ namespace IronCurtain.EditorTools
             SessionState.SetBool("ic.capture", true);
             EditorApplication.EnterPlaymode();
         }
+
+        [MenuItem("IronCurtain/Play & Fast Result")]
+        public static void FastResult()
+        {
+            if (!File.Exists("Assets/Scenes/Main.unity"))
+                IronCurtainSceneTools.CreateMainScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            SessionState.SetBool("ic.fastresult", true);
+            EditorApplication.EnterPlaymode();
+        }
     }
 }

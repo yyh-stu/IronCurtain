@@ -20,6 +20,11 @@ namespace IronCurtain.View
 #if UNITY_EDITOR
             if (!SessionState.GetBool("ic.capture", false))
             {
+                if (SessionState.GetBool("ic.fastresult", false))
+                {
+                    StartCoroutine(RunFastResult());
+                    return;
+                }
                 Destroy(this);
                 return;
             }
@@ -69,6 +74,49 @@ namespace IronCurtain.View
             yield return new WaitForSecondsRealtime(1.5f);
 #if UNITY_EDITOR
             SessionState.SetBool("ic.capture", false);
+            EditorApplication.ExitPlaymode();
+#endif
+        }
+
+        // M6.4b 快速结算通道:压缩对局(sim 1min 常规+1min 加时)→ 加时/结算两张全屏截图
+        private IEnumerator RunFastResult()
+        {
+            var boot = GetComponent<GameBootstrap>();
+            if (boot == null || boot.Sim == null)
+            {
+                Debug.LogError("[fastresult] GameBootstrap missing");
+                yield break;
+            }
+            boot.Sim.Game.Match.DurationMinutes = 1;   // 运行时压缩时限(MatchClockSystem 读实时值)
+            boot.Sim.Game.Match.OvertimeMinutes = 1;
+            boot.Speed = 6f;
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 保证对打有伤亡与 EP 差,面板数据非全零
+
+            bool tookOvertime = false, tookResult = false;
+            float guard = 0f;
+            while (!(tookOvertime && tookResult))
+            {
+                yield return null;
+                if (!tookOvertime && boot.Sim.Phase == MatchPhase.Overtime)
+                {
+                    tookOvertime = true;
+                    yield return new WaitForSecondsRealtime(0.5f); // 等顶栏加时橙红倒计时稳定
+                    ScreenCapture.CaptureScreenshot("D:/DevTools/shots/m6.4a_overtime.png");
+                    Debug.Log("[fastresult] overtime shot");
+                }
+                if (!tookResult && boot.Sim.Phase == MatchPhase.Ended)
+                {
+                    tookResult = true;
+                    yield return new WaitForSecondsRealtime(1.0f); // 等结算面板完整渲染
+                    ScreenCapture.CaptureScreenshot("D:/DevTools/shots/m6.4a_result.png");
+                    Debug.Log("[fastresult] result shot");
+                }
+                guard += Time.unscaledDeltaTime;
+                if (guard > 180f) { Debug.Log("[fastresult] timeout"); break; }
+            }
+            yield return new WaitForSecondsRealtime(1.5f);
+#if UNITY_EDITOR
+            SessionState.SetBool("ic.fastresult", false);
             EditorApplication.ExitPlaymode();
 #endif
         }
