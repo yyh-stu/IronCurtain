@@ -1,7 +1,7 @@
 ﻿# PROJECT_STATE —— 铁幕:前线 Demo 项目交接文件
 
 > 用途:新会话续工时,先读本文件即可恢复全部上下文。每次里程碑更新本文件。
-> 最后更新:2026-09-06 | 阶段:M6.2 战斗 UI ✅(216/216)+ AI 潜伏回归修复(波次门槛/出生死锁);下一步=M6.4 特效音效/计时加时积分结算(Sim 无 Match 时钟,待补)→ M6.3 操作 UI(EP/海克斯/道具);**待用户编辑器 Play 审:M6.2+M6.1+M8.6+M8.7 全部 View 视觉(顶栏/飘字/射程圈/路径线/小地图/雾/框选/撤退按钮)**
+> 最后更新:2026-09-06 | 阶段:M6.4a 对局时钟+加时+积分结算 ✅(227/227)+M6.4b 快速结算截屏通道;下一步=M6.4 特效音效+M6.5 新手浮层→M6.3 操作 UI;**待用户编辑器 Play 审:M6.2+M6.1+M8.6+M8.7+M6.4a(顶栏倒计时/加时橙红/结算面板)全部 View 视觉**
 
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
@@ -127,7 +127,8 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 ## 7. 进度(已完成模块为一行式索引;完整细节见各模块 commit message 与提示词 docs/prompts/;归因见 7.5)
 
 ### 待办(按优先级)
-- [ ] **M6.4 特效+音效 / M6.5 新手浮层 / 对局计时+加时+积分结算**(Sim 无 Match 时钟,待补;下一模块)
+- [ ] **M6.4 特效+音效**(冲锋残影/死亡消散/占领特效/破盾特效/胜利失败演出;程序化音效无 BGM;受击闪白已在 M6.2)
+- [ ] M6.5 新手浮层(3 步极简引导,可跳过)
 - [ ] M6.3 操作 UI(底部栏:EP 存量与获取进度/海克斯手牌/升级/道具;点选框选指挥已在 M8.6 落地)
 - [ ] M6.0d 六英雄模型替换(等 Quaternius 机甲,用户下载→Assets/Models/)
 - [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
@@ -136,6 +137,8 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - [ ] **待用户编辑器 Play 审(累积)**:M6.2 顶栏/飘字/射程圈/路径线 + M6.1 小地图/雾/镜头手感 + M8.6 框选/行军/占地底板 + M8.7 撤退按钮
 
 ### 已完成(细节见 git log 各 commit;★=含独有教训)
+- [x] 2026-09-06 **M6.4a 对局时钟+加时+积分结算 ✅ 227/227**:MatchClockSystem(Normal→Overtime→Ended;600s→加时 120s→积分判定;摧毁胜利统一收口 MatchEnded)+加时 buff(GDD 人口+10→名额制映射名额+1;产速+10%→补兵×1.1;EP 90→60s)+积分公式(5×基地血+3×存活将+2×EP+建筑×1;平局链总分→人口→阵亡兵团→平局)+顶栏倒计时/加时橙红/PhaseText+ResultPanel 简易结算(胜负/双方明细/再来一局/继续观战);LostGenerals 双路径计数(CombatUpdate 清理块+MatchClock 留场死扫描,DeadCounted 防重)。★batchmode 伪绿陷阱:编译错+旧 DLL 跑旧测试 exit 0,误当全绿,全靠核对 error CS 识破;★deepseek 真刺 T7(总分 507≠506 打平设计失效,人口 tiebreak 从未被覆盖)
+- [x] 2026-09-06 **M6.4b 快速结算截屏通道 ✅ 227/227**:Play&FastResult 菜单(压缩对局 sim 1+1min/Speed 6x/蓝 Normal AI)+CaptureRunner.RunFastResult(加时/结算两张全屏 ScreenCapture,IMGUI 面板入图,自动退 Play);`-executeMethod IronCurtain.EditorTools.PlayAndCapture.FastResult` 免焦点后台跑,4.5v 双图验收过(加时 00:57 橙红+人口 4/5 名额+1 实证;结算"失败"红字+双方明细+按钮)
 - [x] 2026-09-06 **M6.2 战斗 UI ✅ 216/216**:顶栏(基地血量/人口/时间/敌方雾口径快照)+伤害飘字(DamageDealt 驱动,池 40,己红敌金)+血条受击闪白+单选射程圈+移动路径线;TopBarModel/FloatingTextModel 纯逻辑可测。★CaptureBatch 升级战线跟随+渲染前持续 Step 喂飘字;飘字双证验收法(程序化计数+4.5v 原图);GLM 4 错(BuildingSnapshot 嵌套前缀/尾部中文摘要/GetGet 笔误/路径线下标错位→字典重写)
 - [x] 2026-09-06 **fix(AI) 两处潜伏回归 ★ 216/216**:①波次门槛"≥8 只"在 4 名额制永不满足→AI 自 M8.4b 起永不推进(改 2 兵团);②出生螺旋 d≤8 被开局兵团块全堵→第 4 将 WaitingForSpawn 死锁(玩家产将同卡,改 d≤40)。诊断法=临时 DiagAI 脚本逐 10s 打点跑完即删;视野翻倍已排除嫌疑
 - [x] 2026-09-06 **M6.1 镜头/迷雾/小地图 ✅ 198/198**:CameraRig 边缘滑动/FogView 迷雾+敌实体信息过滤(快照冻结)/MinimapPanel 点击跳转;VisionSystem 纯增量 LastKnownBuilding。★MatchSetup 潜伏崩溃修复(开局将位重排 24/30/36+SpawnSoldier 出生防崩);IMGUI 纹理 v=0=南颠倒坑(§8)
@@ -182,6 +185,8 @@ M3.3 时代契约(正式 ≤9/D24 Exit/D26 优先级/D27 回血等)已被 **M8.3
 | M8.7 | 7 文件一版过门禁(static/rewrite 一次过;api_gate 117 条全为符号库缺口误报,备案 m8.7.allowed.txt),RetreatSystem/系数/防拉回/撤退按钮全命中契约,RetreatTests 输出两版自取修订版一次绿 | 编排者修 4 处幻想 API(GameConfig.LoadDefault/ClearEventListeners/SimConfig{TickRate=30}/SimEvent.Id→SubjectId)+SelectionSystem 尾部 markdown 污染清除;parse_files.py 加行首 `**` 截断根治(自测过) | **188/188 ✓** |
 | M6.1 | 13 文件(5 新+8 改)一版过三门禁(api_gate 25 条全误报;static/rewrite 一次过),CameraRig/FogView/FogRules/MinimapPanel/MinimapLayout 数值与契约全命中,测试 9 条一版绿 | 编排者修 5 处:FogView 幻想重载 CreateMesh(Vector3[],uv,tris)/AttachMesh 参数序→自建 Mesh;FogView 枚举未限定 2 编译错;小地图纹理上下颠倒(GUI v=0=南)×2 处翻转;T4 越界坐标;**MatchSetup 潜伏崩溃**(零覆盖+将位压叠)——SpawnSoldier 防崩(格心口径,首版落点口径致 T4 红返工一轮)+将位重排+冒烟测试 | **198/198 ✓** |
 | M6.2 | 10 文件(6 新+4 改)一版过三门禁(api_gate 363 条全为符号库缺口误报,m6.2.allowed.txt 备案;static/rewrite 一次过),顶栏/飘字/闪白/射程圈/路径线规格全命中,测试 16 条一版绿 | 编排者修 4 处:BuildingSnapshot 嵌套前缀(提示词契约笔误)、FloatingTextTests 尾部中文摘要污染(parse_files 补丁根治+自测)、ray.GetGet 笔误、路径线下标对齐错位(列表占位方案在部分有目标时线被误删/错位→字典 id→线重写,并补"右键下令即现线");**截图通道暴露士兵 FlashHit NRE**(无背板守卫)与 **AI 两处潜伏回归**(门槛 8/出生死锁,编排者直修 2 行+DiagAI 诊断脚本实证);CaptureBatch 战线跟随+持续 Step 喂飘字 | **216/216 ✓** |
+| M6.4a | 10 文件一版过三门禁(api_gate 12 条误报备案,真拦 1 条 BuildingId.ArrowTower 编造成员;static/rewrite 一次过),MatchClockSystem/加时三 buff 接线/顶栏倒计时/ResultPanel/11 测试一版交付,契约数值全命中 | 编排者修:ArrowTower→Tower;测试缺 using IronCurtain.Tests(提示词模板缺陷,30 条 CS0103)+out long→int 两处(TestUtil 签名 out int);**T4 对照组修复**(Phase 单向时钟回推→独立 sim2);**T7 重写**(deepseek 真刺:507≠506 打平设计失效,改蓝 103 血+0 将 516 vs 红 100 血+5 将 516,人口决胜);契约 506 算术笔误(500+6+2=508)修正 | **227/227 ✓** |
+| M6.4b | 2 文件(2 改)一版过三门禁(全 PASS),FastResult 菜单+RunFastResult 协程全命中契约 | 编排者直跑验收:编辑器 -executeMethod 免焦点后台出双图,4.5v 双图过(两处误读经程序化裁决证伪:"总份"源码为"总分"/敌方血量 200/20 有 HpText 单测兜底) | **227/227 ✓** |
 
 ## 7.75 三层门禁(已上线)
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
@@ -214,4 +219,6 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - **batchmode 跑测试禁止带 -quit**:`-runTests -quit` 组合会启动即退出、测试全跳过且 exit 0(伪绿);不带 -quit 测试完自动退出,失败 exit 2。编译检查可用 `-quit -executeMethod` 但跑测试绝不能加
 - **小文字 UI(飘字/血条数字)的视觉验收局限**:1920p 原图里十几像素高的 TextMesh,缩图压缩后基本不可读;**2026-09-06 起 4.5v 原图验收已覆盖此场景(hy-vision 缩图管线退役)**;最终裁决顺序仍=程序化计数(打点)>4.5v 原图识别>人眼。字号根治待 M6.6 新相机(单位放大 ~3 倍)
 - **Sim 行为改动必须配"长线冒烟"**:AI 波次门槛回归(8→2)潜伏于 M8.4b→M6.2 才被截图暴露,期间 160/188/198/200/216 全绿——单步断言测不出"AI 是否真的会推进";临时 DiagAI 编辑器脚本(逐 10s 打印兵力/位置/State/生产槽/池,跑完删)模式已沉淀,凡动 AiSystem/ProductionSystem/MatchSetup 应顺手跑一次
+- **batchmode 跑测试必核对 error CS + testcasecount(M6.4a 新坑)**:编译错误时 Unity 会用旧 DLL 跑旧测试并以 exit 0 退出——`-runTests` 结果 XML 全绿、exit 0,是**伪绿**;真信号=editmode.log 里 `error CS` 条数≠0 且 results.xml 的 testcasecount 没涨。每次跑测试后两个都查:先 `grep -c "error CS"`,再核对 testcasecount 等于预期总数。
+- **Sim 单向状态机不可手动回设做对照(M6.4a 新坑)**:MatchPhase 之类单向时钟(已过 600s 即恒回 Overtime)手动 `sim.Phase = Normal` 后下一 Step 就被时钟推回,对照组走错分支;对照实验一律**独立新 SimCore**(new SimCore+Game 注入)。
 - Sim 连续坐标规则速查:`SimVec2{X=列米,Y=行米}`;`Entity.PosF`=单位权威位置;`Entity.Pos`=格(建筑);世界坐标 x=X,z=3−Y;碰撞半径 `SimCore.BuildingCollisionRadius`;单位不占格;测试模板布局(6×255 下):兵营(1,8)/蓝塔(1,16)/红塔(1,24)/蓝基地(1,0)
