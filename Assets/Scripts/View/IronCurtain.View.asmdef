@@ -1,0 +1,1 @@
+{"name": "IronCurtain.View", "rootNamespace": "IronCurtain.View", "references": ["IronCurtain.Sim", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"]}

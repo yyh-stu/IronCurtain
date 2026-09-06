@@ -1,0 +1,27 @@
+# Unity 生成物
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
+[Mm]emoryCaptures/
+[Rr]ecords/
+
+# IDE
+.vs/
+.idea/
+*.csproj
+*.sln
+*.user
+*.pidb
+*.booproj
+
+# 测试与日志(TestResults 在项目根)
+TestResults*.xml
+*.log
+
+# 系统
+Thumbs.db
+.DS_Store

@@ -1,0 +1,480 @@
+{
+  "Heroes": [
+    {
+      "Id": 0,
+      "Name": "磐石",
+      "Tag": "重装·塔盾",
+      "MaxHp": 80,
+      "Attack": 6,
+      "AttackIntervalSec": 2.0,
+      "MoveSpeed": 2.0,
+      "ChargeSpeed": 2.0,
+      "Range": 1,
+      "Population": 1,
+      "Shield": 140,
+      "PassiveText": "护盾:非破防攻击仅70%伤害;星落打盾再减半"
+    },
+    {
+      "Id": 1,
+      "Name": "镇岳",
+      "Tag": "重装·攻城",
+      "MaxHp": 200,
+      "Attack": 14,
+      "AttackIntervalSec": 2.0,
+      "MoveSpeed": 2.0,
+      "ChargeSpeed": 2.0,
+      "Range": 1,
+      "Population": 2,
+      "Shield": 0,
+      "PassiveText": "基础免伤20%;对磐石破防×2.5且无视护盾减免;受远程0.7"
+    },
+    {
+      "Id": 2,
+      "Name": "断峰",
+      "Tag": "战士·长矛",
+      "MaxHp": 80,
+      "Attack": 14,
+      "AttackIntervalSec": 2.5,
+      "MoveSpeed": 2.0,
+      "ChargeSpeed": 2.0,
+      "Range": 2,
+      "Population": 1,
+      "Shield": 0,
+      "PassiveText": "拒马:打断逐风冲锋并施加迟滞(移速-30%、攻速-10%,3秒)"
+    },
+    {
+      "Id": 3,
+      "Name": "逐风",
+      "Tag": "骑兵·枪骑",
+      "MaxHp": 70,
+      "Attack": 15,
+      "AttackIntervalSec": 2.0,
+      "MoveSpeed": 3.0,
+      "ChargeSpeed": 4.0,
+      "Range": 1,
+      "Population": 1,
+      "Shield": 0,
+      "PassiveText": "冲锋移速4格/s,冲锋伤害翻倍;对远程后排收割;受远程1.25"
+    },
+    {
+      "Id": 4,
+      "Name": "坠日",
+      "Tag": "射手·弓手",
+      "MaxHp": 40,
+      "Attack": 10,
+      "AttackIntervalSec": 2.0,
+      "MoveSpeed": 2.0,
+      "ChargeSpeed": 2.0,
+      "Range": 5,
+      "Population": 1,
+      "Shield": 0,
+      "PassiveText": "攻击镇岳无视其20%基础免伤,附加重伤(全属性-15%,3秒)"
+    },
+    {
+      "Id": 5,
+      "Name": "星落",
+      "Tag": "射手·术士",
+      "MaxHp": 45,
+      "Attack": 5,
+      "AttackIntervalSec": 1.0,
+      "MoveSpeed": 2.0,
+      "ChargeSpeed": 2.0,
+      "Range": 5,
+      "Population": 1,
+      "Shield": 0,
+      "PassiveText": "沉默非镇岳单位禁止冲锋;攻击磐石护盾伤害减半"
+    }
+  ],
+  "Buildings": [
+    {
+      "Id": 0,
+      "Name": "大本营",
+      "MaxHp": 200,
+      "Attack": 0,
+      "AttackIntervalSec": 0,
+      "SplashDamage": 0,
+      "SplashRange": 0,
+      "Range": 0,
+      "PopulationBonus": 40,
+      "ProducesEp": false,
+      "EpIntervalSec": 0,
+      "GarrisonFormal": 0,
+      "GarrisonTemp": 0,
+      "QueueCount": 0,
+      "CanGarrison": false
+    },
+    {
+      "Id": 1,
+      "Name": "兵营",
+      "MaxHp": 80,
+      "Attack": 0,
+      "AttackIntervalSec": 0,
+      "SplashDamage": 0,
+      "SplashRange": 0,
+      "Range": 0,
+      "PopulationBonus": 0,
+      "ProducesEp": false,
+      "EpIntervalSec": 0,
+      "GarrisonFormal": 30,
+      "GarrisonTemp": 30,
+      "QueueCount": 3,
+      "CanGarrison": true
+    },
+    {
+      "Id": 2,
+      "Name": "资源点",
+      "MaxHp": 60,
+      "Attack": 0,
+      "AttackIntervalSec": 0,
+      "SplashDamage": 0,
+      "SplashRange": 0,
+      "Range": 0,
+      "PopulationBonus": 5,
+      "ProducesEp": true,
+      "EpIntervalSec": 90,
+      "GarrisonFormal": 0,
+      "GarrisonTemp": 0,
+      "QueueCount": 0,
+      "CanGarrison": false
+    },
+    {
+      "Id": 3,
+      "Name": "箭塔",
+      "MaxHp": 50,
+      "Attack": 18,
+      "AttackIntervalSec": 2.5,
+      "SplashDamage": 12,
+      "SplashRange": 1,
+      "Range": 5,
+      "PopulationBonus": 0,
+      "ProducesEp": false,
+      "EpIntervalSec": 0,
+      "GarrisonFormal": 30,
+      "GarrisonTemp": 30,
+      "QueueCount": 0,
+      "CanGarrison": true
+    }
+  ],
+  "Counters": [
+    {
+      "Attacker": 1,
+      "Target": 0,
+      "Description": "破防标签,伤害×2.5,无视护盾减免",
+      "Multiplier": 2.5
+    },
+    {
+      "Attacker": 0,
+      "Target": 4,
+      "Description": "护盾:非破防攻击仅70%伤害;星落打盾再减半",
+      "Multiplier": 0.7
+    },
+    {
+      "Attacker": 4,
+      "Target": 1,
+      "Description": "无视镇岳20%基础免伤,附加重伤debuff(全属性-15%,3秒)",
+      "Multiplier": 1.0
+    },
+    {
+      "Attacker": 2,
+      "Target": 3,
+      "Description": "拒马被动打断冲锋,附带迟滞(移速-30%、攻速-10%,3秒)",
+      "Multiplier": 1.0
+    },
+    {
+      "Attacker": 5,
+      "Target": 3,
+      "Description": "普攻施加沉默禁止冲锋",
+      "Multiplier": 1.0
+    },
+    {
+      "Attacker": 3,
+      "Target": 4,
+      "Description": "高移速冲锋伤害翻倍,绕后收割远程后排",
+      "Multiplier": 2.0
+    }
+  ],
+  "Damage": {
+    "ZhenYueArmor": 0.8,
+    "ZhenYueVsPanShi": 2.5,
+    "ZhuFengCharge": 2.0,
+    "XingLuoVsShield": 0.5,
+    "ZhenYueRangedTaken": 0.7,
+    "ZhuFengRangedTaken": 1.25
+  },
+  "Production": {
+    "Pop1Seconds": 6.0,
+    "ZhenYueSeconds": 9.0,
+    "ZhenYueUpgradedSeconds": 7.5,
+    "QueuesPerBarracks": 3,
+    "BasePopulation": 40,
+    "ResourcePointPopulation": 5,
+    "InitialOwnedResourcePoints": 3,
+    "MaxResourcePoints": 8
+  },
+  "Ep": {
+    "Cap": 5,
+    "Start": 0,
+    "IntervalSeconds": 90,
+    "UpgradeCost": 2,
+    "HexDrawCost": 2,
+    "RebuildCost": 1,
+    "RamCost": 1,
+    "FortCost": 1
+  },
+  "Upgrades": [
+    {
+      "Hero": 0,
+      "Name": "磐石·坚定",
+      "Description": "完全免疫减速、沉默、重伤",
+      "Cost": 2,
+      "MoveSpeedOverride": 0,
+      "ProductionSecondsOverride": 0,
+      "AttackOverride": 0,
+      "SectorDamageMultiplier": 1.0,
+      "SectorAngleDeg": 0,
+      "SectorRadius": 0,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 0,
+      "TowerDamagePerSecOverride": 0,
+      "FragileBonus": 0,
+      "ImmuneAllDebuffs": true,
+      "MaxHpPercentBonus": 0
+    },
+    {
+      "Hero": 1,
+      "Name": "镇岳·强化",
+      "Description": "移速固定2.2格/s(覆盖3分钟衰减),生产时间缩短至7.5秒",
+      "Cost": 2,
+      "MoveSpeedOverride": 2.2,
+      "ProductionSecondsOverride": 7.5,
+      "AttackOverride": 0,
+      "SectorDamageMultiplier": 1.0,
+      "SectorAngleDeg": 0,
+      "SectorRadius": 0,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 0,
+      "TowerDamagePerSecOverride": 0,
+      "FragileBonus": 0,
+      "ImmuneAllDebuffs": false,
+      "MaxHpPercentBonus": 0
+    },
+    {
+      "Hero": 2,
+      "Name": "断峰·横扫",
+      "Description": "单次伤害×75%,攻击身前90°扇形(半径2格内全部敌人)",
+      "Cost": 2,
+      "MoveSpeedOverride": 0,
+      "ProductionSecondsOverride": 0,
+      "AttackOverride": 0,
+      "SectorDamageMultiplier": 0.75,
+      "SectorAngleDeg": 90,
+      "SectorRadius": 2,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 0,
+      "TowerDamagePerSecOverride": 0,
+      "FragileBonus": 0,
+      "ImmuneAllDebuffs": false,
+      "MaxHpPercentBonus": 0
+    },
+    {
+      "Hero": 3,
+      "Name": "逐风·突袭",
+      "Description": "突进4格造成40范围伤害,拆塔每秒7;非战斗途经敌方建筑不被锁定",
+      "Cost": 2,
+      "MoveSpeedOverride": 0,
+      "ProductionSecondsOverride": 0,
+      "AttackOverride": 0,
+      "SectorDamageMultiplier": 1.0,
+      "SectorAngleDeg": 0,
+      "SectorRadius": 0,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 4,
+      "TowerDamagePerSecOverride": 7,
+      "FragileBonus": 0,
+      "ImmuneAllDebuffs": false,
+      "MaxHpPercentBonus": 0
+    },
+    {
+      "Hero": 4,
+      "Name": "坠日·穿甲",
+      "Description": "攻击镇岳附加脆弱,目标承受所有来源伤害+10%",
+      "Cost": 2,
+      "MoveSpeedOverride": 0,
+      "ProductionSecondsOverride": 0,
+      "AttackOverride": 0,
+      "SectorDamageMultiplier": 1.0,
+      "SectorAngleDeg": 0,
+      "SectorRadius": 0,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 0,
+      "TowerDamagePerSecOverride": 0,
+      "FragileBonus": 0.1,
+      "ImmuneAllDebuffs": false,
+      "MaxHpPercentBonus": 0
+    },
+    {
+      "Hero": 5,
+      "Name": "星落·蚀命",
+      "Description": "基础攻击提升至6,额外附加目标最大生命1%伤害",
+      "Cost": 2,
+      "MoveSpeedOverride": 0,
+      "ProductionSecondsOverride": 0,
+      "AttackOverride": 6,
+      "SectorDamageMultiplier": 1.0,
+      "SectorAngleDeg": 0,
+      "SectorRadius": 0,
+      "FlyoverDamage": 0,
+      "FlyoverRange": 0,
+      "TowerDamagePerSecOverride": 0,
+      "FragileBonus": 0,
+      "ImmuneAllDebuffs": false,
+      "MaxHpPercentBonus": 0
+    }
+  ],
+  "Hexes": [
+    {
+      "Id": 0,
+      "Name": "钢铁洪流",
+      "Description": "生命100+单位移速+50%,开战3秒免伤50%,免疫负面",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 1,
+      "Name": "快速部署",
+      "Description": "产速+40%,短时+20%人口上限",
+      "DurationSeconds": 45,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 2,
+      "Name": "陷阵之志",
+      "Description": "每阵亡一兵团,友军攻防移速+5%,可叠加(每层15s)",
+      "DurationSeconds": 0,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 3,
+      "Name": "轻装机动",
+      "Description": "控区内支援速度×2",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 4,
+      "Name": "铁壁防线",
+      "Description": "生成30血堡垒,可驻军,每3s伤敌15",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 5,
+      "Name": "以逸待劳",
+      "Description": "建筑10格控区内全属性+10%",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 6,
+      "Name": "曲径通幽",
+      "Description": "非交战不被塔锁定,可穿行敌方据点",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    },
+    {
+      "Id": 7,
+      "Name": "沙包",
+      "Description": "选中单位免伤50%、攻击-50%",
+      "DurationSeconds": 30,
+      "DrawNodes": [
+        3,
+        5,
+        7,
+        9
+      ],
+      "UnlockMinute": 3,
+      "UsedWeightPenalty": 0.5
+    }
+  ],
+  "Siege": {
+    "MeleePerSec": 2.0,
+    "ZhenYuePerSec": 4.0,
+    "RangedPerSec": 4.0,
+    "ZhuFengPerSec": 3.0,
+    "ZhuFengChargeHit": 5.0,
+    "FlyoverPerSec": 7.0
+  },
+  "Match": {
+    "BaseHp": 200,
+    "DurationMinutes": 10,
+    "OvertimeMinutes": 2,
+    "OvertimePopBonus": 10,
+    "OvertimeProductionBonus": 0.1,
+    "OvertimeEpInterval": 60,
+    "ScoreBaseHpWeight": 5,
+    "ScoreHeroWeight": 3,
+    "ScoreEpWeight": 2,
+    "ScoreBuildingWeight": 1
+  },
+  "Tools": {
+    "RamDamage": 15.0,
+    "FortHp": 30,
+    "FortGarrison": 3,
+    "FortDurationSeconds": 30
+  },
+  "TowerGarrison": {
+    "AttackPerGarrison": 2.0,
+    "AttackBonusCap": 12.0,
+    "SplashRangeBonusAtGarrison": 9,
+    "SplashRangeBonus": 1
+  }
+}

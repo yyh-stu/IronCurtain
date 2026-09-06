@@ -1,0 +1,1 @@
+{"name":"IronCurtain.Tests","rootNamespace":"IronCurtain.Tests","references":["IronCurtain.Sim","IronCurtain.View","UnityEngine.TestRunner","UnityEditor.TestRunner"],"includePlatforms":["Editor"],"precompiledReferences":["nunit.framework.dll"],"overrideReferences":true,"defineConstraints":["UNITY_INCLUDE_TESTS"]}
