@@ -83,6 +83,9 @@ namespace IronCurtain.Sim
         public byte SupKind;       // 被玩家打断而失效的自动决策(防复读)
         public int SupTargetId;
 
+        // 玩家授意撤退(M8.7):撤退到达后压制自动行为层,玩家下次手动命令解除
+        public bool RetreatHold;
+
         // 布阵朝向覆盖(M8.5c 规划器设置;null=默认规则)
         public SimVec2? FacingOverride;
 

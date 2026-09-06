@@ -135,6 +135,7 @@ namespace IronCurtain.Sim
                 if (e.AutoKind != 0) { e.SupKind = e.AutoKind; e.SupTargetId = e.AutoTargetId; }
                 e.AutoKind = 0;
                 e.AutoTargetId = 0;
+                e.RetreatHold = false; // M8.7:玩家再下令=重新接管自动层(解除撤退压制)
             }
 
             e.MoveTarget = target;
@@ -494,11 +495,11 @@ namespace IronCurtain.Sim
             bool zhuMie = attacker.Hero == HeroId.XingLuo && IsUpgraded(attacker.Side, HeroId.XingLuo);
             if (zhuMie && attacker.Attack > 0f) baseDmg = baseDmg / attacker.Attack * 6f;
 
-            // 叠算层(D28):输出加算、承伤加算、免伤乘算;溃逃并入对应层
+            // 叠算层(D28):输出加算、承伤加算、免伤乘算;撤退/溃逃 −25%/+25%(M8.7)
             float outSum = attacker.Status.AttackBonus + HexSystem.OutputBonusOf(this, attacker)
-                         + (attacker.State == EntityState.Routing ? -0.3f : 0f);
+                         + (attacker.State == EntityState.Routing ? -0.25f : 0f);
             float takeSum = defender.Status.DamageTakenBonus + HexSystem.DamageTakenBonusOf(this, defender)
-                          + (defender.State == EntityState.Routing ? 0.3f : 0f);
+                          + (defender.State == EntityState.Routing ? 0.25f : 0f);
             float reduce = defender.Status.DamageReduction * HexSystem.DamageReductionOf(this, defender);
             float dmg = baseDmg * (1f + outSum) * (1f + takeSum) * reduce;
 
@@ -543,8 +544,9 @@ namespace IronCurtain.Sim
                 if (dx * facing < 0) continue;         // 身后不打
                 if (dx * dx + dy * dy > 4f) continue;  // 半径 2 米扇形
                 float baseDmg = 0.75f * DamageCalculator.CalculateDamage(attacker, o, Game, attacker.IsCharging);
-                float outSum = attacker.Status.AttackBonus + (attacker.State == EntityState.Routing ? -0.3f : 0f);
-                float takeSum = o.Status.DamageTakenBonus + (o.State == EntityState.Routing ? 0.3f : 0f);
+                // 撤退/溃逃 −25%/+25%(M8.7)
+                float outSum = attacker.Status.AttackBonus + (attacker.State == EntityState.Routing ? -0.25f : 0f);
+                float takeSum = o.Status.DamageTakenBonus + (o.State == EntityState.Routing ? 0.25f : 0f);
                 float dmg = baseDmg * (1f + outSum) * (1f + takeSum) * o.Status.DamageReduction;
                 float remaining = dmg;
                 if (o.Shield > 0f)

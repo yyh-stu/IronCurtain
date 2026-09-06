@@ -47,6 +47,7 @@ namespace IronCurtain.Sim
                 var g = e.GeneralId != 0 ? sim.GetEntity(e.GeneralId) : null;
                 if (g != null && g.Kind == EntityKind.Unit && g.State != EntityState.Dead)
                 {
+                    if (e.State == EntityState.Routing && g.State != EntityState.Routing) e.State = EntityState.Idle; // 主将已到站/被打断 → 士兵撤出撤退态
                     // a) 主将存活:阵型跟随(士兵不写 HasMoveTarget/State)
                     var target = g.PosF + SlotOffset(g, e.FormationSlot);
                     float dist = SimVec2.Distance(e.PosF, target);
@@ -54,6 +55,7 @@ namespace IronCurtain.Sim
                 }
                 else
                 {
+                    if (e.State == EntityState.Routing) e.State = EntityState.Idle; // 无将续战不是撤退,清除撤退态(撤减益不适用于拼死作战)
                     // b) 无将续战:就近索敌逐杀至死(永不溃逃/撤退/响应指令)
                     var enemy = NearestEnemy(sim, e);
                     if (enemy == null) continue;

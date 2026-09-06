@@ -17,6 +17,7 @@ namespace IronCurtain.Sim
             foreach (var g in snapshot)
             {
                 if (g.Kind != EntityKind.Unit || g.IsSoldier || g.State == EntityState.Dead) continue;
+                if (g.RetreatHold) continue; // M8.7 防拉回:玩家授意撤退后自动层让位,直到玩家再下令(被迫接战由 CombatUpdate 兜底)
                 if (g.GarrisonBuildingId != 0) continue;
 
                 // 1) 手动/自动命令执行保护(防拉回):有目标在身一律不动,到位后自然重评估

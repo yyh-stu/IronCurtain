@@ -31,6 +31,7 @@ namespace IronCurtain.View
         private GameObject _marker;
         private Material _markerMat;
         private float _markerT;
+        private Rect _retreatBtnRect; // M8.7 撤退按钮占位(兼做点击穿透过滤)
 
         public void Init(SimCore sim, Camera cam)
         {
@@ -44,7 +45,8 @@ namespace IronCurtain.View
             {
                 Vector2 m = Input.mousePosition;
                 // 面板 Rect 为 GUI 坐标(y 从顶起),鼠标 y 从底起,需翻转
-                return BarracksOverviewPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y));
+                return BarracksOverviewPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
+                    || _retreatBtnRect.Contains(new Vector2(m.x, Screen.height - m.y));
             }
         }
 
@@ -230,6 +232,13 @@ namespace IronCurtain.View
 
         private void OnGUI()
         {
+            if (_selected.Count >= 1)
+            {
+                _retreatBtnRect = new Rect(Screen.width * 0.5f - 60f, Screen.height - 60f, 120f, 40f);
+                if (GUI.Button(_retreatBtnRect, "撤退"))
+                    foreach (var id in new List<int>(_selected))
+                        RetreatSystem.OrderRetreat(_sim, id);
+            }
             if (_selected.Count < 2 || _hintT <= 0f) return;
             var style = new GUIStyle(GUI.skin.label) { fontSize = 24, alignment = TextAnchor.MiddleCenter };
             style.normal.textColor = Color.white;
