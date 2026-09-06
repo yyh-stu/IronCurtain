@@ -85,7 +85,8 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 ## 2. 环境事实(本机)
 - OS:Win11 专业版;32GB 内存;RTX 5060 Ti(驱动 32.0.16.1656,与 Unity Hub Chromium 硬件加速冲突→Hub 需 --disable-gpu 启动,桌面快捷方式已建)
 - Unity 6000.0.30f1 LTS 装在 `D:\Unity\Editor`(注意:是 2024-12 的 LTS 补丁,不是最新;国内 CDN 只镜像到这个版本)
-- **Blender(美术底模管线,2026-09-06 引入)**:4.5.9 便携版解压 `D:\DevTools\Blender`(免安装免管理员);下载源 mirrors.aliyun.com/blender(国内可达,替代 Google Drive);无头用法 `blender.exe --background --python <脚本> -o <渲染输出>`;路线详见 `docs/美术底模管线.md`
+- **Blender(美术底模管线,2026-09-06 引入)**:4.5.9 便携版解压 `D:\DevTools\Blender`(免安装免管理员;**桌面快捷方式已建,点开即用**);下载源 mirrors.aliyun.com/blender(国内可达,替代 Google Drive);无头用法 `blender.exe --background --python <脚本> -o <渲染输出>`;路线详见 `docs/美术底模管线.md`
+- **美术资产仓库(2026-09-07 建)**:`D:\DevTools\美术资产仓库\`——00_台账/01_概念图/02_底模脚本/03_四视图渲染/04_人工复核/05_导出资产/06_入库登记;**留痕铁律:落盘必登记台账,失败也登记**;规范见仓库内 README
 - **项目:`D:\DevTools\IronCurtain`**(Unity -createProject 生成,完整标准骨架);旧实验工程 `D:\DevTools\IronCurtainDemo` 是备份
 - Python:`C:\Users\HP\AppData\Local\Programs\Python\Python312\python.exe`;有 venv 在 `D:\DevTools\unity-mcp-main\Server\.venv`(含 fastmcp/pillow/pypdf,优先用它跑脚本)
 
