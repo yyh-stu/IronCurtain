@@ -71,6 +71,12 @@ namespace IronCurtain.Sim
         public int GeneralId;       // 主将实体 id(0=无;主将死亡/移除后士兵无将续战)
         public int FormationSlot;   // 阵型槽号 0..19(士兵唯一;主将恒 0,无意义)
 
+        // 兵团自主行为(M8.5b)
+        public byte AutoKind;      // 自动决策类型:0=无,1=索敌进攻,2=支援
+        public int AutoTargetId;   // 自动决策目标实体 id
+        public byte SupKind;       // 被玩家打断而失效的自动决策(防复读)
+        public int SupTargetId;
+
         public Entity(int id, Side side, EntityKind kind, GridPos pos, float hp)
         {
             Id = id;

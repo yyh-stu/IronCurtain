@@ -117,8 +117,11 @@ namespace IronCurtain.Sim
 
         public void SubmitCommand(ICommand cmd) => _commandQueue.Enqueue(cmd);
 
-        /// <summary>单位移动指令:目标越界/实体非单位时抛异常。</summary>
-        public void SetMoveTarget(int id, GridPos target)
+        /// <summary>单位移动指令:目标越界/实体非单位时抛异常。既有两参签名视为手动命令。</summary>
+        public void SetMoveTarget(int id, GridPos target) => SetMoveTarget(id, target, true);
+
+        /// <summary>M8.5b 重载:manual=true(玩家/AI 手动)打断自动决策并写防复读字段;manual=false 为自动层专用。</summary>
+        public void SetMoveTarget(int id, GridPos target, bool manual)
         {
             if (!_entities.TryGetValue(id, out var e))
                 throw new InvalidOperationException($"实体不存在: {id}");
@@ -126,6 +129,13 @@ namespace IronCurtain.Sim
                 throw new InvalidOperationException($"非线单位不可设置移动目标: {id}");
             if (!_grid.InBounds(target))
                 throw new InvalidOperationException($"移动目标越界: {target}");
+
+            if (manual && !e.IsSoldier)
+            {
+                if (e.AutoKind != 0) { e.SupKind = e.AutoKind; e.SupTargetId = e.AutoTargetId; }
+                e.AutoKind = 0;
+                e.AutoTargetId = 0;
+            }
 
             e.MoveTarget = target;
             e.HasMoveTarget = true;
@@ -152,6 +162,7 @@ namespace IronCurtain.Sim
             HexSystem.Tick(this, 1f / Config.TickRate);
             VisionSystem.Tick(this, 1f / Config.TickRate);
             AiSystem.Tick(this, 1f / Config.TickRate);
+            if (Config.AutoBehavior) RegimentBehaviorSystem.Tick(this, 1f / Config.TickRate); // M8.5b 兵团自主行为
             Emit(new SimEvent(Tick, SimEventType.StepEnd, 0));
         }
 
@@ -314,7 +325,7 @@ namespace IronCurtain.Sim
             {
                 if (b.Kind != EntityKind.Building || b.Rubbled) continue;
                 if (!BuildingFootprint.Contains(b, u.PosF)) continue;
-                u.PosF = BuildingFootprint.ClosestPoint(b, u.PosF); // 点在矩形内→最小穿透轴推出,幂等无死循环
+                u.PosF = BuildingFootprint.ClosestPoint(b, u.PosF); // 点在矩形内→最小穿透轴推出,幂等无死锁
             }
         }
 

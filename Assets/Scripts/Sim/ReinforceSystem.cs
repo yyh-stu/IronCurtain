@@ -76,13 +76,37 @@ namespace IronCurtain.Sim
                 for (int slot = 0; slot < RegimentSystem.SoldiersPerGeneral && give > 0; slot++)
                 {
                     if (used.Contains(slot)) continue;
-                    RegimentSystem.SpawnSoldier(sim, g, slot);
-                    sim.ReinforcePool[side]--;
-                    give--;
-                    anyGiven = true;
+                    // 防崩:槽位落格若被建筑占地/单位占据,沿槽向再推 1m(至多 3 次);仍堵则跳过该槽不耗池
+                    var off = RegimentSystem.SlotOffset(g, slot);
+                    var pos = g.PosF + off;
+                    bool placed = false;
+                    for (int t = 0; t < 3 && !placed; t++)
+                    {
+                        if (SlotCellFree(sim, pos.ToGrid()))
+                        {
+                            RegimentSystem.SpawnSoldier(sim, g, slot, pos);
+                            sim.ReinforcePool[side]--;
+                            give--;
+                            anyGiven = true;
+                            placed = true;
+                        }
+                        else pos = TerrainMap.ClampToEllipse(pos + off.Normalized());
+                    }
                 }
             }
             if (!anyGiven) { error = "补兵池为空"; return false; }
+            return true;
+        }
+
+        /// <summary>落格是否可出生:不在任何非废墟建筑占地内、距存活露天猫单位 ≥0.5m(镜像 SpawnEntity 校验)。</summary>
+        static bool SlotCellFree(SimCore sim, GridPos cell)
+        {
+            var c = SimVec2.FromGrid(cell);
+            foreach (var b in sim.Entities.Values)
+                if (b.Kind == EntityKind.Building && !b.Rubbled && BuildingFootprint.Contains(b, c)) return false;
+            foreach (var u in sim.Entities.Values)
+                if (u.Kind == EntityKind.Unit && u.State != EntityState.Dead && u.GarrisonBuildingId == 0
+                    && SimVec2.Distance(u.PosF, c) < 0.5f) return false;
             return true;
         }
     }

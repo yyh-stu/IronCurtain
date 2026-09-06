@@ -12,7 +12,7 @@ namespace IronCurtain.View
             HexSystem.Reset();
             SiegeSystem.Reset();
 
-            var sim = new SimCore(new SimConfig(), new SeededRng(42));
+            var sim = new SimCore(new SimConfig { AutoBehavior = true }, new SeededRng(42)); // M8.5b 开局打开自主行为
             sim.Game = cfg;
 
             // 2026-09-05 用户拍板:椭圆形大地图(30×286 包围盒),9 座建筑沿长轴 Row=15、间距 30 格

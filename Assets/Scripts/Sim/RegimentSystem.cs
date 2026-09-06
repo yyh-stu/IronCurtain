@@ -85,9 +85,9 @@ namespace IronCurtain.Sim
         }
 
         /// <summary>生成一名士兵(属性=主将/10,攻速/移速/射程=主将,变装=主将 Hero),落位槽位偏移点。SpawnGeneral 与补兵共用。</summary>
-        public static Entity SpawnSoldier(SimCore sim, Entity general, int slot)
+        public static Entity SpawnSoldier(SimCore sim, Entity general, int slot, SimVec2? atPos = null)
         {
-            var target = general.PosF + SlotOffset(general, slot);
+            var target = atPos ?? general.PosF + SlotOffset(general, slot);
             var s = sim.SpawnEntity(general.Side, EntityKind.Unit, target.ToGrid());
             s.IsSoldier = true;
             s.FormationSlot = slot;

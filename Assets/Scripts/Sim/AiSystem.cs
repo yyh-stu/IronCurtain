@@ -9,6 +9,8 @@ namespace IronCurtain.Sim
     public static class AiSystem
     {
         const int DecisionInterval = 20;
+        const int ReinforceInterval = 50;     // M8.5b:AI 自动补兵评估间隔(5s)
+        const int ReinforcePoolThreshold = 10; // 池 ≥10 才放,避免碎补
 
         class AiState
         {
@@ -32,6 +34,16 @@ namespace IronCurtain.Sim
 
         public static void Tick(SimCore sim, float dt)
         {
+            // M8.5b:AI 自动补兵(Simple/Normal 共用,顶层入口)
+            if (sim.Tick % ReinforceInterval == 0)
+            {
+                foreach (var ai in _ais.Values.ToList())
+                {
+                    if (sim.ReinforcePool[ai.Side] >= ReinforcePoolThreshold)
+                        ReinforceSystem.RequestReinforce(sim, ai.Side, out _);
+                }
+            }
+
             if (sim.Tick % DecisionInterval != 0) return;
             foreach (var ai in _ais.Values.ToList())
             {
