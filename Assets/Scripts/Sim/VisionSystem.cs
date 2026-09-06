@@ -102,12 +102,12 @@ namespace IronCurtain.Sim
             }
         }
 
-        /// <summary>建筑视野半径(M5.0 权威):大本营 20、箭塔 12、其余 10。</summary>
+        /// <summary>建筑视野半径(2026-09-06 用户拍板在原值上扩大一倍):大本营 40、箭塔 24、其余 20。</summary>
         static int BuildingVisionRadius(Entity b)
         {
-            if (b.Building == BuildingId.Base) return 20;
-            if (b.Building == BuildingId.Tower) return 12;
-            return 10; // Barracks / ResourcePoint / 堡垒
+            if (b.Building == BuildingId.Base) return 40;
+            if (b.Building == BuildingId.Tower) return 24;
+            return 20; // Barracks / ResourcePoint / 堡垒
         }
 
         static int UnitRadius(SimCore sim, Side side, Entity e, int forwardCol)

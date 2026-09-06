@@ -141,7 +141,7 @@ namespace IronCurtain.Tests
 
             SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(16, 113)); // 第 8 只
             Run(25);
-            // 蓝塔 12 格视野自动揭示中立点 → 波次首选中立(占中立优先)
+            // 蓝塔视野自动揭示中立点 → 波次首选中立(占中立优先)
             Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "8 只应触发对中立点的攻城意图");
         }
 

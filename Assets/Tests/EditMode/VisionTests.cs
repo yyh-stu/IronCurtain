@@ -52,17 +52,36 @@ public class VisionTests
     }
 
     [Test]
-    public void 建筑视野_塔12格_大本营20格()
+    public void 建筑视野_塔24格()
     {
+        // 2026-09-06 用户拍板:建筑视野在原值上扩大一倍(塔 12→24)
         MakeBuilding(Side.Blue, BuildingId.Tower, 15, 114);
-        MakeBuilding(Side.Blue, BuildingId.Base, 15, 108);
-        var red = MakeUnit(Side.Red, HeroId.DuanFeng, 15, 126);
-        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Red, red.Id), "距塔 12 格应被塔视野覆盖(红方看自己)");
-        red.Pos = new GridPos(15, 129); sim.Step();
-        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "距塔 15 格、距大本营 21 格,蓝方不可见");
+        var inR = MakeUnit(Side.Red, HeroId.PanShi, 15, 138);   // 距塔 24,应可见
+        var outR = MakeUnit(Side.Red, HeroId.PanShi, 16, 139);  // 欧氏距 25.02,应不可见
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, inR.Id), "距塔 24 格应被塔视野覆盖");
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, outR.Id), "距塔 25 格超出塔视野");
+    }
 
-        var probe = MakeUnit(Side.Red, HeroId.ZhuiRi, 15, 128);
-        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, probe.Id), "蓝大本营 (1,0) 半径 20 应覆盖 (1,20)");
+    [Test]
+    public void 建筑视野_大本营40格()
+    {
+        // 2026-09-06 用户拍板:大本营 20→40
+        MakeBuilding(Side.Blue, BuildingId.Base, 15, 108);
+        var inR = MakeUnit(Side.Red, HeroId.PanShi, 15, 148);   // 距 40,应可见
+        var outR = MakeUnit(Side.Red, HeroId.PanShi, 16, 149);  // 欧氏距 41.01,应不可见
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, inR.Id), "距大本营 40 格应被覆盖");
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, outR.Id), "距大本营 41 格超出视野");
+    }
+
+    [Test]
+    public void 建筑视野_兵营20格()
+    {
+        // 2026-09-06 用户拍板:其余建筑 10→20
+        MakeBuilding(Side.Blue, BuildingId.Barracks, 15, 114);
+        var inR = MakeUnit(Side.Red, HeroId.PanShi, 15, 134);   // 距 20,应可见
+        var outR = MakeUnit(Side.Red, HeroId.PanShi, 16, 135);  // 欧氏距 21.02,应不可见
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, inR.Id), "距兵营 20 格应被覆盖");
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, outR.Id), "距兵营 21 格超出视野");
     }
 
     [Test]
