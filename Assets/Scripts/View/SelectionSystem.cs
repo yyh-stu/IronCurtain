@@ -47,6 +47,8 @@ namespace IronCurtain.View
                 // 面板 Rect 为 GUI 坐标(y 从顶起),鼠标 y 从底起,需翻转
                 // 撤退按钮 Rect 仅在有选中时参与拦截(清空选择后残留旧值会让该区域左键永久失效——盲测挑出)
                 return BarracksOverviewPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
+                    // 小地图区域点击不穿透到世界
+                    || MinimapPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
                     || (_selected.Count >= 1 && _retreatBtnRect.Contains(new Vector2(m.x, Screen.height - m.y)));
             }
         }

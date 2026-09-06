@@ -32,14 +32,15 @@ namespace IronCurtain.View
             baseBlue.Prod = new ProductionSet();
             baseRed.Prod = new ProductionSet();
 
-            // 开局 3 将(测试版:磐石/断峰/坠日,基地旁散开,椭圆内)
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 22));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.DuanFeng, new GridPos(14, 24));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhuiRi, new GridPos(16, 24));
+            // 开局 3 将(测试版:磐石/断峰/坠日)。将间距 ≥6 列:4×5 士兵阵型块(纵深 4m、横宽 5m,
+            // 蓝向 −x 延展、红向 +x 延展)互不压叠,且避开基地占地(蓝基 13..18 / 红基 269..274)与兵营
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 24));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.DuanFeng, new GridPos(15, 30));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhuiRi, new GridPos(15, 36));
 
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(15, 264));
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(14, 262));
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.ZhuiRi, new GridPos(16, 262));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(15, 263));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(15, 257));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.ZhuiRi, new GridPos(15, 251));
 
             if (blueTier.HasValue) AiSystem.Configure(sim, Side.Blue, blueTier.Value);
             if (redTier.HasValue) AiSystem.Configure(sim, Side.Red, redTier.Value);

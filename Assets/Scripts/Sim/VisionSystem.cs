@@ -228,6 +228,13 @@ namespace IronCurtain.Sim
             return S(side).Buildings.TryGetValue(buildingId, out s) ? (float?)s.Hp : null;
         }
 
+        /// <summary>最后已知建筑快照(冻结显示用);未知返回 null。返回对象只读,调用方勿改。</summary>
+        public static BuildingSnapshot LastKnownBuilding(SimCore sim, Side side, int buildingId)
+        {
+            BuildingSnapshot s;
+            return S(side).Buildings.TryGetValue(buildingId, out s) ? s : null;
+        }
+
         static bool TryGet(SimCore sim, int id, out Entity e)
         {
             e = null;

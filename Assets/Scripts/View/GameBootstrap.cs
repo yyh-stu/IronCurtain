@@ -14,6 +14,8 @@ namespace IronCurtain.View
         public float Speed = 1f;
 
         private double _accumulator;
+        private CameraRig _rig;
+        private FogView _fog;
 
         private void Awake()
         {
@@ -22,6 +24,8 @@ namespace IronCurtain.View
             Sim = MatchSetup.Build(cfg, null, AiTier.Normal);
 
             CreateCamera();
+            _rig = Cam.gameObject.AddComponent<CameraRig>();
+            _rig.Init(Cam, 40f, 15f); // 开局聚焦蓝基地前方 col40/row15
             CreateLighting();
             CreatePostProcess();
 
@@ -29,12 +33,20 @@ namespace IronCurtain.View
             boardGo.transform.SetParent(transform, false);
             Board = boardGo.AddComponent<BoardView>();
             Board.Init(Sim, transform);
+            Board.PlayerSide = Side.Blue;
             Sim.AddEventListener(Board.OnSimEvent);
             var overview = gameObject.AddComponent<BarracksOverviewPanel>();
             overview.Init(Sim, Side.Blue);
             gameObject.AddComponent<CaptureRunner>();
             var selection = gameObject.AddComponent<SelectionSystem>();
             selection.Init(Sim, Cam);
+
+            var fogGo = new GameObject("FogView");
+            fogGo.transform.SetParent(transform, false);
+            _fog = fogGo.AddComponent<FogView>();
+            _fog.Init(Sim, Side.Blue, transform);
+            var minimap = gameObject.AddComponent<MinimapPanel>();
+            minimap.Init(Sim, Side.Blue, _rig, _fog, Cam);
 
             Debug.Log("[GameBootstrap] Match started");
         }

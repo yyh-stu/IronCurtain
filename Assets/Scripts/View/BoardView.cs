@@ -9,6 +9,8 @@ namespace IronCurtain.View
         private SimCore _sim;
         private readonly Dictionary<int, EntityView> _views = new Dictionary<int, EntityView>();
 
+        public Side PlayerSide = Side.Blue;
+
         public static Vector3 WorldPos(SimVec2 p) { return new Vector3(p.X, 0f, 3f - p.Y); }
         public static Vector3 WorldPos(GridPos p) { return new Vector3(p.Col, 0f, 3f - p.Row); }
 
@@ -71,8 +73,23 @@ namespace IronCurtain.View
                 if (v == null) continue;
                 var e = _sim.GetEntity(kv.Key);
                 if (e == null || e.State == EntityState.Dead) v.SetDead();
+                if (e != null) ApplyFog(v, e);
                 v.Tick(dt, cam);
             }
+        }
+
+        private void ApplyFog(EntityView v, Entity e)
+        {
+            if (e.Kind == EntityKind.Building)
+            {
+                if (e.Side == PlayerSide) { v.SetFogBuilding(false, false); v.SetFogGarrison(null); return; }
+                var st = FogRules.BuildingState(_sim, PlayerSide, e);
+                v.SetFogBuilding(st == BuildingFogState.Unknown, st == BuildingFogState.Stale);
+                v.SetFogGarrison(st == BuildingFogState.Stale
+                    ? VisionSystem.LastKnownGarrison(_sim, PlayerSide, e.Id) : null);
+            }
+            else if (e.Kind == EntityKind.Unit)
+                v.SetFogUnitHidden(e.Side != PlayerSide && !FogRules.UnitVisible(_sim, PlayerSide, e));
         }
 
         private EntityView CreateView(Entity e)

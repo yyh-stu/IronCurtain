@@ -120,7 +120,11 @@ namespace IronCurtain.Sim
         /// <summary>生成一名士兵(属性=主将/10,攻速/移速/射程=主将,变装=主将 Hero),落位槽位偏移点。SpawnGeneral 与补兵共用。</summary>
         public static Entity SpawnSoldier(SimCore sim, Entity general, int slot, SimVec2? atPos = null)
         {
-            var target = atPos ?? general.PosF + SlotOffset(general, slot);
+            var off = SlotOffset(general, slot);
+            var target = atPos ?? general.PosF + off;
+            // 防崩(与 ReinforceSystem 补兵槽位同款):出生点撞建筑占地/贴其他单位 → 沿槽向外推 1m×3 次;仍堵保留原抛出语义
+            for (int t = 0; t < 3 && !SpawnPointFree(sim, target); t++)
+                target = TerrainMap.ClampToEllipse(target + off.Normalized());
             var s = sim.SpawnEntity(general.Side, EntityKind.Unit, target.ToGrid());
             s.IsSoldier = true;
             s.FormationSlot = slot;
@@ -138,6 +142,18 @@ namespace IronCurtain.Sim
             s.PrevPosF = target;
             s.Pos = target.ToGrid();
             return s;
+        }
+
+        /// <summary>出生点是否可用(口径=SimCore.SpawnEntity 抛出条件:按落点格心判定,与 ReinforceSystem.SlotCellFree 同构)。</summary>
+        static bool SpawnPointFree(SimCore sim, SimVec2 target)
+        {
+            var c = SimVec2.FromGrid(target.ToGrid());
+            foreach (var b in sim.Entities.Values)
+                if (b.Kind == EntityKind.Building && !b.Rubbled && BuildingFootprint.Contains(b, c)) return false;
+            foreach (var u in sim.Entities.Values)
+                if (u.Kind == EntityKind.Unit && u.State != EntityState.Dead && u.GarrisonBuildingId == 0
+                    && SimVec2.Distance(u.PosF, c) < 0.5f) return false;
+            return true;
         }
 
         /// <summary>生成主将 + 20 名士兵的完整兵团,返回主将实体。</summary>

@@ -22,6 +22,12 @@ namespace IronCurtain.View
         private float _countRefresh;
         private System.Func<int> _soldierCountOf;
 
+        // M6.1 战争迷雾门控状态
+        private bool _fogUnitHidden;
+        private bool _fogBuildingUnknown;
+        private bool _fogBuildingStale;
+        private int? _fogGarrisonOverride;
+
         // M8.6b 行军组件接管位:为 true 时 Tick 跳过位置同步(外部组件驱动 transform)
         public bool MarchHold;
 
@@ -120,6 +126,14 @@ namespace IronCurtain.View
             _hpFill.GetComponent<MeshRenderer>().sharedMaterial = t > 0.5f ? _g : (t > 0.25f ? _y : _r);
         }
 
+        public void SetFogUnitHidden(bool hidden) { _fogUnitHidden = hidden; }
+        public void SetFogBuilding(bool unknown, bool stale)
+        {
+            _fogBuildingUnknown = unknown;
+            _fogBuildingStale = stale;
+        }
+        public void SetFogGarrison(int? knownCount) { _fogGarrisonOverride = knownCount; }
+
         public void TickBillboard(Camera cam)
         {
             if (_hpRoot != null && cam != null)
@@ -130,18 +144,25 @@ namespace IronCurtain.View
         {
             if (_e == null) return;
             bool isB = _e.Kind == EntityKind.Building;
-            bool hidden = !isB && _e.GarrisonBuildingId != 0;
-            bool vis = !hidden && !_rubbled;
+            bool hidden = !isB && (_e.GarrisonBuildingId != 0 || _fogUnitHidden);
+            bool vis = !hidden && !_rubbled && !(isB && _fogBuildingUnknown);
             if (_model != null && _model.activeSelf != vis) { _model.SetActive(vis); _hpRoot.gameObject.SetActive(!hidden); }
+            if (isB && _fogBuildingUnknown)
+            {
+                // 建筑未知:血条与驻军点也全部隐藏
+                if (_hpRoot != null && _hpRoot.gameObject.activeSelf) _hpRoot.gameObject.SetActive(false);
+                if (_gr != null && _gr.activeSelf) _gr.SetActive(false);
+            }
             if (!hidden && !MarchHold)
             {
                 Vector3 target = isB ? BoardView.WorldPos(_e.Pos) : BoardView.WorldPos(_e.PosF);
                 if (isB) transform.position = target;
                 else transform.position = Vector3.Lerp(transform.position, target, 1f - Mathf.Exp(-14f * dt));
-                SetHp(_e.Hp, _e.MaxHp);
+                if (!(isB && _fogBuildingStale)) SetHp(_e.Hp, _e.MaxHp); // Stale=冻结血条(不刷新)
             }
             if (_countLabel != null && _soldierCountOf != null)
             {
+                _countLabel.gameObject.SetActive(!_fogUnitHidden);
                 _countRefresh += dt;
                 if (_countRefresh >= 0.5f)
                 {
@@ -165,15 +186,16 @@ namespace IronCurtain.View
 
         private void UpdateGarrison()
         {
+            if (_fogBuildingUnknown) return; // 未知建筑不显示驻军点
             int f = _e.GarrisonFormal.Count, t = _e.GarrisonTemp.Count;
-            if (f == t && f == _gf && t == _gt) return;
-            _gf = f; _gt = t;
+            int n = _fogGarrisonOverride ?? (f + t);
+            if (n == _gf) return;
+            _gf = n; _gt = t;
             if (_gr != null) Destroy(_gr);
             _gr = null;
-            if (f + t == 0) return;
+            if (n == 0) return;
             _gr = new GameObject("Garrison");
             _gr.transform.SetParent(transform, false);
-            int n = f + t;
             for (int i = 0; i < n; i++)
             {
                 float a = i / (float)Mathf.Max(1, n) * Mathf.PI * 2f;

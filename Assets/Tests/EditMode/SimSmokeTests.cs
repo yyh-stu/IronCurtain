@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using IronCurtain.Sim;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace IronCurtain.Tests
 {
@@ -52,6 +53,24 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 1000; i++)
                 if (a.NextInt(0, 100) != c.NextInt(0, 100)) { anyDiff = true; break; }
             Assert.IsTrue(anyDiff);
+        }
+
+        [Test]
+        public void MatchSetup_开局构建_6将满编120兵不抛()
+        {
+            // 回归:M8.4d 起 MatchSetup 无测试覆盖,开局将位槽位互相压叠致 SpawnEntity 抛"出生点过近"
+            VisionSystem.Reset();
+            var cfg = GameConfigParser.FromJson(Resources.Load<TextAsset>("gameconfig").text);
+            var sim = IronCurtain.View.MatchSetup.Build(cfg, null, null);
+            int generals = 0, soldiers = 0;
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e.Kind != EntityKind.Unit || e.State == EntityState.Dead) continue;
+                if (e.IsSoldier) soldiers++;
+                else generals++;
+            }
+            Assert.AreEqual(6, generals, "开局双方各 3 将");
+            Assert.AreEqual(120, soldiers, "6 将 × 20 兵满编");
         }
 
         [Test]

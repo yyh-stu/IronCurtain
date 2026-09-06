@@ -50,8 +50,9 @@ namespace IronCurtain.View
                     var cam = Camera.main;
                     if (cam != null)
                     {
-                        cam.transform.position = new Vector3(CamX[i], 55f, -50f);
-                        cam.transform.LookAt(new Vector3(CamX[i], 0f, -12f));
+                        var rig = cam.GetComponent<CameraRig>();
+                        if (rig != null) rig.SetFocus(CamX[i], 15f);
+                        else { cam.transform.position = new Vector3(CamX[i], 55f, -50f); cam.transform.LookAt(new Vector3(CamX[i], 0f, -12f)); }
                     }
                     string p = string.Format("D:/DevTools/shots/m6.6_{0}_t{1}s.png", i + 1, (int)Marks[i]);
                     ScreenCapture.CaptureScreenshot(p);

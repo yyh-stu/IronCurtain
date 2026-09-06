@@ -38,6 +38,7 @@ namespace IronCurtain.EditorTools
             AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 双方对打,画面有内容
             Directory.CreateDirectory("D:/DevTools/shots");
             var cam = Camera.main;
+            var fogView = Object.FindFirstObjectByType<FogView>();
 
             for (int i = 0; i < Marks.Length; i++)
             {
@@ -45,6 +46,7 @@ namespace IronCurtain.EditorTools
                 int guard = 0;
                 while (boot.Sim.Tick < targetTick && guard++ < 100000) boot.Sim.Step();
                 boot.Board.TickViews();
+                if (fogView != null) fogView.RefreshNow();
                 // 视图平滑收敛(edit 模式 Time.deltaTime≈0,手工喂 dt)
                 for (int k = 0; k < 5; k++)
                     foreach (var v in Object.FindObjectsOfType<EntityView>())
