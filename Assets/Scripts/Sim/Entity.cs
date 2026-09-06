@@ -86,6 +86,9 @@ namespace IronCurtain.Sim
         // 玩家授意撤退(M8.7):撤退到达后压制自动行为层,玩家下次手动命令解除
         public bool RetreatHold;
 
+        // 阵亡计数防重(M6.4a):战斗死(CombatUpdate 统一清理块)与留场死(塔击/海克斯)双路径只计一次
+        public bool DeadCounted;
+
         // 布阵朝向覆盖(M8.5c 规划器设置;null=默认规则)
         public SimVec2? FacingOverride;
 

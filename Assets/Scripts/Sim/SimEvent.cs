@@ -9,7 +9,9 @@ namespace IronCurtain.Sim
         CommandExecuted,
         UnitAdvanced,
         DamageDealt,
-        EntityDied
+        EntityDied,
+        OvertimeStarted, // M6.4a 常规时限到,进入加时
+        MatchEnded       // M6.4a 对局结束(摧毁胜利或积分判定;SubjectId=(int)Winner,-1=平局)
     }
 
     public struct SimEvent

@@ -21,6 +21,12 @@ namespace IronCurtain.Sim
         public Side? Winner { get; private set; }
         public void SetWinner(Side side) { Winner = side; }
 
+        /// <summary>对局阶段(M6.4a):Normal → Overtime → Ended。加时 buff 读此状态。</summary>
+        public MatchPhase Phase { get; set; } = MatchPhase.Normal;
+
+        /// <summary>各方位阵亡主将数(M6.4a 积分平局链末级;士兵不计)。</summary>
+        public readonly Dictionary<Side, int> LostGenerals = new Dictionary<Side, int> { { Side.Blue, 0 }, { Side.Red, 0 } };
+
         // 补兵池(M8.4a):按阵营的全局池
         public readonly Dictionary<Side, float> ReinforceAccum = new Dictionary<Side, float> { { Side.Blue, 0f }, { Side.Red, 0f } };
         public readonly Dictionary<Side, int> ReinforcePool = new Dictionary<Side, int> { { Side.Blue, 0 }, { Side.Red, 0 } };
@@ -160,6 +166,7 @@ namespace IronCurtain.Sim
             TowerCombatSystem.Tick(this, 1f / Config.TickRate);
             GarrisonSystem.Tick(this, 1f / Config.TickRate);
             DestroySystem.Tick(this, 1f / Config.TickRate);
+            MatchClockSystem.Tick(this, 1f / Config.TickRate); // 对局时钟(M6.4a):时限/加时/积分判定
             HexSystem.Tick(this, 1f / Config.TickRate);
             VisionSystem.Tick(this, 1f / Config.TickRate);
             AiSystem.Tick(this, 1f / Config.TickRate);
@@ -219,8 +226,8 @@ namespace IronCurtain.Sim
             return used;
         }
 
-        /// <summary>名额上限 = GeneralCap(测试版 4;正式版 8)。</summary>
-        public int PopulationCapOf(Side side) => GeneralCap;
+        /// <summary>名额上限 = GeneralCap(测试版 4);加时 +1(GDD「人口+10」在名额制下的映射,M6.4a)。</summary>
+        public int PopulationCapOf(Side side) => GeneralCap + (Phase == MatchPhase.Overtime ? 1 : 0);
 
         public float EpOf(Side side) => _ep.TryGetValue(side, out var v) ? v : 0f;
 
@@ -246,7 +253,7 @@ namespace IronCurtain.Sim
                 if (pts <= 0) continue;
                 float acc = _epAccum.TryGetValue(s, out var a) ? a : 0f;
                 acc += pts * dt;
-                float interval = (float)Game.Ep.IntervalSeconds;
+                float interval = (float)(Phase == MatchPhase.Overtime ? Game.Match.OvertimeEpInterval : Game.Ep.IntervalSeconds); // 加时 EP 60s(M6.4a)
                 while (acc >= interval)
                 {
                     acc -= interval;
@@ -451,6 +458,7 @@ namespace IronCurtain.Sim
             {
                 if (_entities.TryGetValue(id, out var e))
                 {
+                    if (!e.IsSoldier && !e.DeadCounted) { e.DeadCounted = true; LostGenerals[e.Side]++; } // 阵亡兵团计数(M6.4a)
                     if (e.Hero != null) HexSystem.OnUnitDied(this, e.Side); // 陷阵之志
                     Emit(new SimEvent(Tick, SimEventType.EntityDied, id));
                     if (e.Kind == EntityKind.Building)
@@ -568,7 +576,7 @@ namespace IronCurtain.Sim
             return 0;
         }
 
-        private void Emit(SimEvent ev)
+        public void Emit(SimEvent ev)
         {
             for (int i = _listeners.Count - 1; i >= 0; i--)
                 _listeners[i]?.Invoke(ev);

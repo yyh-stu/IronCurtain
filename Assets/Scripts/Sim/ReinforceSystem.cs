@@ -4,7 +4,7 @@ namespace IronCurtain.Sim
 {
     /// <summary>
     /// 补兵池(M8.4a 第一批):全局 2s/兵、上限 60;玩家点补兵 → SJF(最缺人兵团先补、补齐为止);
-    /// 交战兵团不可补、脱战 3s 重新入列。行军表现归 View(M8.6b),本类纯 Sim。
+    /// 交战兵团不可补、脱战 3s 重新入列。行军表现归 View(M6.6b),本类纯 Sim。
     /// </summary>
     public static class ReinforceSystem
     {
@@ -16,8 +16,12 @@ namespace IronCurtain.Sim
 
         public static void Tick(SimCore sim, float dt)
         {
-            sim.ReinforceAccum[Side.Blue] += dt / SecondsPerSoldier;
-            sim.ReinforceAccum[Side.Red] += dt / SecondsPerSoldier;
+            // M6.4a 加时:兵营产速+10%(GDD)在将兵制下映射为全局补兵速度+10%(兵营只承担补兵)
+            float perSoldier = sim.Phase == MatchPhase.Overtime
+                ? (float)(SecondsPerSoldier / (1.0 + sim.Game.Match.OvertimeProductionBonus))
+                : SecondsPerSoldier;
+            sim.ReinforceAccum[Side.Blue] += dt / perSoldier;
+            sim.ReinforceAccum[Side.Red] += dt / perSoldier;
             foreach (Side side in new[] { Side.Blue, Side.Red })
             {
                 while (sim.ReinforceAccum[side] >= 1f && sim.ReinforcePool[side] < PoolCap)

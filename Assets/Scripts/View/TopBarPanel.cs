@@ -51,11 +51,12 @@ namespace IronCurtain.View
 
             var clockStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
             clockStyle.normal.textColor = Color.white;
+            if (_sim.Phase == MatchPhase.Overtime) clockStyle.normal.textColor = new Color(1f, 0.55f, 0.2f); // 加时橙红
             GUI.Label(new Rect(Screen.width * 0.5f - 90f, 4f, 180f, 26f),
-                TopBarModel.FormatClock(_sim.Tick, _sim.Config.TickRate), clockStyle);
+                TopBarModel.FormatCountdown(_sim), clockStyle);
             var sub = new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
             sub.normal.textColor = new Color(1f, 1f, 1f, 0.7f);
-            GUI.Label(new Rect(Screen.width * 0.5f - 90f, 28f, 180f, 14f), "对战中", sub);
+            GUI.Label(new Rect(Screen.width * 0.5f - 90f, 28f, 180f, 14f), TopBarModel.PhaseText(_sim), sub);
 
             var snap = _enemyBase != null
                 ? VisionSystem.LastKnownBuilding(_sim, _side, _enemyBase.Id) : null;

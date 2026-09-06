@@ -43,6 +43,8 @@ namespace IronCurtain.View
 
             var topBar = gameObject.AddComponent<TopBarPanel>();
             topBar.Init(Sim, Side.Blue);
+            var result = gameObject.AddComponent<ResultPanel>();
+            result.Init(Sim, Side.Blue);
             var ftGo = new GameObject("FloatingText");
             ftGo.transform.SetParent(transform, false);
             var floats = ftGo.AddComponent<FloatingTextView>();
