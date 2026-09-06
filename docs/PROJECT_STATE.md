@@ -1,7 +1,7 @@
 ﻿# PROJECT_STATE —— 铁幕:前线 Demo 项目交接文件
 
 > 用途:新会话续工时,先读本文件即可恢复全部上下文。每次里程碑更新本文件。
-> 最后更新:2026-09-06 | 阶段:M8.7 撤退 13c 落地(188/188;RetreatSystem/溃逃系数统一−25%/防拉回/View 撤退按钮),下一步=M8.6+M8.7 View 视觉验收(用户编辑器 Play 审)→ M6.1 镜头/迷雾/小地图
+> 最后更新:2026-09-06 | 阶段:M6.1 镜头/迷雾/小地图落地(198/198;CameraRig 边缘滑动/FogView+敌实体信息过滤/MinimapPanel 点击跳转;附修 MatchSetup 开局将位压叠潜伏崩溃),下一步=M6.2 战斗 UI(顶栏/飘字/血条/选中/射程)→ M6.4 特效音效/计时加时积分结算;**待用户编辑器 Play 审:M6.1+M8.6+M8.7 全部 View 视觉(小地图/雾观感/框选/撤退按钮)**
 
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
@@ -142,7 +142,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - [x] 2026-09-06 **M8.5d 卡死自动绕行 ✅ 176/176**(用户拍板:卡死 1.5s 自动寻路绕开):NavigationAid(前向探测 1.2m 找阻挡建筑→外扩 1.5m 矩形较近角为旁路点;单位互堵→垂直让位 2m 按 id 奇偶定侧);主将(MoveUnits)/士兵(RegimentSystem)/溃逃同路径接入;停滞判定=位移<期望步长×0.25 连续 15 tick;旁路 0.8m 清障/45 tick 超时保险。**编排者修 1 个顺序 bug**:GLM 把 PrevPosF 采样写在移动后,检查时距离恒 0→全员假卡死全员绕路(诊断测试定位);BuildingRectPush 断言随新语义更新(贴边滑动/绕行合法,穿透>0.05 违规)。
 - [x] 2026-09-06 **M8.7 撤退 13c ✅ 188/188**(GLM-5.3 一版过+编排者修 4 处幻想 API):①**RetreatSystem.OrderRetreat**(玩家授意撤退:最近己方非废墟据点、站定点=建筑边缘外 1.2m、兵团原子=同兵团非驻军士兵同步 Routing、清自动决策);②**溃逃系数统一 −0.3/+0.3 → −0.25/+0.25**(SimCore 4 处含断峰扇形分支;"撤退期间血量与攻击力−25%"按乘区近似:输出−25%/承伤+25%,撤退结束自动消失——待确认①按此落地);③**防拉回 RetreatHold**:OrderRetreat 置位→RegimentBehaviorSystem 跳过(索敌/支援均压制,被迫接战保留),玩家 manual SetMoveTarget 解除→自动层恢复接管;④士兵撤退态自动复位 2 处(主将到站/被打断、无将续战清除);⑤**View 撤退按钮**(SelectionSystem:选中≥1 主将底部中央"撤退"按钮,MouseOverPanel 防点击穿透)。新增 RetreatTests T1-T9(基本/输出比 0.75/承伤比 1.25/到达站定/防拉回+解除/撤退中不覆盖/士兵复位/边界×4/最近据点)。**编排者修 GLM 4 处幻想 API**:GameConfig.LoadDefault→GameConfigParser.FromJson、ClearEventListeners→TearDown 四系统复位、SimConfig{TickRate=30}→默认 10Hz(防节奏崩)、SimEvent.Id→SubjectId(属性链漏检);**新坑根治**:GLM 末块尾部无围栏 markdown 摘要被 parse_files 写入 cs 尾部→parse_files.py 加行首 `**` 截断(.cs,自测过)。api_gate 117 条全为符号库缺口误报(m8.7.allowed.txt 备案)。**M8.6+M8.7 View 视觉验收待用户编辑器 Play 审**(撤退按钮+框选/行军/底板/提示文字一并)。
 - [x] 2026-09-06 **deepseek 挑刺岗盲测 + M8.7fix ✅ 188/188**(流程实验):通道打通=ZCode config 里已有 deepseek provider(`api.deepseek.com/anthropic`,deepseek-v4-pro;**v4-pro 默认开思考会吃光 max_tokens,须 thinking disabled**);新工具 `glm-pipeline/deepseek_review.py`(挑刺 runner,泛化任务单内嵌)+`review_check.py`(裁决硬门禁:报告+「## 裁决」段齐才放行落盘)。盲测=挑 M8.7 原始输出:严格分 1/5 未过线(漏检 4 处全为 API 存在性类=api_gate 强项),但计划外 3 真刺全中机械门禁盲区——**修复 2 个真 bug:①撤退按钮 Rect 残留(清空选择后旧按钮区域左键永久失效→拦截加选中守卫)②交换中士兵被误置撤退态(→Exchanging 排除)**;误报 2/24 零顺着说,成本 ≈¥0.55/次。**待用户拍板**:窄口径上岗(逻辑/时序/状态类审查岗,嵌入"GLM 输出落盘前+提示词定稿前"两节点)或按盲测规则换 Kimi(K2.5,¥27 全程)。→ **2026-09-06 制作人拍板:deepseek 挑刺岗常驻(窄口径)**,已入 PROTOCOL 验收矩阵与 ROSTER(LogicAuditor);Kimi K3(非 K2.5,2.8T/7 月发布)列为总编排首选候选,档位建议 Moderato ¥99 起(详见模型管线表)。
-- [ ] M6.1 镜头边缘滑动+迷雾渲染+小地图(D18/D19/D34)
+- [x] 2026-09-06 **M6.1 镜头/迷雾/小地图 ✅ 198/198**(GLM 一版过三门禁+编排者自修;提示词 `docs/prompts/m6.1-camera-fog-minimap.md`):①**CameraRig(D18)** 鼠标贴边(12px)匀速平移 28m/s 公开可配置、焦点钳制包围盒 6m 余量、悬停 IMGUI 面板停滚、开局聚焦 (40,15);CaptureRunner 截图改走 rig.SetFocus 防打架;②**FogView(D34)** 286×30 纹理贴 y=0.25 地面四边形(URP Unlit 透明配方),IsFresh→alpha 0/160 双线性平滑,0.5s 刷新+CaptureBatch 手动 RefreshNow;**敌实体信息过滤**:敌露天单位不可见=模型/血条/兵力标签全隐;敌建筑未见过=全隐、失视=冻结快照(血条冻结+驻军点=LastKnownGarrison+归侧按快照),Sim 纯增量 `VisionSystem.LastKnownBuilding`;③**MinimapPanel(D19)** 右下角 440×90(点采样背景:椭圆/河/桥/岛/虚空),雾叠加(纹理垂直翻转:GUI v=0=底部=南)、己方全量+敌方仅可见/快照、相机取景白框(4 屏角射线投地面)、点击/拖动=SetFocus+防穿透,SelectionSystem 守卫加小地图 Rect;MinimapLayout/FogRules 纯逻辑可测。新增 MinimapFogTests 9 条。**编排者自修 5 处**:FogView 幻想 API ViewAssets.CreateMesh(Vector3[],uv,trys) 重载→自建 Mesh;FogView 枚举未限定(Bilinear/Clamp);小地图背景+雾上下颠倒(GUI 纹理 v=0=rect 底部=南与 row0=北相反→背景行序翻转+DrawTextureWithTexCoords 垂直翻转);T4 出生点越界(300→250);**MatchSetup 潜伏崩溃修复**(M8.4d 起 MatchSetup.Build 零覆盖:开局 3 将位差 2 列,4×5 士兵阵型块大面积压叠→SpawnEntity 抛"出生点过近";CaptureBatch 是 M8.4 后首跑当场暴露):SpawnSoldier 加出生防崩(沿槽外推 1m×3 次,口径=格心判定与 SlotCellFree 同构;首版误用落点判定与 SpawnEntity 格心口径不一致致 AiTests T4 红,对齐后绿)+开局将位重排(蓝 24/30/36、红 263/257/251,将间距 ≥6 列=阵型块互不压叠且避基地/兵营占地)+SimSmokeTests 补 MatchSetup 冒烟(6 将 120 兵)。api_gate 25 条全为符号库缺口误报(m6.1.allowed.txt)。**hy-vision 客观项过**:雾罩未探区/己方清晰/平滑渐变/无渲染错;30s 中线雾封 vs 60s 随军清晰=视野联动正确;敌区无任何单位建筑细节=过滤生效。截图 `D:/DevTools/shots/m6.1_1..4_*.png`(旧 m6.6 备份 backup_m66/);**小地图/雾审美+镜头手感终审待用户编辑器 Play 审**(IMGUI 不入离屏截图,同总览面板惯例)。
 - [ ] M6.2 战斗 UI / M6.4 特效音效 / 计时加时积分结算
 - [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
 - [ ] GPT 总编排交接准备(用户拟接入 GPT-6 Astra/5.6 Sol 任总编排;交接载体=本文件+docs/team/+team-pipeline README)
@@ -208,6 +208,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 | M8.4+M8.6a | 4a/6a 并行双交付一版过(补兵池+兵团渲染);4b 产将一版过;4c 面板一版过(自写 T9 场景 1 处红) | 编排者修复:出生螺旋+阵型纵深校验、死亡实体不挡出生、出生默认脱战、迅捷 7.5s 保留、节奏账适配(20s+错峰);GLM 漏改测试 1 处(SideOf 假 API) | **158/158 ✓** |
 | M8.6 | 9 文件一版过门禁全清(api_gate 330 条全为符号库缺口误报,人工 triage 放行;static/rewrite 一次过),行军源/选择/布阵接线/占地底板数值全命中,新测试 T7-T9 一次绿 | 编排者 3 小修:提示淡出计时重置时机、选中圈根节点泄漏、点击标记缩放兜底;gitignore 修正 | **179/179 ✓** |
 | M8.7 | 7 文件一版过门禁(static/rewrite 一次过;api_gate 117 条全为符号库缺口误报,备案 m8.7.allowed.txt),RetreatSystem/系数/防拉回/撤退按钮全命中契约,RetreatTests 输出两版自取修订版一次绿 | 编排者修 4 处幻想 API(GameConfig.LoadDefault/ClearEventListeners/SimConfig{TickRate=30}/SimEvent.Id→SubjectId)+SelectionSystem 尾部 markdown 污染清除;parse_files.py 加行首 `**` 截断根治(自测过) | **188/188 ✓** |
+| M6.1 | 13 文件(5 新+8 改)一版过三门禁(api_gate 25 条全误报;static/rewrite 一次过),CameraRig/FogView/FogRules/MinimapPanel/MinimapLayout 数值与契约全命中,测试 9 条一版绿 | 编排者修 5 处:FogView 幻想重载 CreateMesh(Vector3[],uv,tris)/AttachMesh 参数序→自建 Mesh;FogView 枚举未限定 2 编译错;小地图纹理上下颠倒(GUI v=0=南)×2 处翻转;T4 越界坐标;**MatchSetup 潜伏崩溃**(零覆盖+将位压叠)——SpawnSoldier 防崩(格心口径,首版落点口径致 T4 红返工一轮)+将位重排+冒烟测试 | **198/198 ✓** |
 
 ## 7.75 三层门禁(已上线)
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
@@ -235,4 +236,6 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - CUA(电脑控制)与 Unity 交互时频繁断连(broker 超时),Unity 编译/导入期间不可用;只读操作在空闲时可用
 - **GLM 末 FILE 块尾部外溢 markdown 摘要(M8.7 事故)**:无围栏包裹的"改动摘要"曾被 parse_files 原样写入 cs 尾部→已根治(parse_files.py 对 .cs 内容遇行首 `**` 截断,自测通过);落盘后仍建议 `git diff` 核对尾部
 - 外部写 .cs 新文件后 Unity 可能不自动编译 → 前台激活编辑器+SendKeys ^r 强制刷新;或 kill 编辑器走 batchmode 编译
+- **glm_call.py -o 输出路径的父目录必须已存在**(不会自动建目录;M6.1 首跑 -o out/xx.md → 生成 12 分钟 75k tokens 全部丢失只剩 FileNotFoundError,重烧一轮)。惯例:输出直接放 glm-pipeline/ 根(m6.x.out.md),用前 ls 确认
+- **IMGUI 纹理上下颠倒坑**:GUI.DrawTexture 把纹理 v=0(=SetPixels32 第 0 行)画在 rect 底部;Sim row0=北=顶部 → 直接画必颠倒。修法:像素行序翻转 或 GUI.DrawTextureWithTexCoords(rect, tex, Rect(0,1,1,-1)) 垂直翻转(MinimapPanel 已两处落地)
 - Sim 连续坐标规则速查:`SimVec2{X=列米,Y=行米}`;`Entity.PosF`=单位权威位置;`Entity.Pos`=格(建筑);世界坐标 x=X,z=3−Y;碰撞半径 `SimCore.BuildingCollisionRadius`;单位不占格;测试模板布局(6×255 下):兵营(1,8)/蓝塔(1,16)/红塔(1,24)/蓝基地(1,0)
