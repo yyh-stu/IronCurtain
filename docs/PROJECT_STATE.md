@@ -1,7 +1,7 @@
 ﻿# PROJECT_STATE —— 铁幕:前线 Demo 项目交接文件
 
 > 用途:新会话续工时,先读本文件即可恢复全部上下文。每次里程碑更新本文件。
-> 最后更新:2026-09-06 | 阶段:将兵化改造 M8.5 全绿(176/176;射程/行为层/自动布阵/卡死绕行),下一步 M8.6 View 大块
+> 最后更新:2026-09-06 | 阶段:M8.6 View 指挥大块全绿(179/179;补兵行军/框选指挥/T键布阵/占地底板),下一步 M8.7 收口(撤退 13c 落地+视觉验收+全量回归)
 
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
@@ -136,7 +136,8 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - **主编排已换 GLM-5.3**(2026-09-06 用户拍板,deepseek 有降智迹象):代码与编排同模型,接口契约零转译损耗;执行原则=GLM 用量需有效益+编排者非必要不下场。
 - [x] 2026-09-06 **M8.5a 射程体系 ✅ 160/160**:近战(磐石/镇岳/逐风)=2、断峰=3、射手(坠日/星落)=9;建筑 Range 未动;**TestUtil.RunUntil 测试基建落地**(Combat/Destroy 已用,新测试一律用它,节奏账根治)。测试几何适配 2 处(射程变长改变索敌边界:T3 红镇岳隔行、T6 改镇岳贴塔拆除)。
 - [x] 2026-09-06 **M8.5b 兵团自主行为层 ✅ 166/166**:RegimentBehaviorSystem(SimConfig.AutoBehavior 开关,默认 false,MatchSetup 开;手动命令永不覆盖;索敌进攻(兵团视野:主将视野表+士兵 3/6)>支援(友军主将 15 格内交战);手动打断写 Sup 防复读,新事件可再触发)+AI 每 5s 自动补兵(池≥10)+**补兵槽位防崩**(出生格被占则沿槽向外推 1m×3 次,再堵跳过不耗池——修复路过建筑旁补兵抛异常)。行为测试补 TearDown 复位静态系统(修复跨测试污染)。
-- [x] 2026-09-06 **M8.5c 自动布阵规划器 ✅ 172/172**:RegimentFormationSystem(HeroClass 三分类;PlanFormation:质心→框选内视野找敌→朝向(敌质心/敌大本营/前进向)→常规三排(前重装/中战士/后射手,横距 6 排距 6)或屏风模式(方位差 >120°:射手居质心,近战按敌簇分向弧半径 4);Apply=设 FacingOverride+手动级移动);FacingOf 升级(规则③:后撤/横移不转身,面朝敌方向;FacingOverride 最优先)。Entity 加 FacingOverride。View 接线(T 键/框选)在 M8.6。编排者修:GLM 测试文件路径写错(门禁拦截后归位)、HeroCfg.Vision 假字段(对齐视野口径)、2 处测试布局(阵型压格/对向穿廊死锁)。 / M8.6 View 兵团渲染+行军+面板扩展 / M8.7 收口
+- [x] 2026-09-06 **M8.5c 自动布阵规划器 ✅ 172/172**:RegimentFormationSystem(HeroClass 三分类;PlanFormation:质心→框选内视野找敌→朝向(敌质心/敌大本营/前进向)→常规三排(前重装/中战士/后射手,横距 6 排距 6)或屏风模式(方位差 >120°:射手居质心,近战按敌簇分向弧半径 4);Apply=设 FacingOverride+手动级移动);FacingOf 升级(规则③:后撤/横移不转身,面朝敌方向;FacingOverride 最优先)。Entity 加 FacingOverride。View 接线(T 键/框选)在 M8.6。编排者修:GLM 测试文件路径写错(门禁拦截后归位)、HeroCfg.Vision 假字段(对齐视野口径)、2 处测试布局(阵型压格/对向穿廊死锁)。
+- [x] 2026-09-06 **M8.6 View 指挥大块 ✅ 179/179**(GLM-5.3 一版过+编排者 3 小修):①**补兵行军表现**(纯表现不可截击):Entity.MarchOrigin(出生源)+ReinforceSystem.MarchSource(距主将最近己方存活非废墟兵营→无兵营 fallback 主基地→再无 null 即时落位)+ReinforceMarchView(View 组件:士兵模型自生产点以 MoveSpeed 走向活目标 e.PosF,<0.5m 入队交接;EntityView.MarchHold 跳过位置同步);②**点选/框选指挥**(SelectionSystem,新):左键点选(3m 命中,士兵点击映射其主将)/拖框选蓝方主将、右键手动级移动(SetMoveTarget manual:true,含防拉回语义)、绿色选中圈、点击标记、BarracksOverviewPanel.LastPanelRect 避让;③**T 键自动布阵接线**:选中≥2 兵团→屏幕中央"按 T 键自动布阵"提示 2.5s 渐隐,T=RegimentFormationSystem.Apply;④**建筑占地底板**:EntityView.BuildBuilding 按 BuildingFootprint.HalfW/H 画阵营色薄板(多格占地可视化)。新增 T7(最近兵营)/T8(fallback 主基)/T9(空场 null)行军源测试。**编排者自修 3 处**:提示文字每帧重置永不满淡(→仅选择变化瞬间重置)、SelectionRings 空根节点泄漏、不透明材质下点击标记 alpha 淡出无效(加缩放消退兜底);gitignore TestResults 目录规则修正(原 `TestResults*.xml` 不匹配子目录文件)。**api_gate 符号库缺口备案**:`const` 成员/Unity View 类型/Tuple.Item/注释内版本号共 15 模式全误报(330 条),人工 triage 无幻想 API 后放行——下次 Sim 大改前值得给 api_gate 补 const 提取与 View 白名单。**视觉验收待用户编辑器 Play 审**(框选手感/行军观感/占地底板/提示文字)。
 - [x] 2026-09-06 **M8.5d 卡死自动绕行 ✅ 176/176**(用户拍板:卡死 1.5s 自动寻路绕开):NavigationAid(前向探测 1.2m 找阻挡建筑→外扩 1.5m 矩形较近角为旁路点;单位互堵→垂直让位 2m 按 id 奇偶定侧);主将(MoveUnits)/士兵(RegimentSystem)/溃逃同路径接入;停滞判定=位移<期望步长×0.25 连续 15 tick;旁路 0.8m 清障/45 tick 超时保险。**编排者修 1 个顺序 bug**:GLM 把 PrevPosF 采样写在移动后,检查时距离恒 0→全员假卡死全员绕路(诊断测试定位);BuildingRectPush 断言随新语义更新(贴边滑动/绕行合法,穿透>0.05 违规)。
 - [ ] M6.1 镜头边缘滑动+迷雾渲染+小地图(D18/D19/D34)
 - [ ] M6.2 战斗 UI / M6.4 特效音效 / 计时加时积分结算
@@ -202,6 +203,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 | M8.2 | 兵团底座两批一版过(Entity 3 字段/RegimentSystem/SimCore 集成/平伤/视野 3·6/AI 守卫) | T7 两处自修(冻结移速防阵型拉回、视野 3s 保鲜步进 35 tick) | **157/157 ✓** |
 | M8.3 | 口径改造一版过+测试重写(158 条) | 修复轮 GLM 超时+输出失格(无 FILE 标记/截断)满 3 轮→接管 5 红:资源点容量 0→30、AI 防守调兵容错、3 个测试修正 | **158/158 ✓** |
 | M8.4+M8.6a | 4a/6a 并行双交付一版过(补兵池+兵团渲染);4b 产将一版过;4c 面板一版过(自写 T9 场景 1 处红) | 编排者修复:出生螺旋+阵型纵深校验、死亡实体不挡出生、出生默认脱战、迅捷 7.5s 保留、节奏账适配(20s+错峰);GLM 漏改测试 1 处(SideOf 假 API) | **158/158 ✓** |
+| M8.6 | 9 文件一版过门禁全清(api_gate 330 条全为符号库缺口误报,人工 triage 放行;static/rewrite 一次过),行军源/选择/布阵接线/占地底板数值全命中,新测试 T7-T9 一次绿 | 编排者 3 小修:提示淡出计时重置时机、选中圈根节点泄漏、点击标记缩放兜底;gitignore 修正 | **179/179 ✓** |
 
 ## 7.75 三层门禁(已上线)
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
