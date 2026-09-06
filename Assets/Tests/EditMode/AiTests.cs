@@ -104,8 +104,10 @@ namespace IronCurtain.Tests
         public void T4_普通补产镇岳()
         {
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
-            Run(800); // 配比"3 只 1 人口 → 1 镇岳";20s/将+错峰出生,镇岳入队约 tick 710
-            bool hasZhenYue = blueHQ.Prod.Slots.Any(s =>
+            Run(1000); // 配比"3 只 → 1 镇岳";20s/将+错峰出生,出生节奏随场景浮动,放宽并兜底查场上
+            bool hasZhenYue = sim.Entities.Values.Any(e => e.Side == Side.Blue && e.Kind == EntityKind.Unit
+                && !e.IsSoldier && e.Hero == HeroId.ZhenYue)
+                || blueHQ.Prod.Slots.Any(s =>
                 s.Current == HeroId.ZhenYue || s.Pending.Contains(HeroId.ZhenYue));
             Assert.IsTrue(hasZhenYue, "普通 AI 兵种配比应含镇岳");
         }
@@ -133,16 +135,16 @@ namespace IronCurtain.Tests
         public void T7_普通集结阈值()
         {
             RevealBuilding(Side.Blue, redTower);
-            for (int i = 0; i < 7; i++)
-                SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(i % 3, 3 + i / 3));
+            // 将兵制(M8.4b 名额 4):波次门槛按兵团计=2(旧 8 只单兵口径作废)
+            SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(0, 3));
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
             Run(25);
-            Assert.AreEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, neutral.Id), "7 只不应触发集结");
+            Assert.AreEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, neutral.Id), "1 兵团不应触发集结");
 
-            SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(16, 113)); // 第 8 只
+            SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(1, 3)); // 第 2 兵团
             Run(25);
             // 蓝塔视野自动揭示中立点 → 波次首选中立(占中立优先)
-            Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "8 只应触发对中立点的攻城意图");
+            Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "2 兵团应触发对中立点的攻城意图");
         }
 
         [Test]

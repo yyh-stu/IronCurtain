@@ -140,7 +140,8 @@ namespace IronCurtain.Sim
                             && e.State != EntityState.Dead && e.GarrisonBuildingId == 0
                             && e.State != EntityState.Exchanging)
                 .ToList();
-            if (field.Count < 8) return;
+            // 将兵制(M8.4b 名额上限 4):波次门槛按兵团计——8 只单兵的旧口径在 4 名额下永不满足,AI 永不推进
+            if (field.Count < 2) return;
 
             var home = Home(sim, ai.Side);
             // 目标选择
@@ -167,7 +168,7 @@ namespace IronCurtain.Sim
             }
 
             var targetB = sim.GetEntity(targetId);
-            var wave = field.OrderBy(e => targetB != null ? Dist(sim, e, targetB) : 0f).Take(10).Select(e => e.Id).ToList();
+            var wave = field.OrderBy(e => targetB != null ? Dist(sim, e, targetB) : 0f).Take(4).Select(e => e.Id).ToList(); // 名额 4,一波最多全员
             if (SiegeSystem.SetIntent(sim, targetId, ai.Side, intent, out _))
             {
                 SiegeSystem.IssueOrder(sim, wave, targetId, out _);

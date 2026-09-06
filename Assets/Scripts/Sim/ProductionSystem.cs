@@ -91,7 +91,7 @@ namespace IronCurtain.Sim
 
             // 前缘列螺旋外扩:基地正前方被其他建筑(如紧邻兵营)堵住时,向外找可落兵团的位置
             int baseCol = b.Pos.Col + dir * ((int)System.Math.Ceiling(BuildingFootprint.HalfW(b)) + RegimentSystem.FormationRows + 1); // 再让出阵型纵深(4 排),兵团不压基地
-            for (int d = 0; d <= 8; d++)
+            for (int d = 0; d <= 40; d++) // 外扩 40:出生带可能被中立点/兵团阵型块占满(如测试场景 116..136 挤满),保底不死锁
             {
             int col = baseCol + dir * d;
             for (int i = 0; i < SpawnDRows.Length; i++)
