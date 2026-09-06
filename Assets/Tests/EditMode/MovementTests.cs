@@ -170,16 +170,18 @@ namespace IronCurtain.Tests
         {
             // 推出有效/不穿墙:单位撞向兵营占地,被矩形推出且不得停在矩形内部
             var sim = NewSim();
-            sim.SpawnBuilding(Side.Red, BuildingId.Barracks, new GridPos(15, 120)); // x∈[118,123]
+            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Barracks, new GridPos(15, 120)); // x∈[118,123]
             var u = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(15, 116));
             u.MoveSpeed = 2f;
             sim.SetMoveTarget(u.Id, new GridPos(15, 130));
             for (int i = 0; i < 80; i++)
             {
                 sim.Step();
-                Assert.IsTrue(u.PosF.X <= 118.001f, "单位不得穿入占地矩形(X 应停留在左缘 118 以内)");
+                var cp = BuildingFootprint.ClosestPoint(bar, u.PosF);
+                Assert.IsFalse(BuildingFootprint.Contains(bar, u.PosF) && SimVec2.Distance(u.PosF, cp) > 0.05f,
+                    "单位不得深入占地矩形(贴边/绕行合法,穿透>0.05 违规)");
             }
-            Assert.AreEqual(EntityState.Moving, u.State, "被建筑挡住,保持行军但不可穿越");
+            Assert.IsTrue(u.State == EntityState.Moving || u.State == EntityState.Idle, "绕行后仍在行军或已抵达");
         }
     }
 }

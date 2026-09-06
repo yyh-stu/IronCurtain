@@ -50,7 +50,7 @@ namespace IronCurtain.Sim
                     // a) 主将存活:阵型跟随(士兵不写 HasMoveTarget/State)
                     var target = g.PosF + SlotOffset(g, e.FormationSlot);
                     float dist = SimVec2.Distance(e.PosF, target);
-                    if (dist > 0.2f) StepMove(e, target, dist, dt);
+                    if (dist > 0.2f) StepMove(sim, e, target, dt);
                 }
                 else
                 {
@@ -59,17 +59,45 @@ namespace IronCurtain.Sim
                     if (enemy == null) continue;
                     float dist = SimVec2.Distance(e.PosF, enemy.PosF);
                     if (dist <= e.Range + 0.3f) continue; // 交战交给 CombatUpdate
-                    StepMove(e, enemy.PosF, dist, dt);
+                    StepMove(sim, e, enemy.PosF, dt);
                 }
             }
         }
 
-        private static void StepMove(Entity e, SimVec2 target, float dist, float dt)
+        /// <summary>士兵步进(M8.5d:旁路点状态机 + 卡死检测内联,与 SimCore.MoveUnits 同一套数值)。</summary>
+        private static void StepMove(SimCore sim, Entity e, SimVec2 target, float dt)
         {
+            // 旁路点:抵达(<0.8m)或超时(>45 tick)→ 清除,转回原目标
+            if (e.Detour.HasValue)
+            {
+                e.DetourTicks++;
+                if (SimVec2.Distance(e.PosF, e.Detour.Value) < NavigationAid.DetourClearDist
+                    || e.DetourTicks > NavigationAid.DetourTimeoutTicks)
+                {
+                    e.Detour = null;
+                    e.DetourTicks = 0;
+                }
+            }
+            var goal = e.Detour ?? target;
+
             float spd = e.MoveSpeed * TerrainMap.MoveFactor(e.PosF);
-            float step = System.Math.Min(spd * dt, dist);
-            e.PosF = TerrainMap.ClampToEllipse(e.PosF + (target - e.PosF).Normalized() * step);
+            float step = System.Math.Min(spd * dt, SimVec2.Distance(e.PosF, goal));
+            e.PosF = TerrainMap.ClampToEllipse(e.PosF + (goal - e.PosF).Normalized() * step);
+            // 建筑推出(与主将路径同语义,士兵不得穿墙)
+            foreach (var b in sim.Entities.Values)
+                if (b.Kind == EntityKind.Building && !b.Rubbled && BuildingFootprint.Contains(b, e.PosF))
+                    e.PosF = BuildingFootprint.ClosestPoint(b, e.PosF);
             e.Pos = e.PosF.ToGrid();
+
+            // 卡死检测:位移 < 期望步长×0.25 → 停滞;满 15 tick 且无旁路 → 计算旁路点
+            if (SimVec2.Distance(e.PosF, e.PrevPosF) < spd * dt * NavigationAid.StepRatio) e.StuckTicks++;
+            else e.StuckTicks = 0;
+            e.PrevPosF = e.PosF;
+            if (e.StuckTicks >= NavigationAid.StuckThresholdTicks && !e.Detour.HasValue)
+            {
+                e.Detour = NavigationAid.ComputeDetour(sim, e, target);
+                e.StuckTicks = 0;
+            }
         }
 
         /// <summary>最近敌索敌:与 SimCore.FindNearestEnemy 同一欧氏语义(单位、非己方、非死亡、非城内/交换)。</summary>
@@ -105,6 +133,7 @@ namespace IronCurtain.Sim
             s.ShieldMax = s.Shield;
             s.GeneralId = general.Id;
             s.PosF = target;
+            s.PrevPosF = target;
             s.Pos = target.ToGrid();
             return s;
         }

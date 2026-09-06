@@ -270,18 +270,47 @@ namespace IronCurtain.Sim
                 if (e.GarrisonBuildingId != 0) continue; // 驻军单位不占线移动
                 if (!e.HasMoveTarget) continue;          // 无目标的 Routing 原地待命
 
-                SimVec2 target = SimVec2.FromGrid(e.MoveTarget);
-                SimVec2 delta = target - e.PosF;
-                float dist = delta.Magnitude;
-                if (dist <= 0.15f)
+                // M8.5d 旁路点状态机:抵达(<0.8m)或超时(>45 tick)→ 清除,转回原目标
+                if (e.Detour.HasValue)
+                {
+                    e.DetourTicks++;
+                    if (SimVec2.Distance(e.PosF, e.Detour.Value) < NavigationAid.DetourClearDist
+                        || e.DetourTicks > NavigationAid.DetourTimeoutTicks)
+                    {
+                        e.Detour = null;
+                        e.DetourTicks = 0;
+                    }
+                }
+
+                SimVec2 origTarget = SimVec2.FromGrid(e.MoveTarget); // 原目标(唯一抵达判定基准)
+                SimVec2 target = e.Detour ?? origTarget;             // 有效目标(移动朝向)
+
+                // M8.5d 卡死检测:本 tick 实际位移 < 期望步长×StepRatio → 停滞计数
+                float spd = MoveSpeedOf(e);
+                float expect = spd * perTick;
+                if (SimVec2.Distance(e.PosF, e.PrevPosF) < expect * NavigationAid.StepRatio) e.StuckTicks++;
+                else e.StuckTicks = 0;
+                e.PrevPosF = e.PosF; // 采样须在检查之后(与士兵分支同序);写在移动后会导致检查时距离恒 0
+                if (e.StuckTicks >= NavigationAid.StuckThresholdTicks && !e.Detour.HasValue)
+                {
+                    e.Detour = NavigationAid.ComputeDetour(this, e, target);
+                    e.StuckTicks = 0;
+                }
+
+                SimVec2 delta = origTarget - e.PosF;
+                if (delta.Magnitude <= 0.15f)
                 {
                     e.HasMoveTarget = false;
                     e.State = EntityState.Idle;
                     e.MoveAccum = 0f;
+                    e.Detour = null;
+                    e.DetourTicks = 0;
+                    e.PrevPosF = e.PosF;
                     continue;
                 }
 
-                float spd = MoveSpeedOf(e);
+                delta = target - e.PosF;
+                float dist = delta.Magnitude;
                 float step = System.Math.Min(spd * perTick, dist);
                 e.PosF = TerrainMap.ClampToEllipse(e.PosF + delta.Normalized() * step);
                 PushOutOfBuildings(e);
@@ -295,11 +324,13 @@ namespace IronCurtain.Sim
                     Emit(new SimEvent(Tick, SimEventType.UnitAdvanced, e.Id)); // 节流:约每 1 米一次
                 }
 
-                if ((target - e.PosF).Magnitude <= 0.15f)
+                if ((origTarget - e.PosF).Magnitude <= 0.15f)
                 {
                     e.HasMoveTarget = false;
                     e.State = EntityState.Idle;
                     e.MoveAccum = 0f;
+                    e.Detour = null;
+                    e.DetourTicks = 0;
                 }
             }
             RegimentSystem.Tick(this, perTick); // 兵团底座(M8.2a):阵型跟随/无将续战,先于软碰撞

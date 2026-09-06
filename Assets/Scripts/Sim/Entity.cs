@@ -21,6 +21,12 @@ namespace IronCurtain.Sim
         /// <summary>连续位置(米)。单位的移动权威;建筑保持 Pos 格中心语义(由调用方按需转换)。</summary>
         public SimVec2 PosF;
 
+        // M8.5d 卡死自动绕行
+        public SimVec2 PrevPosF;     // 上一 tick 位置(卡死检测)
+        public int StuckTicks;       // 连续停滞 tick 数
+        public SimVec2? Detour;      // 旁路点(null=直行)
+        public int DetourTicks;      // 旁路进行 tick 数(超时保险)
+
         public HeroId? Hero;
         public BuildingId? Building;
 
