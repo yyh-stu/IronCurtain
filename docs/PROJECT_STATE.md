@@ -1,7 +1,7 @@
 ﻿# PROJECT_STATE —— 铁幕:前线 Demo 项目交接文件
 
 > 用途:新会话续工时,先读本文件即可恢复全部上下文。每次里程碑更新本文件。
-> 最后更新:2026-09-06 | 阶段:M8.6 View 指挥大块全绿(179/179;补兵行军/框选指挥/T键布阵/占地底板),下一步 M8.7 收口(撤退 13c 落地+视觉验收+全量回归)
+> 最后更新:2026-09-06 | 阶段:M8.7 撤退 13c 落地(188/188;RetreatSystem/溃逃系数统一−25%/防拉回/View 撤退按钮),下一步=M8.6+M8.7 View 视觉验收(用户编辑器 Play 审)→ M6.1 镜头/迷雾/小地图
 
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
@@ -79,7 +79,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
    - **主动攻击(修订)**:兵团**视野范围内出现敌人**即自动寻路进攻(原"15 格"作废);优先级高于支援。
    - **警戒/支援(修订,原 20 格警戒作废)**:友军兵团(含其小兵视野)发现敌人→按主动攻击自动接战;若该友军主将距己方主将 **≤15 格** → 己方**无需指令自动支援**。
    - **撤退(新)**:交战中兵团被玩家主动授意撤退(点主将或框选出现撤退 UI,点 UI 执行);**撤退期间血量与攻击力 −25%**;**所有撤退/溃逃同理**;撤退目标=最近己方据点,在附近站定。
-   - 待确认:①撤退 −25% 的结算口径(当前血与上限同步 −25%?还是承伤 +25% 近似?);②被玩家控制的兵团是否仍执行"视野内敌人自动寻路进攻"(还是只被迫接战、不主动寻路);③断峰(3 格)在布阵/屏风里归"战士(近战)"一档,对吗。
+   - 待确认(M8.7 已按默认口径落地,待用户复核):①撤退 −25% 已按"乘区近似"落地(输出−25%/承伤+25%,撤退结束自动消失,与溃逃同构,溃逃系数同步 0.3→0.25);②玩家控制兵团**维持现状=视野内敌人仍自动寻路进攻**(13c 字面只豁免支援类;若要"只被迫接战不主动寻路"需再拍板);③断峰归"战士(近战)"档已是现状(M8.5c HeroClass 三分类),无需改。
 
 ## 2. 环境事实(本机)
 - OS:Win11 专业版;32GB 内存;RTX 5060 Ti(驱动 32.0.16.1656,与 Unity Hub Chromium 硬件加速冲突→Hub 需 --disable-gpu 启动,桌面快捷方式已建)
@@ -139,6 +139,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - [x] 2026-09-06 **M8.5c 自动布阵规划器 ✅ 172/172**:RegimentFormationSystem(HeroClass 三分类;PlanFormation:质心→框选内视野找敌→朝向(敌质心/敌大本营/前进向)→常规三排(前重装/中战士/后射手,横距 6 排距 6)或屏风模式(方位差 >120°:射手居质心,近战按敌簇分向弧半径 4);Apply=设 FacingOverride+手动级移动);FacingOf 升级(规则③:后撤/横移不转身,面朝敌方向;FacingOverride 最优先)。Entity 加 FacingOverride。View 接线(T 键/框选)在 M8.6。编排者修:GLM 测试文件路径写错(门禁拦截后归位)、HeroCfg.Vision 假字段(对齐视野口径)、2 处测试布局(阵型压格/对向穿廊死锁)。
 - [x] 2026-09-06 **M8.6 View 指挥大块 ✅ 179/179**(GLM-5.3 一版过+编排者 3 小修):①**补兵行军表现**(纯表现不可截击):Entity.MarchOrigin(出生源)+ReinforceSystem.MarchSource(距主将最近己方存活非废墟兵营→无兵营 fallback 主基地→再无 null 即时落位)+ReinforceMarchView(View 组件:士兵模型自生产点以 MoveSpeed 走向活目标 e.PosF,<0.5m 入队交接;EntityView.MarchHold 跳过位置同步);②**点选/框选指挥**(SelectionSystem,新):左键点选(3m 命中,士兵点击映射其主将)/拖框选蓝方主将、右键手动级移动(SetMoveTarget manual:true,含防拉回语义)、绿色选中圈、点击标记、BarracksOverviewPanel.LastPanelRect 避让;③**T 键自动布阵接线**:选中≥2 兵团→屏幕中央"按 T 键自动布阵"提示 2.5s 渐隐,T=RegimentFormationSystem.Apply;④**建筑占地底板**:EntityView.BuildBuilding 按 BuildingFootprint.HalfW/H 画阵营色薄板(多格占地可视化)。新增 T7(最近兵营)/T8(fallback 主基)/T9(空场 null)行军源测试。**编排者自修 3 处**:提示文字每帧重置永不满淡(→仅选择变化瞬间重置)、SelectionRings 空根节点泄漏、不透明材质下点击标记 alpha 淡出无效(加缩放消退兜底);gitignore TestResults 目录规则修正(原 `TestResults*.xml` 不匹配子目录文件)。**api_gate 符号库缺口备案**:`const` 成员/Unity View 类型/Tuple.Item/注释内版本号共 15 模式全误报(330 条),人工 triage 无幻想 API 后放行——下次 Sim 大改前值得给 api_gate 补 const 提取与 View 白名单。**视觉验收待用户编辑器 Play 审**(框选手感/行军观感/占地底板/提示文字)。
 - [x] 2026-09-06 **M8.5d 卡死自动绕行 ✅ 176/176**(用户拍板:卡死 1.5s 自动寻路绕开):NavigationAid(前向探测 1.2m 找阻挡建筑→外扩 1.5m 矩形较近角为旁路点;单位互堵→垂直让位 2m 按 id 奇偶定侧);主将(MoveUnits)/士兵(RegimentSystem)/溃逃同路径接入;停滞判定=位移<期望步长×0.25 连续 15 tick;旁路 0.8m 清障/45 tick 超时保险。**编排者修 1 个顺序 bug**:GLM 把 PrevPosF 采样写在移动后,检查时距离恒 0→全员假卡死全员绕路(诊断测试定位);BuildingRectPush 断言随新语义更新(贴边滑动/绕行合法,穿透>0.05 违规)。
+- [x] 2026-09-06 **M8.7 撤退 13c ✅ 188/188**(GLM-5.3 一版过+编排者修 4 处幻想 API):①**RetreatSystem.OrderRetreat**(玩家授意撤退:最近己方非废墟据点、站定点=建筑边缘外 1.2m、兵团原子=同兵团非驻军士兵同步 Routing、清自动决策);②**溃逃系数统一 −0.3/+0.3 → −0.25/+0.25**(SimCore 4 处含断峰扇形分支;"撤退期间血量与攻击力−25%"按乘区近似:输出−25%/承伤+25%,撤退结束自动消失——待确认①按此落地);③**防拉回 RetreatHold**:OrderRetreat 置位→RegimentBehaviorSystem 跳过(索敌/支援均压制,被迫接战保留),玩家 manual SetMoveTarget 解除→自动层恢复接管;④士兵撤退态自动复位 2 处(主将到站/被打断、无将续战清除);⑤**View 撤退按钮**(SelectionSystem:选中≥1 主将底部中央"撤退"按钮,MouseOverPanel 防点击穿透)。新增 RetreatTests T1-T9(基本/输出比 0.75/承伤比 1.25/到达站定/防拉回+解除/撤退中不覆盖/士兵复位/边界×4/最近据点)。**编排者修 GLM 4 处幻想 API**:GameConfig.LoadDefault→GameConfigParser.FromJson、ClearEventListeners→TearDown 四系统复位、SimConfig{TickRate=30}→默认 10Hz(防节奏崩)、SimEvent.Id→SubjectId(属性链漏检);**新坑根治**:GLM 末块尾部无围栏 markdown 摘要被 parse_files 写入 cs 尾部→parse_files.py 加行首 `**` 截断(.cs,自测过)。api_gate 117 条全为符号库缺口误报(m8.7.allowed.txt 备案)。**M8.6+M8.7 View 视觉验收待用户编辑器 Play 审**(撤退按钮+框选/行军/底板/提示文字一并)。
 - [ ] M6.1 镜头边缘滑动+迷雾渲染+小地图(D18/D19/D34)
 - [ ] M6.2 战斗 UI / M6.4 特效音效 / 计时加时积分结算
 - [ ] 美术风格定稿+3D 批量生成(管线已就绪,等风格拍板)
@@ -204,6 +205,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 | M8.3 | 口径改造一版过+测试重写(158 条) | 修复轮 GLM 超时+输出失格(无 FILE 标记/截断)满 3 轮→接管 5 红:资源点容量 0→30、AI 防守调兵容错、3 个测试修正 | **158/158 ✓** |
 | M8.4+M8.6a | 4a/6a 并行双交付一版过(补兵池+兵团渲染);4b 产将一版过;4c 面板一版过(自写 T9 场景 1 处红) | 编排者修复:出生螺旋+阵型纵深校验、死亡实体不挡出生、出生默认脱战、迅捷 7.5s 保留、节奏账适配(20s+错峰);GLM 漏改测试 1 处(SideOf 假 API) | **158/158 ✓** |
 | M8.6 | 9 文件一版过门禁全清(api_gate 330 条全为符号库缺口误报,人工 triage 放行;static/rewrite 一次过),行军源/选择/布阵接线/占地底板数值全命中,新测试 T7-T9 一次绿 | 编排者 3 小修:提示淡出计时重置时机、选中圈根节点泄漏、点击标记缩放兜底;gitignore 修正 | **179/179 ✓** |
+| M8.7 | 7 文件一版过门禁(static/rewrite 一次过;api_gate 117 条全为符号库缺口误报,备案 m8.7.allowed.txt),RetreatSystem/系数/防拉回/撤退按钮全命中契约,RetreatTests 输出两版自取修订版一次绿 | 编排者修 4 处幻想 API(GameConfig.LoadDefault/ClearEventListeners/SimConfig{TickRate=30}/SimEvent.Id→SubjectId)+SelectionSystem 尾部 markdown 污染清除;parse_files.py 加行首 `**` 截断根治(自测过) | **188/188 ✓** |
 
 ## 7.75 三层门禁(已上线)
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
@@ -229,5 +231,6 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - **Unity 许可证**:直接启动 Unity.exe 会"No ULF license found"退出 → 必须先启动 Unity Hub(它会拉起 LicensingClient),再启 Unity;Hub 未登录但 LicensingClient 会给 personal serial
 - **M6 表现层工作流(重要)**:截图验收=编辑器菜单 IronCurtain/Play & Capture(热键 Ctrl+Shift+Alt+P)→ 场景内 CaptureRunner 按 sim 10/30/60/120s 拍 4 张到 D:/DevTools/shots/(Speed=3x,蓝方配 Normal AI 对打);触发热键用 PowerShell SetForegroundWindow+SendKeys(见 workspace/win_focus.ps1);**Play 运行期间禁止改脚本**(会热重载丢 Sim 字段刷 NRE,GameBootstrap 已有防护但勿依赖)
 - CUA(电脑控制)与 Unity 交互时频繁断连(broker 超时),Unity 编译/导入期间不可用;只读操作在空闲时可用
+- **GLM 末 FILE 块尾部外溢 markdown 摘要(M8.7 事故)**:无围栏包裹的"改动摘要"曾被 parse_files 原样写入 cs 尾部→已根治(parse_files.py 对 .cs 内容遇行首 `**` 截断,自测通过);落盘后仍建议 `git diff` 核对尾部
 - 外部写 .cs 新文件后 Unity 可能不自动编译 → 前台激活编辑器+SendKeys ^r 强制刷新;或 kill 编辑器走 batchmode 编译
 - Sim 连续坐标规则速查:`SimVec2{X=列米,Y=行米}`;`Entity.PosF`=单位权威位置;`Entity.Pos`=格(建筑);世界坐标 x=X,z=3−Y;碰撞半径 `SimCore.BuildingCollisionRadius`;单位不占格;测试模板布局(6×255 下):兵营(1,8)/蓝塔(1,16)/红塔(1,24)/蓝基地(1,0)
