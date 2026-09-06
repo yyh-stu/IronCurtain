@@ -41,8 +41,9 @@ namespace IronCurtain.Sim
 
             foreach (var s in sim.Entities.Values)
                 if (s.Kind == EntityKind.Unit && s.IsSoldier && s.GeneralId == g.Id
-                    && s.State != EntityState.Dead && s.GarrisonBuildingId == 0)
-                    s.State = EntityState.Routing; // 兵团原子:士兵同步撤退(减益+只被迫接战)
+                    && s.State != EntityState.Dead && s.State != EntityState.Exchanging
+                    && s.GarrisonBuildingId == 0)
+                    s.State = EntityState.Routing; // 兵团原子:士兵同步撤退(减益+只被迫接战);交换中士兵除外(盲测挑出)
             return true;
         }
     }
