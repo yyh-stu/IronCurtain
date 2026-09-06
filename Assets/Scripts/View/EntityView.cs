@@ -31,6 +31,11 @@ namespace IronCurtain.View
         // M8.6b 行军组件接管位:为 true 时 Tick 跳过位置同步(外部组件驱动 transform)
         public bool MarchHold;
 
+        // M6.2 飘字顶部锚点高度(单位默认 2.9;建筑在 Bind 时覆盖)
+        public float TextTopY = 2.9f;
+        private float _hitT;
+        private Transform _hpBack;
+
         public void Bind(Entity e, Side side, HeroId? hero, BuildingId? building, System.Func<int> soldierCountOf = null)
         {
             _e = e; _side = side;
@@ -48,7 +53,11 @@ namespace IronCurtain.View
             else
             {
                 if (e.Kind == EntityKind.Unit) BuildUnit(hero.HasValue ? hero.Value : HeroId.PanShi);
-                else BuildBuilding(building.HasValue ? building.Value : BuildingId.Tower);
+                else
+                {
+                    BuildBuilding(building.HasValue ? building.Value : BuildingId.Tower);
+                    TextTopY = _topY + 1.2f;
+                }
                 BuildHpBar();
                 if (e.Kind == EntityKind.Unit && !e.IsSoldier && soldierCountOf != null)
                 {
@@ -107,7 +116,7 @@ namespace IronCurtain.View
             _gB = ViewAssets.Mat(Color.black, 0f, 0.9f, new Color(0.4f, 0.4f, 0.4f), 0.7f);
         }
 
-        public void FlashHit() { }
+        public void FlashHit() { _hitT = 0.18f; }
 
         public void SetDead()
         {
@@ -159,6 +168,21 @@ namespace IronCurtain.View
                 if (isB) transform.position = target;
                 else transform.position = Vector3.Lerp(transform.position, target, 1f - Mathf.Exp(-14f * dt));
                 if (!(isB && _fogBuildingStale)) SetHp(_e.Hp, _e.MaxHp); // Stale=冻结血条(不刷新)
+            }
+            if (_hitT > 0f)
+            {
+                _hitT -= dt;
+                if (_hpBack != null) // 士兵不建血条,无背板可闪
+                {
+                    float f = Mathf.Clamp01(_hitT / 0.18f);
+                    var r = _hpBack.GetComponent<MeshRenderer>();
+                    if (r != null && r.sharedMaterial != null)
+                    {
+                        Color c = Color.Lerp(new Color(0.18f, 0.18f, 0.20f), Color.white, f);
+                        if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", c);
+                        else r.sharedMaterial.color = c;
+                    }
+                }
             }
             if (_countLabel != null && _soldierCountOf != null)
             {
@@ -224,7 +248,7 @@ namespace IronCurtain.View
             root.transform.SetParent(transform, false);
             root.transform.localPosition = new Vector3(0f, _e.Kind == EntityKind.Building ? _topY + 0.9f : 2.7f, 0f);
             _hpRoot = root.transform;
-            ViewAssets.DecoQuad(_bk, Vector3.zero, new Vector2(_w, _h), root.transform, "Back");
+            _hpBack = ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w, _h), root.transform, "Back").transform;
             _hpFill = ViewAssets.DecoQuad(_g, Vector3.zero, new Vector2(_w, _h), root.transform, "Fill").transform;
             _shFill = ViewAssets.DecoQuad(_sh, new Vector3(0f, 0.14f, 0f), new Vector2(_w, 0.05f), root.transform, "Shield").transform;
             _shFill.gameObject.SetActive(false);

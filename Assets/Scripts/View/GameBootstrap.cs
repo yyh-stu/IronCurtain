@@ -41,6 +41,13 @@ namespace IronCurtain.View
             var selection = gameObject.AddComponent<SelectionSystem>();
             selection.Init(Sim, Cam);
 
+            var topBar = gameObject.AddComponent<TopBarPanel>();
+            topBar.Init(Sim, Side.Blue);
+            var ftGo = new GameObject("FloatingText");
+            ftGo.transform.SetParent(transform, false);
+            var floats = ftGo.AddComponent<FloatingTextView>();
+            floats.Init(Sim, Side.Blue, Board);
+
             var fogGo = new GameObject("FogView");
             fogGo.transform.SetParent(transform, false);
             _fog = fogGo.AddComponent<FogView>();

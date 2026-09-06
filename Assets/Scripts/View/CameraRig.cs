@@ -43,7 +43,8 @@ namespace IronCurtain.View
             if (_cam == null) return;
             Vector2 m = Input.mousePosition;
             // 悬停任何 IMGUI 面板时跳过(防误滚)
-            if (OverRect(BarracksOverviewPanel.LastPanelRect, m) || OverRect(MinimapPanel.LastPanelRect, m)) return;
+            if (OverRect(BarracksOverviewPanel.LastPanelRect, m) || OverRect(MinimapPanel.LastPanelRect, m)
+                || OverRect(TopBarPanel.LastPanelRect, m)) return;
 
             float dx = 0f, dy = 0f; // dy 为行米增量(北=行增)
             if (m.x <= EdgeMarginPx) dx = -1f;

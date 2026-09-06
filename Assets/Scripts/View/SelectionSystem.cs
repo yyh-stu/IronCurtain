@@ -7,6 +7,7 @@ namespace IronCurtain.View
 {
     /// <summary>
     /// M8.6 点选/框选己方(蓝方)主将 + 右键移动命令(手动级)+ T 键自动布阵 + 淡出提示 + 选中圈/点击标记。
+    /// M6.2 增:单选射程圈 / 全选中移动路径线 / 顶栏点击穿透。
     /// </summary>
     public sealed class SelectionSystem : MonoBehaviour
     {
@@ -33,6 +34,11 @@ namespace IronCurtain.View
         private float _markerT;
         private Rect _retreatBtnRect; // M8.7 撤退按钮占位(兼做点击穿透过滤)
 
+        // M6.2 单选射程圈
+        private GameObject _rangeRing;
+        // M6.2 移动路径线(单位 id → 线;Update 每帧自管建/刷/拆)
+        private readonly Dictionary<int, LineRenderer> _paths = new Dictionary<int, LineRenderer>();
+
         public void Init(SimCore sim, Camera cam)
         {
             _sim = sim;
@@ -47,6 +53,8 @@ namespace IronCurtain.View
                 // 面板 Rect 为 GUI 坐标(y 从顶起),鼠标 y 从底起,需翻转
                 // 撤退按钮 Rect 仅在有选中时参与拦截(清空选择后残留旧值会让该区域左键永久失效——盲测挑出)
                 return BarracksOverviewPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
+                    // 顶栏常驻拦截(屏幕最顶部横条)
+                    || TopBarPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
                     // 小地图区域点击不穿透到世界
                     || MinimapPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
                     || (_selected.Count >= 1 && _retreatBtnRect.Contains(new Vector2(m.x, Screen.height - m.y)));
@@ -179,6 +187,43 @@ namespace IronCurtain.View
                 if (e == null || _rings[i] == null) continue;
                 _rings[i].transform.position = BoardView.WorldPos(e.PosF);
             }
+            // M6.2 射程圈跟单位走(单选)
+            if (_rangeRing != null && _selected.Count == 1)
+            {
+                var e = _sim.GetEntity(_selected[0]);
+                if (e != null) _rangeRing.transform.position = BoardView.WorldPos(e.PosF);
+            }
+            // M6.2 移动路径线:字典 id→线。有目标无钱则建(右键下令即现线),有线则刷新两端;目标消失则拆线
+            var stale = new List<int>();
+            foreach (var kv in _paths)
+            {
+                var e = _sim.GetEntity(kv.Key);
+                if (kv.Value == null || e == null || !e.HasMoveTarget) { stale.Add(kv.Key); continue; }
+                var s = BoardView.WorldPos(e.PosF); s.y += 0.1f;
+                var t = BoardView.WorldPos(e.MoveTarget); t.y += 0.1f;
+                kv.Value.SetPosition(0, s);
+                kv.Value.SetPosition(1, t);
+            }
+            foreach (var id in stale)
+            {
+                if (_paths[id] != null) Destroy(_paths[id].gameObject);
+                _paths.Remove(id);
+            }
+            foreach (var id in _selected)
+            {
+                if (_paths.ContainsKey(id)) continue;
+                var e = _sim.GetEntity(id);
+                if (e == null || !e.HasMoveTarget) continue;
+                var go = new GameObject("PathLine");
+                go.transform.SetParent(transform, false);
+                var lr = go.AddComponent<LineRenderer>();
+                lr.positionCount = 2;
+                lr.startWidth = 0.15f;
+                lr.endWidth = 0.15f;
+                lr.useWorldSpace = true;
+                lr.material = ViewAssets.Flat(new Color(0.3f, 1f, 0.5f, 0.5f));
+                _paths[id] = lr;
+            }
         }
 
         private string BuildKey()
@@ -193,6 +238,11 @@ namespace IronCurtain.View
             foreach (var r in _rings) if (r != null) Destroy(r);
             _rings.Clear();
             if (_ringRoot != null) { Destroy(_ringRoot); _ringRoot = null; }
+            // M6.2 销毁旧射程圈
+            if (_rangeRing != null) { Destroy(_rangeRing); _rangeRing = null; }
+            // M6.2 销毁旧路径线(选择变化时全拆,Update 按需重建)
+            foreach (var kv in _paths) if (kv.Value != null) Destroy(kv.Value.gameObject);
+            _paths.Clear();
             if (_selected.Count == 0) return;
             Material ringMat = ViewAssets.Mat(new Color(0.2f, 1f, 0.35f) * 0.5f, 0f, 0.5f, new Color(0.2f, 1f, 0.35f), 0.45f);
             _ringRoot = new GameObject("SelectionRings");
@@ -204,6 +254,23 @@ namespace IronCurtain.View
                     new Vector3(RingRadius * 2f, 0.03f, RingRadius * 2f), _ringRoot.transform, "Ring" + id);
                 _rings.Add(_ringRoot.transform.GetChild(_ringRoot.transform.childCount - 1).gameObject);
                 _rings[_rings.Count - 1].transform.position = BoardView.WorldPos(e.PosF);
+            }
+            // M6.2 单选射程圈
+            if (_selected.Count == 1)
+            {
+                var e = _sim.GetEntity(_selected[0]);
+                if (e != null)
+                {
+                    var verts = new List<Vector3>[1];
+                    var tris = new List<int>[1];
+                    verts[0] = new List<Vector3>();
+                    tris[0] = new List<int>();
+                    ViewAssets.AddRing(verts[0], tris[0], new Vector3(0f, 0.06f, 0f), e.Range, 0.35f, 48);
+                    Mesh mesh = ViewAssets.CreateMesh(verts, tris);
+                    Material rm = ViewAssets.Mat(new Color(0.35f, 0.85f, 1f) * 0.4f, 0f, 0.5f, new Color(0.35f, 0.85f, 1f), 0.6f);
+                    _rangeRing = ViewAssets.AttachMesh("RangeRing", transform, mesh, new[] { rm });
+                    _rangeRing.transform.position = BoardView.WorldPos(e.PosF);
+                }
             }
         }
 

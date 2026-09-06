@@ -39,6 +39,7 @@ namespace IronCurtain.EditorTools
             Directory.CreateDirectory("D:/DevTools/shots");
             var cam = Camera.main;
             var fogView = Object.FindFirstObjectByType<FogView>();
+            var floatText = Object.FindFirstObjectByType<FloatingTextView>();
 
             for (int i = 0; i < Marks.Length; i++)
             {
@@ -47,21 +48,47 @@ namespace IronCurtain.EditorTools
                 while (boot.Sim.Tick < targetTick && guard++ < 100000) boot.Sim.Step();
                 boot.Board.TickViews();
                 if (fogView != null) fogView.RefreshNow();
-                // 视图平滑收敛(edit 模式 Time.deltaTime≈0,手工喂 dt)
+                // 视图平滑收敛 + 持续交战(edit 模式 Time.deltaTime≈0,手工喂 dt;
+                // 继续步进 5 tick 让 DamageDealt 在镜头前新鲜发生——飘字寿命 1s,停机渲染会错过)
                 for (int k = 0; k < 5; k++)
+                {
+                    boot.Sim.Step();
+                    boot.Board.TickViews();
+                    if (fogView != null) fogView.RefreshNow();
                     foreach (var v in Object.FindObjectsOfType<EntityView>())
                         v.Tick(0.1f, cam);
+                    if (floatText != null) floatText.RenderFrame(0.1f); // 飘字:同一收敛口径喂 dt
+                }
 
-                cam.transform.position = new Vector3(CamX[i], 55f, -50f);
-                cam.transform.LookAt(new Vector3(CamX[i], 0f, -12f));
+                // 战线跟随:优先对准交战单位(主将>士兵);无交战则固定机位
+                var focus = FindBattleFocus(boot.Sim);
+                float camX = focus?.X ?? CamX[i];
+                float camRow = focus?.Y ?? 15f;
+                cam.transform.position = new Vector3(camX, 55f, 3f - camRow - 38f);
+                cam.transform.LookAt(new Vector3(camX, 0f, 3f - camRow));
 
-                string path = string.Format("D:/DevTools/shots/m6.6_{0}_t{1}s.png", i + 1, (int)Marks[i]);
+                string path = string.Format("D:/DevTools/shots/m6.2_{0}_t{1}s.png", i + 1, (int)Marks[i]);
                 SaveRender(cam, path);
-                Debug.Log("[CaptureBatch] " + path + " simTick=" + boot.Sim.Tick);
+                Debug.Log("[CaptureBatch] " + path + " simTick=" + boot.Sim.Tick + " focus=" + (focus?.ToString() ?? "fixed")
+                    + " floatTexts=" + (floatText != null ? floatText.ActiveCount.ToString() : "n/a"));
             }
 
             Object.DestroyImmediate(go);
             Debug.Log("[CaptureBatch] done");
+        }
+
+        /// <summary>找当前交战点(Attacking 单位;主将优先,其次士兵);无交战返回 null。</summary>
+        private static SimVec2? FindBattleFocus(SimCore sim)
+        {
+            SimVec2? soldier = null;
+            foreach (var kv in sim.Entities)
+            {
+                var e = kv.Value;
+                if (e == null || e.Kind != EntityKind.Unit || e.State != EntityState.Attacking) continue;
+                if (!e.IsSoldier) return e.PosF;
+                if (soldier == null) soldier = e.PosF;
+            }
+            return soldier;
         }
 
         private static void SaveRender(Camera cam, string path)
