@@ -36,6 +36,23 @@ namespace IronCurtain.View
         private float _hitT;
         private Transform _hpBack;
 
+        // M6.0f 六英雄模型接线:动画驱动与配置(懒加载:Unity 禁止静态初始化器调 Resources.Load)
+        private Animator _anim;
+        private static RuntimeAnimatorController _heroCtrl;
+        private static RuntimeAnimatorController HeroCtrl =>
+            _heroCtrl != null ? _heroCtrl : (_heroCtrl = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/HeroAnimator"));
+        // 身高档:A=1.92(镇岳) B=1.78(男标) C=1.62(磐石/星落)
+        private static float HeroTargetHeight(HeroId hero)
+        {
+            switch (hero)
+            {
+                case HeroId.ZhenYue: return 1.92f;
+                case HeroId.PanShi:
+                case HeroId.XingLuo: return 1.62f;
+                default: return 1.78f;
+            }
+        }
+
         public void Bind(Entity e, Side side, HeroId? hero, BuildingId? building, System.Func<int> soldierCountOf = null)
         {
             _e = e; _side = side;
@@ -194,6 +211,12 @@ namespace IronCurtain.View
                     _countLabel.text = _soldierCountOf() + "/" + RegimentSystem.SoldiersPerGeneral;
                 }
             }
+            if (_anim != null && !isB)
+            {
+                int st = _e.State == EntityState.Moving || _e.State == EntityState.Routing ? 1
+                    : (_e.State == EntityState.Attacking ? 2 : 0);
+                if (_anim.GetInteger("state") != st) _anim.SetInteger("state", st);
+            }
             if (_e.Rubbled && !_rubbled) SetRubbled(true);
             if (!_e.Rubbled && _rubbled) SetRubbled(false);
             if (isB) UpdateGarrison();
@@ -345,23 +368,28 @@ namespace IronCurtain.View
         {
             switch (hero)
             {
-                case HeroId.PanShi: return "character-a";
-                case HeroId.ZhenYue: return "character-b";
-                case HeroId.DuanFeng: return "character-c";
-                case HeroId.ZhuFeng: return "character-d";
-                case HeroId.ZhuiRi: return "character-e";
+                case HeroId.PanShi: return "Heroes/PanShi";
+                case HeroId.ZhenYue: return "Heroes/ZhenYue";
+                case HeroId.DuanFeng: return "Heroes/DuanFeng";
+                case HeroId.ZhuFeng: return "Heroes/ZhuFeng";
+                case HeroId.ZhuiRi: return "Heroes/ZhuiRi";
                 case HeroId.XingLuo:
-                default: return "character-f";
+                default: return "Heroes/XingLuo";
             }
         }
 
         private void BuildUnit(HeroId hero)
         {
             _model = NewModelRoot();
-            var body = AddPiece(_model.transform, HeroModelName(hero), 2.4f, 0f);
+            var body = AddPiece(_model.transform, HeroModelName(hero), HeroTargetHeight(hero), 0f);
             if (body != null)
-                TintRenderers(body, _side == Side.Blue ? new Color(0.6f, 0.8f, 1f)
-                    : (_side == Side.Red ? new Color(1f, 0.6f, 0.55f) : Color.white));
+            {
+                TintRenderers(body, _side == Side.Blue ? new Color(0.75f, 0.9f, 1f)
+                    : (_side == Side.Red ? new Color(1f, 0.72f, 0.66f) : Color.white)); // 换装后 tint 减淡(保留贴图识别度)
+                _anim = body.GetComponent<Animator>();
+                if (_anim == null) _anim = body.AddComponent<Animator>();
+                if (HeroCtrl != null) _anim.runtimeAnimatorController = HeroCtrl;
+            }
             AddGlowDisc(_model.transform, 1.15f);
         }
 
