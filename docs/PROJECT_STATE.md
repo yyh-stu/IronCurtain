@@ -116,6 +116,8 @@
 > ④物理行:EntityView.cs 904(存量超限累加,拆分待任务卡)、InputAudit.cs 150、PlayAndCapture.cs 66、HeroLineupBatch.cs 101、GenerateWeaponMats.cs 45。检查点:86a9ec1(#1)/c983de2(#2)/本块随#3 提交。工作树含本块未提交修改随 checkpoint#3 落盘。
 > **晨审清单**:lineup_all.png/lineup_zhufeng.png/m6.2_×4.png(武器+骑乘+建筑);docs/音频方案.md 拍板;换窗待办剩:h)AI 随机化待拍板、i)建筑观感终审、实机输入验收续作、正式骑乘动作管线(hy-3d-motion 骑乘三段)。
 >
+> **2026-09-10 无人值守段·实机输入验收第二轮(仍阻断,但定位大幅收窄)**:新发现/新工具:①AX 菜单**冷启动编辑器时可靠**、域重载后失效(两轮复现)——重启编辑器即恢复;②**InputAudit layout 行实测落账**:`screen=1460x710 upgrade=(1130,50,320,42) hex=(1130,100,320,42) tool=(10,276,340,42)`——下窗点击直接换算 GameView 原点(4.5V 实测升级头屏幕盒 (1670,70)-(1980,120),画布右缘≈屏幕 1992 → 原点≈(532,20) 待二次校准);③OS 级 SetCursorPos+mouse_event 与 SendInput 点击均已送达正确屏幕坐标(cursor_position 复核),画面无"give focus"遮罩,但 command_panel 审计行始终未触发——嫌疑=Unity 6 GameView 输入开关(4.5V 在 GameView 工具栏见到疑似带斜线鼠标图标,屏幕位置未精确定位)或 IMGUI 事件层对合成输入的过滤;④CUA 原生坐标点击被其帧-窗口身份校验拒绝(Unity 多 HWND 结构),元素级 AXPress 可用;⑤Interactive Play 已有热键 %#&i(注册验证过)。**下窗续作清单**:打开编辑器后先目检 GameView 工具栏输入开关(若禁用则启用)→按 layout 行换算点击→以 command_panel/hex_panel 审计行+截图双重确认。工具沉淀:real_click.ps1/sendinput_click.ps1/real_key.ps1/real_hotkey.ps1(team-pipeline)。
+>
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):
