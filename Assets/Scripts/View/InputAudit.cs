@@ -61,6 +61,13 @@ namespace IronCurtain.View
         private SimCore _sim;
         private List<int> _previousIds;
         private int _previousPopulation;
+        private bool _layoutLogged;
+        private int _layoutFrames;
+
+        private static string RectStr(Rect r)
+        {
+            return "(" + r.x.ToString("F0") + "," + r.y.ToString("F0") + "," + r.width.ToString("F0") + "," + r.height.ToString("F0") + ")";
+        }
 
         public void Init(SimCore sim)
         {
@@ -84,6 +91,20 @@ namespace IronCurtain.View
         private void Update()
         {
             if (_sim == null || _previousIds == null) return;
+            // 2026-09-10 真输入验收辅助:等 OnGUI 就绪后一次性打印屏幕尺寸+三面板真实矩形
+            if (!_layoutLogged)
+            {
+                _layoutFrames++;
+                var ur = UpgradeCommandPanel.LastPanelRect;
+                var hr = HexCommandPanel.LastPanelRect;
+                var tr = ToolCommandPanel.LastPanelRect;
+                if (_layoutFrames > 30 && ur.width > 0f && hr.width > 0f && tr.width > 0f)
+                {
+                    _layoutLogged = true;
+                    InputAudit.Log("layout screen=" + Screen.width + "x" + Screen.height
+                        + " upgrade=" + RectStr(ur) + " hex=" + RectStr(hr) + " tool=" + RectStr(tr));
+                }
+            }
             var currentIds = InputAudit.GeneralIds(_sim, Side.Blue);
             int currentPopulation = _sim.PopulationOf(Side.Blue);
             if (currentPopulation == _previousPopulation && SameIds(_previousIds, currentIds)) return;

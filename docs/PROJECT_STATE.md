@@ -109,6 +109,13 @@
 > ⑥**音频方案已立文档**(docs/音频方案.md,仅方案待拍板:A=CC0 库主力+B=AI 生成暂缓+C=程序化 UI 音;v1=骨架+10 核心音效+BGM,验收=制作人耳朵终审)。
 > 待收:长枪 v2 3D 到货→导入+材质+阵容复拍;制作人晨审:lineup_all/lineup_zhufeng/m6.2_*.png+音频方案拍板。检查点:86a9ec1(无人值守#1)。
 >
+> **2026-09-10 无人值守段·收口(武器/战马 8/8 全链完成;294/294 results_v32,`error CS=0`)**:
+> ①**逐风长枪第三次提交成功**:策略=重生成大主体四视图+紧致裁剪(非背景 bbox+8% 边距+补方形)+**侧视图当主图**(正面看枪杆缩成一点必触发"主体占比低于阈值";另踩坑:multi_view view_type 枚举无 "front",正面只能当主图)。8 件 glb→fbx→Tex→WeaponMat_×8 全部就位(Assets/Resources/Models/Weapons/,fbx 25-35MB/件)。
+> ②**最终验收**:GenerateWeaponMats made=8;HeroLineupBatch 阵容复拍(crops3):镇岳锤/磐石盾+刀/断峰矛全部"在手且朝上,无异常";长枪新挂材质;骑乘特写此前已验(稳坐/跨腿/马贴图正常);冷全量 294/294 v32 零编译错;CaptureBatch 正式四帧 cap9 重拍。
+> ③**M6.3-B02 实机验收·控制面打通(部分)**:ZCode computer-use 实测——Unity 编辑器可启动/聚焦、AX 菜单首次可用(IronCurtain→Interactive Play 成功进入 Play,战场运行,InputAudit baseline 落日志)、OS 级 SetCursorPos+mouse_event 点击与 keybd_event 热键均可送达、Ctrl+P/Ctrl+R 生效、CloseMainWindow 干净退出。**遗留摩擦**:AX 菜单在域重载后不再展开;SessionState 审计标志未存活到手动 Ctrl+P 的 Play(仅首菜单路径生效);一次 OS 点击(1690,177)未触发 command_panel 审计行(坐标未经校准)。新增辅助:InputAudit layout 行(打印 Screen+三面板 LastPanelRect,待下次 Play 用)、PlayAndCapture Interactive Play 快捷键 %#&i、real_click.ps1/real_key.ps1/real_hotkey.ps1(OS 级输入工具)。**实机行为验收仍未完成,不冒充**;下窗用 layout 行校准坐标后重试。
+> ④物理行:EntityView.cs 904(存量超限累加,拆分待任务卡)、InputAudit.cs 150、PlayAndCapture.cs 66、HeroLineupBatch.cs 101、GenerateWeaponMats.cs 45。检查点:86a9ec1(#1)/c983de2(#2)/本块随#3 提交。工作树含本块未提交修改随 checkpoint#3 落盘。
+> **晨审清单**:lineup_all.png/lineup_zhufeng.png/m6.2_×4.png(武器+骑乘+建筑);docs/音频方案.md 拍板;换窗待办剩:h)AI 随机化待拍板、i)建筑观感终审、实机输入验收续作、正式骑乘动作管线(hy-3d-motion 骑乘三段)。
+>
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):

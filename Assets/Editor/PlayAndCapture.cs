@@ -34,7 +34,7 @@ namespace IronCurtain.EditorTools
             EditorApplication.EnterPlaymode();
         }
 
-        [MenuItem("IronCurtain/Interactive Play")]
+        [MenuItem("IronCurtain/Interactive Play %#&i")]
         public static void InteractivePlay()
         {
             // Keep this Play session open for real mouse/keyboard input auditing.
