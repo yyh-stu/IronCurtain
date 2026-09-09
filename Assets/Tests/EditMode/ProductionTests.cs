@@ -65,14 +65,14 @@ namespace IronCurtain.Tests
             var wave1 = GeneralsOf(sim, Side.Blue);
             Assert.AreEqual(3, wave1.Count, "tick200 三槽并行各出 1 将");
             foreach (var g in wave1)
-                Assert.AreEqual(20, SoldiersOf(sim, g), "出场自带满编 20 兵");
+                Assert.AreEqual(12, SoldiersOf(sim, g), "出场自带满编 12 兵");
             Assert.AreEqual(3, sim.PopulationOf(b.Side), "3 将占 3 名额");
 
             Step(sim, 200);
             var wave2 = GeneralsOf(sim, Side.Blue);
             Assert.AreEqual(4, wave2.Count, "tick460 第 4 将产出,名额满 4");
             foreach (var g in wave2)
-                Assert.AreEqual(20, SoldiersOf(sim, g), "每个将均带满编 20 兵");
+                Assert.AreEqual(12, SoldiersOf(sim, g), "每个将均带满编 12 兵");
             Assert.AreEqual(4, sim.PopulationOf(Side.Blue), "名额满 4");
 
             // 第 5 个待名额:某槽保持进行中(未清空)
@@ -106,7 +106,7 @@ namespace IronCurtain.Tests
             var generals = GeneralsOf(sim, Side.Blue);
             Assert.AreEqual(4, generals.Count, "第 5 将应补位产出(存活 4)");
             foreach (var g in generals)
-                Assert.AreEqual(20, SoldiersOf(sim, g), "补位将同样满编 20 兵");
+                Assert.AreEqual(12, SoldiersOf(sim, g), "补位将同样满编 12 兵");
             Assert.AreEqual(4, sim.PopulationOf(Side.Blue));
         }
 
@@ -123,7 +123,7 @@ namespace IronCurtain.Tests
             Step(sim, 1);
             var generals = GeneralsOf(sim, Side.Blue);
             Assert.AreEqual(1, generals.Count, "200 tick 出(20s/将)");
-            Assert.AreEqual(20, SoldiersOf(sim, generals[0]));
+            Assert.AreEqual(12, SoldiersOf(sim, generals[0]));
         }
 
         [Test]

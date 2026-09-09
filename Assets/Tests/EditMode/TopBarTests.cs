@@ -70,6 +70,60 @@ public class TopBarTests
     }
 
     [Test]
+    public void T4b_EpText_显示存量来源与常规周期()
+    {
+        SpawnBuilding(Side.Blue, BuildingId.ResourcePoint, 15, 20);
+        SpawnBuilding(Side.Blue, BuildingId.ResourcePoint, 15, 40);
+        Assert.AreEqual("EP 0/5 · 2点/90秒", TopBarModel.EpText(sim, Side.Blue));
+    }
+
+    [Test]
+    public void T4c_EpText_加时切换周期且配置缺失安全降级()
+    {
+        SpawnBuilding(Side.Blue, BuildingId.ResourcePoint, 15, 20);
+        sim.Phase = MatchPhase.Overtime;
+        Assert.AreEqual("EP 0/5 · 1点/60秒", TopBarModel.EpText(sim, Side.Blue));
+        sim.Game.Ep = null;
+        Assert.AreEqual("EP --", TopBarModel.EpText(sim, Side.Blue));
+    }
+
+    [Test]
+    public void T4d_操作面板互斥并取消道具目标模式()
+    {
+        var actionSim = new SimCore(new SimConfig(), new SeededRng(11))
+        {
+            Game = GameConfigParser.FromJson(Resources.Load<TextAsset>("gameconfig").text)
+        };
+        actionSim.SpawnBuilding(Side.Blue, BuildingId.ResourcePoint, new GridPos(15, 20));
+        for (int i = 0; i < 905; i++) actionSim.Step();
+        var root = new GameObject("CommandPanelCoordinatorTest");
+        try
+        {
+            var upgrades = root.AddComponent<UpgradeCommandPanel>();
+            var hexes = root.AddComponent<HexCommandPanel>();
+            var tools = root.AddComponent<ToolCommandPanel>();
+            var building = root.AddComponent<BuildingCommandPanel>();
+            tools.Init(actionSim, Side.Blue);
+            building.Init(actionSim, Side.Blue, new List<int>());
+            var buildingTarget = actionSim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(15, 80));
+            building.SetTarget(buildingTarget.Id);
+            new CommandPanelCoordinator().Attach(upgrades, hexes, tools, building);
+
+            upgrades.SetExpanded(true);
+            Assert.IsFalse(building.HasTarget);
+            hexes.SetExpanded(true);
+            Assert.IsFalse(upgrades.Expanded);
+            Assert.IsTrue(hexes.Expanded);
+            Assert.IsTrue(tools.Arm(ToolTargetMode.Ram));
+            upgrades.SetExpanded(true);
+            Assert.IsFalse(hexes.Expanded);
+            Assert.AreEqual(ToolTargetMode.None, tools.PendingTarget);
+            StringAssert.Contains("已取消", tools.LastFeedback);
+        }
+        finally { Object.DestroyImmediate(root); }
+    }
+
+    [Test]
     public void T5_EnemyBaseSnapshot_Unknown()
     {
         SpawnBuilding(Side.Blue, BuildingId.Base, 15, 20);

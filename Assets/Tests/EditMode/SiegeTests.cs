@@ -40,9 +40,20 @@ public class SiegeTests
     }
 
     List<Entity> SoldiersOf(Entity g)
-        => sim.Entities.Values
+        => SoldiersOf(sim, g);
+
+    static List<Entity> SoldiersOf(SimCore owner, Entity g)
+        => owner.Entities.Values
                .Where(x => x.Kind == EntityKind.Unit && x.IsSoldier && x.GeneralId == g.Id)
                .OrderBy(x => x.FormationSlot).ToList();
+
+    SimCore NewOrderSim(ulong seed, out Entity target, out Entity general)
+    {
+        var owner = new SimCore(new SimConfig(), new SeededRng(seed)) { Game = _cfg };
+        target = owner.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(15, 130));
+        general = RegimentSystem.SpawnGeneral(owner, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
+        return owner;
+    }
 
     /// <summary>守军:生成兵团并直接登记其士兵为正式驻军(驻军士兵不参与兵团跟随/索敌)。</summary>
     List<Entity> Garrison(int buildingId, int count, Side side)
@@ -231,5 +242,203 @@ public class SiegeTests
         Assert.IsFalse(SiegeSystem.SetIntent(sim, baseId, Side.Blue, SiegeIntent.Capture, out var err), "敌方大本营设 Capture 应被拒绝");
         Assert.IsNotNull(err, "应返回错误信息");
         StringAssert.Contains("大本营", err, "错误信息应包含『大本营』");
+    }
+
+    [Test]
+    public void T11_兵团命令只展开士兵_主将获城外集结点不参与交换()
+    {
+        var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
+        var soldiers = SoldiersOf(g);
+        var generalPos = g.PosF;
+        var firstPos = soldiers[0].PosF;
+
+        var result = SiegeSystem.TryIssueRegimentOrder(
+            sim, new[] { g.Id }, redTowerId, Side.Blue, SiegeIntent.Capture);
+
+        Assert.IsTrue(result.Success, result.Error.ToString());
+        Assert.AreEqual(RegimentSystem.SoldiersPerGeneral, result.SoldierIds.Count);
+        // 2026-09-09 制作人二次裁决:兵随主将——令下主将(标记+行军),士兵不受令随行
+        Assert.IsTrue(g.HasMoveTarget, "主将应受令行军");
+        Assert.AreEqual(redTowerId, g.TargetBuildingId, "主将带兵团攻城标记(不参与交换)");
+        Assert.IsTrue(soldiers.All(s => !s.HasMoveTarget && s.TargetBuildingId == 0), "下令时士兵不受令");
+
+        sim.Step();
+        Assert.AreNotEqual(generalPos, g.PosF, "主将应向城外集结点行军");
+        // 模拟主将抵达 → 放兵
+        g.HasMoveTarget = false;
+        var tb = sim.GetEntity(redTowerId);
+        g.PosF = new SimVec2(tb.Pos.Col + 3.5f, tb.Pos.Row + 3.5f);
+        sim.Step();
+        Assert.IsTrue(soldiers.All(s => s.HasMoveTarget && s.TargetBuildingId == redTowerId), "到位后士兵入场");
+        Assert.AreNotEqual(firstPos, soldiers[0].PosF, "士兵须向攻城前排移动");
+    }
+
+    [Test]
+    public void T12_混合重复选择_确定性去重并过滤死亡驻军跨阵营()
+    {
+        var validGeneral = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
+        var deadGeneral = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.DuanFeng, new GridPos(25, 105));
+        var enemyGeneral = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(25, 150));
+        var valid = SoldiersOf(validGeneral);
+        valid[0].Hp = 0;
+        valid[0].State = EntityState.Dead;
+        valid[1].GarrisonBuildingId = blueTowerId;
+        sim.Entities[blueTowerId].GarrisonFormal.Add(valid[1].Id);
+        deadGeneral.Hp = 0;
+        deadGeneral.State = EntityState.Dead;
+
+        var result = SiegeSystem.TryIssueRegimentOrder(sim,
+            new[] { validGeneral.Id, validGeneral.Id, valid[2].Id, valid[0].Id, valid[1].Id,
+                    deadGeneral.Id, enemyGeneral.Id, 999999 },
+            redTowerId, Side.Blue, SiegeIntent.Destroy);
+
+        Assert.IsTrue(result.Success, result.Error.ToString());
+        Assert.AreEqual(10, result.SoldierIds.Count, "12 人中死亡与驻军各过滤 1，重复不得重复下令");
+        Assert.AreEqual(10, result.SoldierIds.Distinct().Count());
+        Assert.IsTrue(result.SoldierIds.All(id => sim.Entities[id].Side == Side.Blue));
+        Assert.IsFalse(deadGeneral.HasMoveTarget);
+        Assert.IsFalse(enemyGeneral.HasMoveTarget);
+        Assert.IsTrue(SoldiersOf(deadGeneral).All(s => !s.HasMoveTarget), "死亡主将不得展开其遗兵");
+        Assert.IsTrue(SoldiersOf(enemyGeneral).All(s => !s.HasMoveTarget), "敌方兵团不得被下令");
+    }
+
+    [Test]
+    public void T13_跨阵营选择_返回NoEligible且零副作用()
+    {
+        var enemy = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(25, 150));
+        var result = SiegeSystem.TryIssueRegimentOrder(
+            sim, new[] { enemy.Id }, redTowerId, Side.Blue, SiegeIntent.Destroy);
+
+        Assert.AreEqual(SiegeOrderError.NoEligibleSoldiers, result.Error);
+        Assert.AreEqual(SiegeIntent.None, sim.Entities[redTowerId].Intent);
+        Assert.IsFalse(enemy.HasMoveTarget);
+        Assert.IsTrue(SoldiersOf(enemy).All(s => !s.HasMoveTarget && s.TargetBuildingId == 0));
+    }
+
+    [Test]
+    public void T14_零兵武将占空点_返回NoEligible且零副作用()
+    {
+        var lone = SpawnUnit(Side.Blue, new GridPos(5, 105), HeroId.PanShi);
+        var before = lone.PosF;
+        var target = sim.Entities[neutralId];
+
+        var result = SiegeSystem.TryIssueRegimentOrder(
+            sim, new[] { lone.Id }, neutralId, Side.Blue, SiegeIntent.Capture);
+
+        Assert.AreEqual(SiegeOrderError.NoEligibleSoldiers, result.Error);
+        Assert.AreEqual(SiegeIntent.None, target.Intent, "失败不得残留占领意图");
+        Assert.IsFalse(lone.HasMoveTarget);
+        Assert.AreEqual(0, lone.TargetBuildingId);
+        Assert.AreEqual(before, lone.PosF);
+    }
+
+    [Test]
+    public void T15_任一士兵无合法落点_整批命令零执行()
+    {
+        var edgeTarget = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(15, 0));
+        var trapped = SpawnUnit(Side.Blue, new GridPos(10, 0)); trapped.IsSoldier = true;
+        var movable = SpawnUnit(Side.Blue, new GridPos(15, 10)); movable.IsSoldier = true;
+
+        var result = SiegeSystem.TryIssueRegimentOrder(sim,
+            new[] { trapped.Id, movable.Id }, edgeTarget.Id, Side.Blue, SiegeIntent.Destroy);
+
+        Assert.AreEqual(SiegeOrderError.NoValidPlacement, result.Error);
+        Assert.AreEqual(SiegeIntent.None, edgeTarget.Intent);
+        Assert.IsFalse(trapped.HasMoveTarget);
+        Assert.IsFalse(movable.HasMoveTarget, "后一个单位即使有落点也不得部分执行");
+        Assert.AreEqual(0, trapped.TargetBuildingId);
+        Assert.AreEqual(0, movable.TargetBuildingId);
+    }
+
+    [Test]
+    public void T16_两局相同输入_展开顺序与命令结果一致()
+    {
+        var first = NewOrderSim(77, out var firstTarget, out var firstGeneral);
+        var second = NewOrderSim(77, out var secondTarget, out var secondGeneral);
+
+        var a = SiegeSystem.TryIssueRegimentOrder(first, new[] { firstGeneral.Id, firstGeneral.Id },
+            firstTarget.Id, Side.Blue, SiegeIntent.Capture);
+        var b = SiegeSystem.TryIssueRegimentOrder(second, new[] { secondGeneral.Id, secondGeneral.Id },
+            secondTarget.Id, Side.Blue, SiegeIntent.Capture);
+
+        Assert.IsTrue(a.Success && b.Success);
+        CollectionAssert.AreEqual(a.SoldierIds, b.SoldierIds);
+        foreach (int id in a.SoldierIds)
+        {
+            Assert.AreEqual(first.Entities[id].MoveTarget, second.Entities[id].MoveTarget);
+            Assert.AreEqual(first.Entities[id].TargetBuildingId, second.Entities[id].TargetBuildingId);
+        }
+        // 2026-09-09 制作人二次裁决:主将令(标记+集结点)同样确定性
+        Assert.IsTrue(firstGeneral.HasMoveTarget);
+        Assert.IsTrue(secondGeneral.HasMoveTarget);
+        Assert.AreEqual(firstGeneral.MoveTarget, secondGeneral.MoveTarget);
+        Assert.AreEqual(firstGeneral.TargetBuildingId, secondGeneral.TargetBuildingId);
+    }
+
+    [Test]
+    public void T17_旧入口保留士兵兼容_拒绝主将后门()
+    {
+        var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
+        var soldier = SoldiersOf(g)[0];
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Capture, out _));
+
+        Assert.IsFalse(SiegeSystem.IssueOrder(sim, new[] { g.Id }, redTowerId, out var generalError));
+        StringAssert.Contains("士兵", generalError);
+        Assert.IsFalse(g.HasMoveTarget);
+        Assert.AreEqual(0, g.TargetBuildingId);
+
+        Assert.IsTrue(SiegeSystem.IssueOrder(sim, new[] { soldier.Id }, redTowerId, out var soldierError), soldierError);
+        Assert.IsTrue(soldier.HasMoveTarget);
+        Assert.AreEqual(redTowerId, soldier.TargetBuildingId);
+    }
+
+    [Test]
+    public void T18_己方建筑Capture与Destroy_两入口均拒绝且零副作用()
+    {
+        var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
+        var soldiers = SoldiersOf(g);
+        var own = sim.Entities[blueTowerId];
+        own.IntentIssuer = Side.Red; // 非默认哨兵，验证拒绝路径不改写 issuer。
+
+        foreach (var intent in new[] { SiegeIntent.Capture, SiegeIntent.Destroy })
+        {
+            Assert.IsFalse(SiegeSystem.SetIntent(sim, blueTowerId, Side.Blue, intent, out var error));
+            StringAssert.Contains("己方", error);
+            Assert.AreEqual(SiegeIntent.None, own.Intent);
+            Assert.AreEqual(Side.Red, own.IntentIssuer);
+
+            var result = SiegeSystem.TryIssueRegimentOrder(
+                sim, new[] { g.Id }, blueTowerId, Side.Blue, intent);
+            Assert.AreEqual(SiegeOrderError.IntentRejected, result.Error);
+            Assert.AreEqual(SiegeIntent.None, own.Intent);
+            Assert.AreEqual(Side.Red, own.IntentIssuer);
+            Assert.IsFalse(g.HasMoveTarget);
+            Assert.IsTrue(soldiers.All(s => !s.HasMoveTarget && s.TargetBuildingId == 0),
+                "拒绝命令不得部分移动任何士兵");
+        }
+    }
+
+    [Test]
+    public void T19_意图阵营规则矩阵_仅允许敌塔双意图敌Base摧毁与中立占领()
+    {
+        var enemyTower = sim.Entities[redTowerId];
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, enemyTower.Id, Side.Blue, SiegeIntent.Capture, out _));
+        Assert.AreEqual(SiegeIntent.Capture, enemyTower.Intent);
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, enemyTower.Id, Side.Blue, SiegeIntent.Destroy, out _));
+        Assert.AreEqual(SiegeIntent.Destroy, enemyTower.Intent);
+
+        var enemyBase = sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 136));
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, enemyBase.Id, Side.Blue, SiegeIntent.Destroy, out _));
+        Assert.AreEqual(SiegeIntent.Destroy, enemyBase.Intent);
+        Assert.IsFalse(SiegeSystem.SetIntent(sim, enemyBase.Id, Side.Blue, SiegeIntent.Capture, out _));
+        Assert.AreEqual(SiegeIntent.Destroy, enemyBase.Intent, "拒绝 Capture 不得覆盖既有 Destroy");
+        Assert.AreEqual(Side.Blue, enemyBase.IntentIssuer);
+
+        var neutral = sim.Entities[neutralId];
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, neutral.Id, Side.Blue, SiegeIntent.Capture, out _));
+        Assert.AreEqual(SiegeIntent.Capture, neutral.Intent);
+        Assert.IsFalse(SiegeSystem.SetIntent(sim, neutral.Id, Side.Blue, SiegeIntent.Destroy, out _));
+        Assert.AreEqual(SiegeIntent.Capture, neutral.Intent, "拒绝 Destroy 不得覆盖既有 Capture");
+        Assert.AreEqual(Side.Blue, neutral.IntentIssuer);
     }
 }

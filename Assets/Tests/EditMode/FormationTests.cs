@@ -124,14 +124,14 @@ namespace IronCurtain.Tests
             var blue = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 100));
             blue.FacingOverride = null;
             sim.SetMoveTarget(blue.Id, new GridPos(15, 90)); // 后撤(-x)
-            Assert.AreEqual(-1f, RegimentSystem.SlotOffset(blue, 0).X, 0.001f,
-                "蓝后撤不转身:士兵仍在主将 -x 侧(面朝 +x 的背后)");
+            Assert.AreEqual(-1.2f, RegimentSystem.SlotOffset(blue, 0).X, 0.001f,
+                "蓝后撤不转身:士兵仍在主将 -x 侧(面朝 +x 的背后,3列纵队首排)");
 
             var red = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(15, 180));
             red.FacingOverride = null;
             sim.SetMoveTarget(red.Id, new GridPos(15, 190)); // 红后撤(+x)
-            Assert.AreEqual(1f, RegimentSystem.SlotOffset(red, 0).X, 0.001f,
-                "红后撤不转身:士兵在主将 +x 侧(面朝 -x 的背后)");
+            Assert.AreEqual(1.2f, RegimentSystem.SlotOffset(red, 0).X, 0.001f,
+                "红后撤不转身:士兵在主将 +x 侧(面朝 -x 的背后,3列纵队首排)");
         }
 
         [Test]

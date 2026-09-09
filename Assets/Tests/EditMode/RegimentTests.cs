@@ -36,7 +36,7 @@ namespace IronCurtain.Tests
             Assert.AreEqual(HeroId.PanShi, g.Hero.Value);
 
             var soldiers = SoldiersOf(sim);
-            Assert.AreEqual(20, soldiers.Count, "20 名士兵");
+            Assert.AreEqual(12, soldiers.Count, "12 名士兵(2026-09-10 制作人拍板)");
 
             var slots = new HashSet<int>();
             foreach (var s in soldiers)
@@ -52,8 +52,8 @@ namespace IronCurtain.Tests
                 Assert.AreEqual(g.Range, s.Range);
                 Assert.AreEqual(HeroId.PanShi, s.Hero.Value);
             }
-            Assert.AreEqual(20, slots.Count, "槽号 0..19 各一次");
-            for (int i = 0; i < 20; i++)
+            Assert.AreEqual(12, slots.Count, "槽号 0..11 各一次");
+            for (int i = 0; i < 12; i++)
                 Assert.IsTrue(slots.Contains(i), $"缺槽 {i}");
         }
 
@@ -84,14 +84,14 @@ namespace IronCurtain.Tests
             var blue = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 110));
             var red = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(15, 140));
 
-            // 槽 2 = row0,col2(中列首排):蓝将身后 -X、红将身后 +X
-            Assert.AreEqual(-1f, RegimentSystem.SlotOffset(blue, 2).X, 1e-4f, "蓝槽2 纵向 -1");
-            Assert.AreEqual(0f, RegimentSystem.SlotOffset(blue, 2).Y, 1e-4f);
-            Assert.AreEqual(1f, RegimentSystem.SlotOffset(red, 2).X, 1e-4f, "红槽2 纵向 +1");
-            Assert.AreEqual(0f, RegimentSystem.SlotOffset(red, 2).Y, 1e-4f);
+            // 2026-09-10 三列纵队:槽2 = row0,col2 → 蓝将身后 -X*1.2 且右列偏 -Y;红将镜像
+            Assert.AreEqual(-1.2f, RegimentSystem.SlotOffset(blue, 2).X, 1e-3f, "蓝槽2 纵向 -1.2");
+            Assert.AreEqual(-1f, RegimentSystem.SlotOffset(blue, 2).Y, 1e-3f);
+            Assert.AreEqual(1.2f, RegimentSystem.SlotOffset(red, 2).X, 1e-3f, "红槽2 纵向 +1.2");
+            Assert.AreEqual(1f, RegimentSystem.SlotOffset(red, 2).Y, 1e-3f); // 镜像侧偏 +1
 
-            // col=2 的槽横向偏移 ≈ 0
-            foreach (int slot in new[] { 2, 7, 12, 17 })
+            // 中列(col=1)槽横向偏移 = 0
+            foreach (int slot in new[] { 1, 4, 7, 10 })
             {
                 Assert.AreEqual(0f, RegimentSystem.SlotOffset(blue, slot).Y, 1e-4f, $"蓝槽{slot} 横向 0");
                 Assert.AreEqual(0f, RegimentSystem.SlotOffset(red, slot).Y, 1e-4f, $"红槽{slot} 横向 0");
@@ -115,7 +115,7 @@ namespace IronCurtain.Tests
             sim.RemoveEntity(g.Id); // 主将战死移除 → 士兵无将续战
 
             var soldiers = SoldiersOf(sim);
-            Assert.AreEqual(20, soldiers.Count);
+            Assert.AreEqual(12, soldiers.Count);
             var birth = SimVec2.FromGrid(new GridPos(15, 110));
 
             float minDistToRed = float.MaxValue;
@@ -130,7 +130,7 @@ namespace IronCurtain.Tests
             }
 
             var after = SoldiersOf(sim);
-            Assert.AreEqual(20, after.Count, "士兵全部存活(不溃逃、不被歼)");
+            Assert.AreEqual(12, after.Count, "士兵全部存活(不溃逃、不被歼)");
             foreach (var s in after)
             {
                 Assert.AreNotEqual(EntityState.Dead, s.State);
@@ -184,8 +184,8 @@ namespace IronCurtain.Tests
 
             var blueSoldiers = SoldiersOf(sim).FindAll(s => s.Side == Side.Blue);
             var redSoldiers = SoldiersOf(sim).FindAll(s => s.Side == Side.Red);
-            Assert.AreEqual(20, blueSoldiers.Count);
-            Assert.AreEqual(20, redSoldiers.Count);
+            Assert.AreEqual(12, blueSoldiers.Count);
+            Assert.AreEqual(12, redSoldiers.Count);
 
             var ps = blueSoldiers[0]; // 磐石士兵
             var zy = redSoldiers[0];  // 镇岳士兵
@@ -276,7 +276,7 @@ namespace IronCurtain.Tests
             // 断峰兵团(蓝)取士兵;敌方靶子单独生成(高血不反击)
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.DuanFeng, new GridPos(15, 100));
             var soldiers = SoldiersOf(sim);
-            Assert.AreEqual(20, soldiers.Count);
+            Assert.AreEqual(12, soldiers.Count);
             // 冻结全体移速,手工布置交战对(避免阵型跟随干扰几何)
             foreach (var s in soldiers) s.MoveSpeed = 0f;
             g.MoveSpeed = 0f;

@@ -1,5 +1,7 @@
 # 《铁幕:前线》单线闭环 Demo 实施计划(成品级)
 
+> 2026-09-08 执行提示：本文保留原始范围与历史模块编号；当前拍板以 `PROJECT_BRIEF.md` 为准，下一轮依赖顺序见 `NEXT_DELIVERY.md`。旧风格、旧产兵规则和旧编排流程不得覆盖后续拍板。
+
 > 版本 v1.1 · 2026-09-03 · 编排者:deepseek-v4-flash | 代码主力:GLM-5.3 | 视觉验收:glm-5.3-flash | 终审:人
 > GDD 依据:《铁幕:前线》v1.6 原文(同目录 GDD原文-铁幕前线.txt)
 > 引擎:Unity 6000.0.30f1(LTS),工程 D:\DevTools\IronCurtain(Unity 官方 -createProject 生成),MCP 已连通

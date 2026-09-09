@@ -171,13 +171,13 @@ namespace IronCurtain.Tests
             var model = new BarracksOverviewModel(sim, Side.Blue);
 
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 130));
-            Assert.AreEqual(20, SoldiersOf(g), "出场满编 20 兵");
+            Assert.AreEqual(12, SoldiersOf(g), "出场满编 12 兵");
 
-            // 杀掉 15 兵 → 场上该兵团剩 5 兵
+            // 杀掉 7 兵 → 场上该兵团剩 5 兵(12 兵制)
             int killed = 0;
             foreach (var e in sim.Entities.Values)
             {
-                if (killed >= 15) break;
+                if (killed >= 7) break;
                 if (e.IsSoldier && e.GeneralId == g.Id) { e.State = EntityState.Dead; killed++; }
             }
             Assert.AreEqual(5, SoldiersOf(g), "剩 5 兵");

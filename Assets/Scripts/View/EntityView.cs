@@ -15,6 +15,8 @@ namespace IronCurtain.View
         private Transform _hpRoot, _hpFill, _shFill;
         private float _w = 1.7f, _h = 0.26f, _deadT = -1f, _topY = 3.5f;
         private bool _dead, _rubbled;
+        // 2026-09-10 建筑正式 fbx 已挂(BuildingMat 直挂,不走 grey/tint 回退)
+        private bool _bldArt;
         private int _gf = -1, _gt = -1;
         private Material _g, _y, _r, _bk, _sh, _rubG, _gA, _gB;
 
@@ -34,6 +36,9 @@ namespace IronCurtain.View
         // M6.2 飘字顶部锚点高度(单位默认 2.9;建筑在 Bind 时覆盖)
         public float TextTopY = 2.9f;
         private float _hitT;
+        private MeshRenderer[] _modelRenderers;
+        private bool _modelFlashed;
+        private MaterialPropertyBlock _flashBlock;
         private Transform _hpBack;
 
         // M6.0f 六英雄模型接线:动画驱动与配置(懒加载:Unity 禁止静态初始化器调 Resources.Load)
@@ -41,15 +46,15 @@ namespace IronCurtain.View
         private static RuntimeAnimatorController _heroCtrl;
         private static RuntimeAnimatorController HeroCtrl =>
             _heroCtrl != null ? _heroCtrl : (_heroCtrl = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/HeroAnimator"));
-        // 身高档:A=1.92(镇岳) B=1.78(男标) C=1.62(磐石/星落)
+        // 身高档:A(镇岳)/B(男标)/C(磐石·星落)。2026-09-09 用户拍板:将整体放大 20%
         private static float HeroTargetHeight(HeroId hero)
         {
             switch (hero)
             {
-                case HeroId.ZhenYue: return 1.92f;
+                case HeroId.ZhenYue: return 2.30f;
                 case HeroId.PanShi:
-                case HeroId.XingLuo: return 1.62f;
-                default: return 1.78f;
+                case HeroId.XingLuo: return 1.94f;
+                default: return 2.14f;
             }
         }
 
@@ -59,8 +64,8 @@ namespace IronCurtain.View
             InitMats();
             if (e.Kind == EntityKind.Unit && e.IsSoldier)
             {
-                // 士兵:轻量占位模型,不建血条/光环/旗帜
-                _model = BuildSoldier();
+                // 士兵:程序化兵种模型(随主将风格),不建血条/光环/旗帜
+                _model = BuildSoldier(hero);
                 _hpFill = null; _shFill = null;
                 var hb = new GameObject("HpBar");
                 hb.transform.SetParent(transform, false);
@@ -85,24 +90,89 @@ namespace IronCurtain.View
             transform.position = e.Kind == EntityKind.Building ? BoardView.WorldPos(e.Pos) : BoardView.WorldPos(e.PosF);
             if (e.Kind == EntityKind.Unit)
                 transform.rotation = Quaternion.Euler(0f, side == Side.Blue ? 90f : -90f, 0f);
+            // 受击模型闪白用(MPB 逐渲染器覆盖,不动共享材质)
+            _modelRenderers = _model != null ? _model.GetComponentsInChildren<MeshRenderer>() : null;
         }
 
-        private GameObject BuildSoldier()
+        // 士兵材质缓存(flash 审查:避免每兵 new Material×2)
+        private static readonly System.Collections.Generic.Dictionary<Side, Material> SoldierBodyMats
+            = new System.Collections.Generic.Dictionary<Side, Material>();
+        private static Material _soldierWeaponMat;
+        private static readonly System.Collections.Generic.Dictionary<HeroId, Material> SoldierAccentMats
+            = new System.Collections.Generic.Dictionary<HeroId, Material>();
+
+        // 2026-09-09 用户拍板:士兵不走美术管线,代码程序化建模——按主将兵种区分风格与配色,
+        // 精细度略低(远景以剪影/配色识别),画面美术焦点留给主将
+        private GameObject BuildSoldier(HeroId? hero)
         {
             var root = NewModelRoot();
             var sm = new GameObject("SoldierModel");
             sm.transform.SetParent(root.transform, false);
-            Material mat = _side == Side.Blue ? ViewAssets.Flat(new Color(0.25f, 0.42f, 0.72f), 0.3f)
-                : (_side == Side.Red ? ViewAssets.Flat(new Color(0.72f, 0.30f, 0.26f), 0.3f)
-                : ViewAssets.Flat(new Color(0.55f, 0.55f, 0.52f), 0.3f));
-            // 躯干
-            ViewAssets.DecoBox(mat, new Vector3(0f, 0.35f, 0f), new Vector3(0.36f, 0.5f, 0.24f), sm.transform, "Torso");
-            // 头
-            ViewAssets.DecoBox(mat, new Vector3(0f, 0.72f, 0f), Vector3.one * 0.22f, sm.transform, "Head");
-            // 武器棒
-            ViewAssets.DecoBox(mat, new Vector3(0f, 0.5f, 0.24f), new Vector3(0.05f, 0.06f, 0.7f), sm.transform, "Weapon");
+            sm.transform.localScale = Vector3.one * 1.25f;
+            // 2026-09-09 制作人拍板·统一士兵样式:躯干=阵营色;头部=主将主色(去红蓝歧义);
+            // 武器=主将武器缩小版剪影,中性灰(不再用色块/发光珠,消灭脚下色块)
+            Material body;
+            if (!SoldierBodyMats.TryGetValue(_side, out body))
+            {
+                body = _side == Side.Blue ? ViewAssets.Flat(new Color(0.30f, 0.56f, 0.96f), 0.3f)
+                    : (_side == Side.Red ? ViewAssets.Flat(new Color(0.95f, 0.34f, 0.26f), 0.3f)
+                    : ViewAssets.Flat(new Color(0.62f, 0.62f, 0.58f), 0.3f));
+                SoldierBodyMats[_side] = body;
+            }
+            var style = hero ?? HeroId.PanShi;
+            Material am;
+            if (!SoldierAccentMats.TryGetValue(style, out am))
+            {
+                am = ViewAssets.Flat(HeroAccent(style), 0.3f);
+                SoldierAccentMats[style] = am;
+            }
+            if (_soldierWeaponMat == null)
+                _soldierWeaponMat = ViewAssets.Flat(new Color(0.45f, 0.46f, 0.50f), 0.35f);
+            float torsoW = style == HeroId.PanShi ? 0.42f : (style == HeroId.ZhenYue ? 0.40f : 0.34f);
+            // 躯干(阵营色)
+            ViewAssets.DecoBox(body, new Vector3(0f, 0.42f, 0f), new Vector3(torsoW, 0.52f, 0.24f), sm.transform, "Torso");
+            // 头(主将主色)
+            ViewAssets.DecoBox(am, new Vector3(0f, 0.82f, 0f), Vector3.one * 0.22f, sm.transform, "Head");
+            ViewAssets.DecoBox(am, new Vector3(0f, 0.95f, 0f), new Vector3(0.27f, 0.09f, 0.27f), sm.transform, "Helm");
+            // 武器:主将武器缩小版(中性灰剪影)
+            switch (style)
+            {
+                case HeroId.PanShi: // 短刀(主将=盾+大刀;盾板已按制作人要求移除)
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.26f, 0.52f, 0.18f), new Vector3(0.05f, 0.34f, 0.08f), sm.transform, "Blade");
+                    break;
+                case HeroId.ZhenYue: // 小锤
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.26f, 0.55f, 0.16f), new Vector3(0.05f, 0.05f, 0.85f), sm.transform, "Shaft");
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.26f, 0.80f, 0.55f), new Vector3(0.14f, 0.14f, 0.16f), sm.transform, "Hammer");
+                    break;
+                case HeroId.DuanFeng: // 长矛
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.24f, 0.62f, 0.10f), new Vector3(0.05f, 1.0f, 0.05f), sm.transform, "Spear");
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.24f, 1.16f, 0.10f), new Vector3(0.07f, 0.12f, 0.07f), sm.transform, "Tip");
+                    break;
+                case HeroId.ZhuFeng: // 平枪(骑姿)
+                    var lance = new GameObject("Lance");
+                    lance.transform.SetParent(sm.transform, false);
+                    lance.transform.localPosition = new Vector3(0.24f, 0.55f, 0.3f);
+                    ViewAssets.DecoBox(_soldierWeaponMat, Vector3.zero, new Vector3(0.05f, 0.05f, 1.05f), lance.transform, "Pole");
+                    break;
+                case HeroId.ZhuiRi: // 弓弧
+                    var b1 = new GameObject("BowTop");
+                    b1.transform.SetParent(sm.transform, false);
+                    b1.transform.localPosition = new Vector3(-0.28f, 0.58f, 0.12f);
+                    b1.transform.localRotation = Quaternion.Euler(28f, 0f, 0f);
+                    ViewAssets.DecoBox(_soldierWeaponMat, Vector3.zero, new Vector3(0.04f, 0.5f, 0.04f), b1.transform, "B1");
+                    var b2 = new GameObject("BowBot");
+                    b2.transform.SetParent(sm.transform, false);
+                    b2.transform.localPosition = new Vector3(-0.28f, 0.26f, 0.12f);
+                    b2.transform.localRotation = Quaternion.Euler(-28f, 0f, 0f);
+                    ViewAssets.DecoBox(_soldierWeaponMat, Vector3.zero, new Vector3(0.04f, 0.5f, 0.04f), b2.transform, "B2");
+                    break;
+                default: // 法杖(星落)
+                    ViewAssets.DecoBox(_soldierWeaponMat, new Vector3(0.26f, 0.55f, 0.10f), new Vector3(0.05f, 0.9f, 0.05f), sm.transform, "Staff");
+                    break;
+            }
             return root;
         }
+
 
         private void BuildCountLabel()
         {
@@ -141,15 +211,32 @@ namespace IronCurtain.View
             _dead = true; _deadT = 0f;
         }
 
+        // 2026-09-09 制作人拍板:血条=阵营识别层(己方蓝/敌方红/中立灰,盾=灰),主将常显,血量读条长
+        private static Material _hpMatBlue, _hpMatRed, _hpMatNeutral, _hpMatShield;
+        private static void EnsureHpMats()
+        {
+            if (_hpMatBlue != null) return;
+            _hpMatBlue = ViewAssets.Flat(new Color(0.25f, 0.55f, 1f), 0.35f);
+            _hpMatRed = ViewAssets.Flat(new Color(0.98f, 0.28f, 0.22f), 0.35f);
+            _hpMatNeutral = ViewAssets.Flat(new Color(0.62f, 0.62f, 0.62f), 0.35f);
+            _hpMatShield = ViewAssets.Flat(new Color(0.78f, 0.80f, 0.84f), 0.35f);
+        }
+        private Material FactionHpMat()
+        {
+            EnsureHpMats();
+            return _side == Side.Blue ? _hpMatBlue : (_side == Side.Red ? _hpMatRed : _hpMatNeutral);
+        }
+
         public void SetHp(float hp, float maxHp)
         {
             if (_hpFill == null) return;
             float t = maxHp > 0f ? Mathf.Clamp01(hp / maxHp) : 0f;
-            bool show = _e.Kind == EntityKind.Building || t < 0.999f;
+            // 主将(非士兵单位)常显血条作阵营识别;建筑常显;血量损失读条长
+            bool show = _e.Kind == EntityKind.Building || t < 0.999f
+                || (_e.Kind == EntityKind.Unit && !_e.IsSoldier);
             _hpRoot.gameObject.SetActive(show);
             _hpFill.localScale = new Vector3(_w * t, _h, 1f);
             _hpFill.localPosition = new Vector3(-_w * (1f - t) * 0.5f, 0f, 0f);
-            _hpFill.GetComponent<MeshRenderer>().sharedMaterial = t > 0.5f ? _g : (t > 0.25f ? _y : _r);
         }
 
         public void SetFogUnitHidden(bool hidden) { _fogUnitHidden = hidden; }
@@ -163,7 +250,8 @@ namespace IronCurtain.View
         public void TickBillboard(Camera cam)
         {
             if (_hpRoot != null && cam != null)
-                _hpRoot.rotation = Quaternion.LookRotation(_hpRoot.position - cam.transform.position);
+                // 2026-09-09 修血条:①不可见(背对相机被剔除)→面向相机;②歪斜→以相机 up 对齐保持屏幕水平
+                _hpRoot.rotation = Quaternion.LookRotation(cam.transform.position - _hpRoot.position, cam.transform.up);
         }
 
         public void Tick(float dt, Camera cam)
@@ -172,7 +260,13 @@ namespace IronCurtain.View
             bool isB = _e.Kind == EntityKind.Building;
             bool hidden = !isB && (_e.GarrisonBuildingId != 0 || _fogUnitHidden);
             bool vis = !hidden && !_rubbled && !(isB && _fogBuildingUnknown);
-            if (_model != null && _model.activeSelf != vis) { _model.SetActive(vis); _hpRoot.gameObject.SetActive(!hidden); }
+            if (_model != null && _model.activeSelf != vis)
+            {
+                // 2026-09-09 bug1 修复:雾散/出驻重现时直接落位实时坐标,
+                // 禁止从雾前残留位置 Lerp 滑移(表现为"从基方向瞬移")
+                if (vis && !isB) transform.position = BoardView.WorldPos(_e.PosF);
+                _model.SetActive(vis); _hpRoot.gameObject.SetActive(!hidden);
+            }
             if (isB && _fogBuildingUnknown)
             {
                 // 建筑未知:血条与驻军点也全部隐藏
@@ -200,6 +294,21 @@ namespace IronCurtain.View
                         else r.sharedMaterial.color = c;
                     }
                 }
+                // 2026-09-09 制作人拍板:受击反馈三件套之一——模型级闪白(士兵/将通用,MPB 不污染共享材质)
+                if (_modelRenderers != null && _modelRenderers.Length > 0)
+                {
+                    if (_flashBlock == null) _flashBlock = new MaterialPropertyBlock();
+                    _flashBlock.SetColor("_BaseColor", Color.white);
+                    for (int i = 0; i < _modelRenderers.Length; i++)
+                        if (_modelRenderers[i] != null) _modelRenderers[i].SetPropertyBlock(_flashBlock);
+                    _modelFlashed = true;
+                }
+            }
+            else if (_modelFlashed)
+            {
+                for (int i = 0; i < _modelRenderers.Length; i++)
+                    if (_modelRenderers[i] != null) _modelRenderers[i].SetPropertyBlock(null);
+                _modelFlashed = false;
             }
             if (_countLabel != null && _soldierCountOf != null)
             {
@@ -219,7 +328,13 @@ namespace IronCurtain.View
             }
             if (_e.Rubbled && !_rubbled) SetRubbled(true);
             if (!_e.Rubbled && _rubbled) SetRubbled(false);
-            if (isB) UpdateGarrison();
+            if (isB)
+            {
+                UpdateGarrison();
+                var smoke = _model != null ? _model.GetComponentInChildren<BuildingSmokeFx>() : null;
+                if (smoke != null && _e.MaxHp > 0f)
+                    smoke.SetHpFraction(_e.Hp / _e.MaxHp, _e.Rubbled);
+            }
             UpdateShield();
             TickBillboard(cam);
             if (_dead)
@@ -272,8 +387,9 @@ namespace IronCurtain.View
             root.transform.localPosition = new Vector3(0f, _e.Kind == EntityKind.Building ? _topY + 0.9f : 2.7f, 0f);
             _hpRoot = root.transform;
             _hpBack = ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w, _h), root.transform, "Back").transform;
-            _hpFill = ViewAssets.DecoQuad(_g, Vector3.zero, new Vector2(_w, _h), root.transform, "Fill").transform;
-            _shFill = ViewAssets.DecoQuad(_sh, new Vector3(0f, 0.14f, 0f), new Vector2(_w, 0.05f), root.transform, "Shield").transform;
+            _hpFill = ViewAssets.DecoQuad(FactionHpMat(), Vector3.zero, new Vector2(_w, _h), root.transform, "Fill").transform;
+            EnsureHpMats();
+            _shFill = ViewAssets.DecoQuad(_hpMatShield, new Vector3(0f, 0.14f, 0f), new Vector2(_w, 0.05f), root.transform, "Shield").transform;
             _shFill.gameObject.SetActive(false);
         }
 
@@ -311,6 +427,70 @@ namespace IronCurtain.View
             return go;
         }
 
+        // ===== 2026-09-10 建筑正式模型接线:Models/Buildings/{名}.fbx + BuildingMat_{名} 直挂 =====
+
+        private static string BuildingModelName(BuildingId id)
+        {
+            switch (id)
+            {
+                case BuildingId.Base: return "主基地";
+                case BuildingId.Barracks: return "兵营";
+                case BuildingId.ResourcePoint: return "资源点";
+                default: return "箭塔";
+            }
+        }
+
+        // 建筑材质缓存(懒加载,同 HeroMats 模式;null 也缓存避免反复 Load)
+        private static readonly System.Collections.Generic.Dictionary<string, Material> BldMats
+            = new System.Collections.Generic.Dictionary<string, Material>();
+        private static Material BuildingMaterial(string name)
+        {
+            Material m;
+            if (BldMats.TryGetValue(name, out m)) return m;
+            m = UnityEngine.Resources.Load<Material>("Models/Buildings/BuildingMat_" + name);
+            BldMats[name] = m;
+            return m;
+        }
+
+        // 建筑美术件:高度归一 + 底面贴地(fbx 枢轴不定)+ 材质直挂;失败返回 null 走 Kenney 回退。
+        // 不走 AddPiece:其会清 root 旋转,而 Blender 导出的 fbx root 带 X-90(Z-up→Y-up),
+        // 清掉后模型躺倒且量高失真(实测兵营 6.2 目标变 10.7)。
+        private GameObject AddBuildingPiece(Transform parent, string name, float targetH)
+        {
+            var prefab = UnityEngine.Resources.Load<GameObject>("Models/Buildings/" + name);
+            if (prefab == null) { Debug.LogWarning("[EntityView] Missing building model: " + name); return null; }
+            var go = Instantiate(prefab, parent);
+            go.name = "Buildings/" + name;
+            go.transform.localRotation = prefab.transform.rotation;
+            var rr = go.GetComponentsInChildren<Renderer>();
+            if (rr.Length == 0) return go;
+            var wb = rr[0].bounds;
+            for (int i = 1; i < rr.Length; i++) wb.Encapsulate(rr[i].bounds);
+            float ph = wb.size.y;
+            float s = ph > 0.0001f ? targetH / ph : 1f;
+            go.transform.localScale = Vector3.one * s;
+            wb = rr[0].bounds; // 缩放后重取
+            for (int i = 1; i < rr.Length; i++) wb.Encapsulate(rr[i].bounds);
+            // 贴地+水平居中:按包围盒最低点对齐模型根地面、包围盒中心对齐建筑原点
+            go.transform.localPosition = new Vector3(parent.position.x - wb.center.x, parent.position.y - wb.min.y, parent.position.z - wb.center.z);
+            var mat = BuildingMaterial(name);
+            if (mat != null)
+                foreach (var r in rr)
+                {
+                    var ms = r.sharedMaterials;
+                    for (int i = 0; i < ms.Length; i++) ms[i] = mat;
+                    r.sharedMaterials = ms;
+                }
+            return go;
+        }
+
+        private bool TryArt(string name, float targetH)
+        {
+            if (AddBuildingPiece(_model.transform, name, targetH) == null) return false;
+            _bldArt = true;
+            return true;
+        }
+
         private Color TeamGlowColor()
         {
             if (_side == Side.Blue) return new Color(0.4f, 0.8f, 1f);
@@ -318,9 +498,10 @@ namespace IronCurtain.View
             return new Color(0.35f, 1f, 0.55f);
         }
 
-        private void AddGlowDisc(Transform parent, float radius)
+        private void AddGlowDisc(Transform parent, float radius, Color? glowColor = null)
         {
-            Material glow = ViewAssets.Mat(TeamGlowColor() * 0.32f, 0f, 0.7f, TeamGlowColor(), 0.55f);
+            Color c = glowColor ?? TeamGlowColor();
+            Material glow = ViewAssets.Mat(c * 0.2f, 0f, 0.7f, c, 0.55f);
             ViewAssets.DecoBox(glow, new Vector3(0f, 0.02f, 0f), new Vector3(radius * 2f, 0.025f, radius * 2f), parent, "GlowDisc");
         }
 
@@ -378,47 +559,119 @@ namespace IronCurtain.View
             }
         }
 
+        // 英雄主色(兵种识别,与士兵配色同源)。2026-09-09 制作人拍板:不得偏红偏蓝(避免阵营歧义)
+        private static Color HeroAccent(HeroId h)
+        {
+            switch (h)
+            {
+                case HeroId.PanShi: return new Color(0.72f, 0.68f, 0.55f);   // 石色
+                case HeroId.ZhenYue: return new Color(0.78f, 0.80f, 0.84f);  // 钢银(去蓝)
+                case HeroId.DuanFeng: return new Color(0.88f, 0.88f, 0.90f); // 亮银(中性)
+                case HeroId.ZhuFeng: return new Color(0.42f, 0.90f, 0.84f);  // 淡青
+                case HeroId.ZhuiRi: return new Color(1.00f, 0.78f, 0.16f);   // 琥珀金(去红)
+                default: return new Color(0.70f, 0.55f, 1.00f);              // 星空紫(星落)
+            }
+        }
+
+        // 管线修复后的英雄材质(FBX 内嵌彩色贴图直挂;懒加载)
+        private static readonly System.Collections.Generic.Dictionary<HeroId, Material> HeroMats
+            = new System.Collections.Generic.Dictionary<HeroId, Material>();
+        private static Material HeroMaterial(HeroId hero)
+        {
+            Material m;
+            if (HeroMats.TryGetValue(hero, out m)) return m;
+            var modelName = HeroModelName(hero);
+            var idx = modelName.LastIndexOf('/');
+            m = UnityEngine.Resources.Load<Material>("Models/Heroes/HeroMat_" + (idx >= 0 ? modelName.Substring(idx + 1) : modelName));
+            HeroMats[hero] = m;
+            return m;
+        }
+
         private void BuildUnit(HeroId hero)
         {
             _model = NewModelRoot();
             var body = AddPiece(_model.transform, HeroModelName(hero), HeroTargetHeight(hero), 0f);
             if (body != null)
             {
-                TintRenderers(body, _side == Side.Blue ? new Color(0.75f, 0.9f, 1f)
-                    : (_side == Side.Red ? new Color(1f, 0.72f, 0.66f) : Color.white)); // 换装后 tint 减淡(保留贴图识别度)
+                // 2026-09-09 管线修复:美术彩色贴图直挂(绑骨 FBX 内嵌贴图 Unity 解不开,已抽取生成 HeroMat);
+                // 找不到材质时回退旧 tint 路径。阵营识别走血条,不再整体染色。
+                var heroMat = HeroMaterial(hero);
+                if (heroMat != null)
+                {
+                    foreach (var rr in body.GetComponentsInChildren<Renderer>())
+                    {
+                        var ms = rr.sharedMaterials;
+                        for (int i = 0; i < ms.Length; i++) ms[i] = heroMat;
+                        rr.sharedMaterials = ms;
+                    }
+                }
+                else
+                {
+                    Color faction = _side == Side.Blue ? new Color(0.75f, 0.9f, 1f)
+                        : (_side == Side.Red ? new Color(1f, 0.72f, 0.66f) : Color.white);
+                    TintRenderers(body, Color.Lerp(faction, HeroAccent(hero), 0.5f));
+                }
                 _anim = body.GetComponent<Animator>();
                 if (_anim == null) _anim = body.AddComponent<Animator>();
                 if (HeroCtrl != null) _anim.runtimeAnimatorController = HeroCtrl;
             }
-            AddGlowDisc(_model.transform, 1.15f);
+            AddGlowDisc(_model.transform, 0.7f, HeroAccent(hero) * 1.25f);
         }
 
         private void BuildBuilding(BuildingId type)
         {
             _model = NewModelRoot();
-            // M8.6 占地底板:半透明阵营色,占地可视化(建筑多格占用)
-            Material pm = ViewAssets.Flat(_side == Side.Blue ? new Color(0.35f, 0.55f, 0.95f, 0.35f)
-                : (_side == Side.Red ? new Color(0.95f, 0.4f, 0.3f, 0.35f) : new Color(0.75f, 0.75f, 0.7f, 0.35f)));
-            ViewAssets.DecoBox(Instantiate(pm), new Vector3(0f, 0.015f, 0f),
-                new Vector3(BuildingFootprint.HalfW(_e) * 2f, 0.02f, BuildingFootprint.HalfH(_e) * 2f), _model.transform, "Footprint");
+            // M8.6 占地可视化。2026-09-09 用户拍板:大面积色块改细描边框(保留占地语义);
+            // flash 审查:共享同一材质实例(原 Instantiate×4 产生孤儿材质)
+            Material pm = ViewAssets.Flat(_side == Side.Blue ? new Color(0.35f, 0.55f, 0.95f, 0.5f)
+                : (_side == Side.Red ? new Color(0.95f, 0.4f, 0.3f, 0.5f) : new Color(0.75f, 0.75f, 0.7f, 0.5f)));
+            float fw = BuildingFootprint.HalfW(_e) * 2f, fh = BuildingFootprint.HalfH(_e) * 2f, ft = 0.3f;
+            ViewAssets.DecoBox(pm, new Vector3(0f, 0.02f, (fh - ft) * 0.5f), new Vector3(fw, 0.02f, ft), _model.transform, "FootN");
+            ViewAssets.DecoBox(pm, new Vector3(0f, 0.02f, -(fh - ft) * 0.5f), new Vector3(fw, 0.02f, ft), _model.transform, "FootS");
+            ViewAssets.DecoBox(pm, new Vector3((fw - ft) * 0.5f, 0.02f, 0f), new Vector3(ft, 0.02f, fh), _model.transform, "FootE");
+            ViewAssets.DecoBox(pm, new Vector3(-(fw - ft) * 0.5f, 0.02f, 0f), new Vector3(ft, 0.02f, fh), _model.transform, "FootW");
             bool neutral = _side == Side.Neutral;
             bool fort = _e.IsFort && type == BuildingId.ResourcePoint;
             switch (type)
             {
                 case BuildingId.Base:
-                    AddPiece(_model.transform, "tower-square-base", 3.6f, 0f);
-                    AddPiece(_model.transform, "tower-square-mid", 4.2f, 3.6f);
-                    AddPiece(_model.transform, "tower-square-top-roof", 3.6f, 7.8f);
-                    _topY = 11.4f; AddGlowDisc(_model.transform, 7.2f);
+                    // 2026-09-10 正式建筑 fbx(主基地);资源缺失回退 Kenney 塔楼组合
+                    if (TryArt("主基地", 11.4f)) { }
+                    else
+                    {
+                        AddPiece(_model.transform, "tower-square-base", 3.6f, 0f);
+                        AddPiece(_model.transform, "tower-square-mid", 4.2f, 3.6f);
+                        AddPiece(_model.transform, "tower-square-top-roof", 3.6f, 7.8f);
+                    }
+                    _topY = 11.4f; AddGlowDisc(_model.transform, 3.2f);
                     break;
                 case BuildingId.Barracks:
-                    AddPiece(_model.transform, "tower-square-mid-door", 4.4f, 0f);
-                    AddPiece(_model.transform, "tower-square-roof", 1.8f, 4.4f);
-                    _topY = 6.2f; AddGlowDisc(_model.transform, 5.0f);
+                    if (TryArt("兵营", 6.2f)) { }
+                    else
+                    {
+                        AddPiece(_model.transform, "tower-square-mid-door", 4.4f, 0f);
+                        AddPiece(_model.transform, "tower-square-roof", 1.8f, 4.4f);
+                    }
+                    _topY = 6.2f; AddGlowDisc(_model.transform, 2.5f);
                     AddFlag(_model.transform, new Vector3(3.6f, 0f, 3.6f), 3.6f);
                     break;
                 case BuildingId.ResourcePoint:
-                    if (fort)
+                    // 据点与非据点共用资源点模型(无专属据点美术);高度统一 7.0 不压扁
+                    if (TryArt("资源点", 7.0f))
+                    {
+                        _topY = 7.0f;
+                        if (fort)
+                        {
+                            Material gm = ViewAssets.Mat(Color.black, 0f, 0.9f, TeamGlowColor(), 2.2f);
+                            for (int i = 0; i < 3; i++)
+                            {
+                                float a = i * Mathf.PI * 2f / 3f;
+                                ViewAssets.DecoBox(gm, new Vector3(Mathf.Cos(a) * 1.7f, _topY + 0.3f, Mathf.Sin(a) * 1.7f),
+                                    Vector3.one * 0.5f, _model.transform, "fortglow" + i);
+                            }
+                        }
+                    }
+                    else if (fort)
                     {
                         var stall = AddPiece(_model.transform, "stall", 4.0f, 0f);
                         _topY = 4.4f;
@@ -436,18 +689,26 @@ namespace IronCurtain.View
                         AddPiece(_model.transform, neutral ? "watermill" : "windmill", 7.0f, 0f);
                         _topY = 7.0f;
                     }
-                    AddGlowDisc(_model.transform, 4.4f);
+                    AddGlowDisc(_model.transform, 2.2f);
                     break;
                 case BuildingId.Tower:
                 default:
-                    AddPiece(_model.transform, "tower-hexagon-base", 2.6f, 0f);
-                    AddPiece(_model.transform, "tower-hexagon-mid", 4.0f, 2.6f);
-                    AddPiece(_model.transform, "tower-hexagon-roof", 2.0f, 6.6f);
-                    _topY = 8.6f; AddGlowDisc(_model.transform, 5.6f);
+                    if (TryArt("箭塔", 8.6f)) { }
+                    else
+                    {
+                        AddPiece(_model.transform, "tower-hexagon-base", 2.6f, 0f);
+                        AddPiece(_model.transform, "tower-hexagon-mid", 4.0f, 2.6f);
+                        AddPiece(_model.transform, "tower-hexagon-roof", 2.0f, 6.6f);
+                    }
+                    _topY = 8.6f; AddGlowDisc(_model.transform, 2.8f);
                     break;
             }
             if (!fort) AddFlag(_model.transform, new Vector3(6.0f, 0f, type == BuildingId.Barracks ? -1.8f : 0f), 5.0f);
-            if (neutral && type != BuildingId.ResourcePoint) GreyRenderers(_model);
+            // 2026-09-10 制作人定稿:建筑分阶段烟雾(75%轻/50%偏浓/25%浓黑/摧毁)
+            BuildingSmokeFx.Attach(_model, _topY, BuildingFootprint.HalfW(_e) + BuildingFootprint.HalfH(_e));
+            // 正式模型材质即成品,阵营识别走旗帜/血条/占地描边(同英雄拍板);仅回退路径保留 grey/tint
+            if (_bldArt) { }
+            else if (neutral && type != BuildingId.ResourcePoint) GreyRenderers(_model);
             else if (!neutral)
                 TintRenderers(_model, _side == Side.Blue ? new Color(0.55f, 0.72f, 1f) : new Color(1f, 0.55f, 0.45f)); // 建筑阵营 tint(红方暖、蓝方冷)
         }
@@ -461,6 +722,9 @@ namespace IronCurtain.View
             if (!on) return;
             _chunks = new GameObject("Rubble");
             _chunks.transform.SetParent(transform, false);
+            // 2026-09-10 废墟正式模型(同建筑 fbx 流程);未挂正式模型时回退 Kenney 碎石
+            if (_bldArt && AddBuildingPiece(_chunks.transform, BuildingModelName(_e.Building ?? BuildingId.Tower) + "_废墟", 4.0f) != null)
+                return;
             string main = _e.Building == BuildingId.ResourcePoint ? "cart" : "siege-tower-demolished";
             var go = AddPiece(_chunks.transform, main, 4.0f, 0f);
             if (go != null) go.transform.localScale *= 0.9f;

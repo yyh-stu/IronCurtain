@@ -94,6 +94,7 @@ namespace IronCurtain.Sim
             if (sim.EpOf(ai.Side) >= 2 && !sim.IsUpgraded(ai.Side, HeroId.ZhenYue))
                 sim.BuyUpgrade(ai.Side, HeroId.ZhenYue, out _);
             // 3. 规律抽卡
+            TryUseHeldHex(sim, ai);
             if (sim.Tick >= 1800 && HexSystem.CanDraw(sim, ai.Side))
                 TryDrawHex(sim, ai);
             // 5. 受挫撤退(先于新波次判断)
@@ -108,12 +109,29 @@ namespace IronCurtain.Sim
         {
             var prio = new[] { HexId.SteelTide, HexId.RapidDeploy, HexId.HoldFast, HexId.Vengeance,
                                HexId.LightMobility, HexId.IronWall, HexId.HiddenPath };
-            var choices = HexSystem.DrawChoices(sim, ai.Side);
+            var draw = HexSystem.TryDraw(sim, ai.Side);
+            if (!draw.Success) return;
             foreach (var c in prio)
             {
                 if (c == HexId.Sandbag) continue;
-                if (choices.Contains(c) && HexSystem.UseHex(sim, ai.Side, c, 0, out _)) return;
+                if (!draw.Choices.Contains(c)) continue;
+                if (HexSystem.TryChoose(sim, ai.Side, c) != HexChooseError.None) return;
+                TryUseHeldHex(sim, ai);
+                return;
             }
+        }
+
+        static bool TryUseHeldHex(SimCore sim, AiState ai)
+        {
+            var prio = new[] { HexId.SteelTide, HexId.RapidDeploy, HexId.HoldFast, HexId.Vengeance,
+                               HexId.LightMobility, HexId.IronWall, HexId.HiddenPath };
+            var hand = HexSystem.HandOf(sim, ai.Side);
+            foreach (var c in prio)
+            {
+                if (!hand.Contains(c)) continue;
+                if (HexSystem.TryUseHeld(sim, ai.Side, c) == HexUseError.None) return true;
+            }
+            return false; // 例如铁壁暂时无合法落点：保留手牌，下个决策 tick 重试。
         }
 
         static void CheckRetreat(SimCore sim, AiState ai)
@@ -169,9 +187,9 @@ namespace IronCurtain.Sim
 
             var targetB = sim.GetEntity(targetId);
             var wave = field.OrderBy(e => targetB != null ? Dist(sim, e, targetB) : 0f).Take(4).Select(e => e.Id).ToList(); // 名额 4,一波最多全员
-            if (SiegeSystem.SetIntent(sim, targetId, ai.Side, intent, out _))
+            var order = SiegeSystem.TryIssueRegimentOrder(sim, wave, targetId, ai.Side, intent);
+            if (order.Success)
             {
-                SiegeSystem.IssueOrder(sim, wave, targetId, out _);
                 ai.WaveActive = true;
                 ai.WaveUnits = wave;
                 ai.WaveStartCount = wave.Count;

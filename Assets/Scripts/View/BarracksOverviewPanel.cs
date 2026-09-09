@@ -24,8 +24,9 @@ namespace IronCurtain.View
         public static Rect LastPanelRect = new Rect(10f, 10f, 360f, 0f);
 
         private BarracksOverviewModel _model;
-        private string _lastError;
-        private float _errorUntil;
+        private string _lastFeedback;
+        private bool _lastFeedbackOk;
+        private float _feedbackUntil;
 
         public void Init(SimCore sim, Side player)
         {
@@ -38,7 +39,8 @@ namespace IronCurtain.View
             GUI.skin.font = ViewAssets.UiFont(14);
 
             var blocks = _model.DescribeBlocks();
-            float height = 84f + blocks.Count * 158f;
+            // 2026-09-09 修底部裁切(制作人指出老毛病):块高余量不足,末行将按钮显示一半 → 158→174
+            float height = 84f + blocks.Count * 174f;
             LastPanelRect = new Rect(10f, 10f, 360f, height);
             GUI.Box(new Rect(10f, 10f, 360f, height), "", MakeBoxStyle());
             GUILayout.BeginArea(new Rect(18f, 16f, 344f, height - 12f));
@@ -49,27 +51,30 @@ namespace IronCurtain.View
             GUILayout.BeginHorizontal();
             GUILayout.Label("补兵池 " + _model.ReinforcePoolOf() + "/" + _model.ReinforcePoolCap());
             if (GUILayout.Button("补兵", GUILayout.Width(64f)))
-                Report(NotNullOrOk(_model.RequestReinforce(out _)));
+            {
+                int before = _model.ReinforcePoolOf();
+                string result = _model.RequestReinforce(out _);
+                Report(result, "已补兵");
+#if UNITY_EDITOR
+                InputAudit.Log("reinforce_click result=" + ResultForLog(result)
+                    + " pool=" + before + "->" + _model.ReinforcePoolOf());
+#endif
+            }
             GUILayout.EndHorizontal();
             GUILayout.Space(4f);
 
             foreach (var block in blocks)
                 DrawBlock(block);
 
-            if (_lastError != null && Time.unscaledTime < _errorUntil)
+            if (_lastFeedback != null && Time.unscaledTime < _feedbackUntil)
             {
                 var prev = GUI.color;
-                GUI.color = _lastError == "已补兵" ? Color.green : Color.red;
-                GUILayout.Label(_lastError);
+                GUI.color = _lastFeedbackOk ? Color.green : Color.red;
+                GUILayout.Label(_lastFeedback);
                 GUI.color = prev;
             }
 
             GUILayout.EndArea();
-        }
-
-        private static string NotNullOrOk(string error)
-        {
-            return error ?? "已补兵";
         }
 
         private void DrawBlock(BarracksOverviewModel.BlockInfo block)
@@ -124,7 +129,14 @@ namespace IronCurtain.View
             if (!destroyed && (slot.Current.HasValue || slot.PendingCount > 0))
             {
                 if (GUILayout.Button("取消", GUILayout.Width(48f)))
-                    Report(_model.Cancel(block.BarracksId, index));
+                {
+                    string result = _model.Cancel(block.BarracksId, index);
+                    Report(result, "已取消");
+#if UNITY_EDITOR
+                    InputAudit.Log("production_cancel building=" + block.BarracksId + " slot=" + index
+                        + " result=" + ResultForLog(result));
+#endif
+                }
             }
             else
             {
@@ -147,17 +159,32 @@ namespace IronCurtain.View
                     GUILayout.Box("", GUILayout.Width(14f), GUILayout.Height(20f));
                     GUI.color = prev;
                     if (GUILayout.Button("将:" + HeroNames[idx], GUILayout.Width(84f)))
-                        Report(_model.StartProduction(buildingId, hero));
+                    {
+                        string result = _model.StartProduction(buildingId, hero);
+                        Report(result, "已加入生产");
+#if UNITY_EDITOR
+                        InputAudit.Log("production_click building=" + buildingId + " hero=" + hero
+                            + " result=" + ResultForLog(result));
+#endif
+                    }
                 }
                 GUILayout.EndHorizontal();
             }
         }
 
-        private void Report(string error)
+        private void Report(string error, string success)
         {
-            _lastError = error;
-            _errorUntil = Time.unscaledTime + 2f;
+            _lastFeedbackOk = error == null;
+            _lastFeedback = error ?? success;
+            _feedbackUntil = Time.unscaledTime + 2f;
         }
+
+#if UNITY_EDITOR
+        private static string ResultForLog(string error)
+        {
+            return error == null ? "ok" : "error message=\"" + error + "\"";
+        }
+#endif
 
         private static string HeroNameOf(HeroId? hero)
         {

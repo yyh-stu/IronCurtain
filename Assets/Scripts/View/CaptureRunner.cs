@@ -25,6 +25,17 @@ namespace IronCurtain.View
                     StartCoroutine(RunFastResult());
                     return;
                 }
+                // 2026-09-09 测试提速:非截图模式下若设了 ic.speed>1,进 Play 自动加速
+                float sp = SessionState.GetFloat("ic.speed", 1f);
+                if (sp > 1f)
+                {
+                    var boot = GetComponent<GameBootstrap>();
+                    if (boot != null)
+                    {
+                        boot.Speed = sp;
+                        Debug.Log("[capture] test speed " + sp + "x (ic.speed; SessionState 跨会话残留,手动 Play 前请用 Interactive Play 菜单重置)");
+                    }
+                }
                 Destroy(this);
                 return;
             }

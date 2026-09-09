@@ -11,6 +11,9 @@ namespace IronCurtain.Sim
         public int EntityCount => _entities.Count;
         public IReadOnlyDictionary<int, Entity> Entities => _entities;
 
+        /// <summary>海克斯抽取/手牌/效果的对局级权威状态；不得放回 View 或静态系统。</summary>
+        internal HexRuntimeState HexRuntime { get; } = new HexRuntimeState();
+
         /// <summary>将名额上限(M8.4b 名额制)。测试版 4;正式版 8。</summary>
         public const int GeneralCap = 4;
 
@@ -272,7 +275,8 @@ namespace IronCurtain.Sim
             float perTick = 1f / Config.TickRate;
             foreach (var e in _entities.Values)
             {
-                if (e.IsSoldier) continue; // 士兵移动全归 RegimentSystem.Tick,不进命令移动分支
+                // 常态士兵跟随主将；攻城士兵临时脱队，按自身命令目标移动入场。
+                if (e.IsSoldier && e.TargetBuildingId == 0) continue;
                 if (e.Kind != EntityKind.Unit || (e.State != EntityState.Moving && e.State != EntityState.Routing) || e.MoveSpeed <= 0f)
                     continue;
                 if (e.GarrisonBuildingId != 0) continue; // 驻军单位不占线移动
@@ -524,7 +528,7 @@ namespace IronCurtain.Sim
             }
             defender.Hp -= remaining;
 
-            Emit(new SimEvent(Tick, SimEventType.DamageDealt, defender.Id, dmg));
+            Emit(new SimEvent(Tick, SimEventType.DamageDealt, defender.Id, dmg, attacker.Id));
 
             HeroAbilitySystem.ApplyOnHitEffects(this, attacker, defender);
 
@@ -564,7 +568,7 @@ namespace IronCurtain.Sim
                     remaining -= absorbed;
                 }
                 o.Hp -= remaining;
-                Emit(new SimEvent(Tick, SimEventType.DamageDealt, o.Id, dmg));
+                Emit(new SimEvent(Tick, SimEventType.DamageDealt, o.Id, dmg, attacker.Id));
                 if (o.Hp <= 0f) { o.State = EntityState.Dead; dead.Add(o.Id); }
             }
         }

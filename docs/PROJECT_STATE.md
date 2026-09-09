@@ -1,22 +1,118 @@
 ﻿# PROJECT_STATE —— 铁幕:前线 Demo 项目交接文件
 
-> 用途:新会话续工时,先读本文件即可恢复全部上下文。每次里程碑更新本文件。
-> 最后更新:2026-09-06 | 阶段:M6.4a 对局时钟+加时+积分结算 ✅(227/227)+M6.4b 快速结算截屏通道;下一步=M6.4 特效音效+M6.5 新手浮层→M6.3 操作 UI;**待用户编辑器 Play 审:M6.2+M6.1+M8.6+M8.7+M6.4a(顶栏倒计时/加时橙红/结算面板)全部 View 视觉**
+> 用途:长期设计、里程碑与事故历史账本。**新会话先读 `docs/PROJECT_BRIEF.md`，需要历史原因时再定向检索本文件。**
+> 2026-09-08 进度核对：最近产品提交 `82a0bb8` M6.0f，六英雄带骨模型已入 Unity，三段镇岳动作共用；武器分离/挂接、专属动作和穿模型 MP4 待收口。旧管线有完整产物，Codex 新媒体适配器仍待验证。下一轮按 `NEXT_DELIVERY.md` 的依赖顺序推进，不机械沿用下方历史待办排列。Terra/Sol 已分别完成本轮源码/计划审查，获准作 DeepSeek 不可用时的下游替代。
+> 最后校正:2026-09-08 | 代码阶段记录仍为 M6.4a/M6.4b、227/227；本次只升级协作架构和门禁，未重跑 Unity。
+>
+> **2026-09-08 当前权威更正（优先于下方历史文字）**：总编排对项目结果和实际效果负责；节省 token 以不损害结果、证据和风险沟通为前提，禁止无效读取、无收益调用、重复转述和冗余表达，对用户一句能说清楚的事不用两句。视觉必须按执行端区分——Codex 直连 GLM-4.5V 无图像权限，Codex 优先使用原生 GPT 视觉额度，按量 TokenHub `glm-5v-turbo` 只作批量预检、补充或交叉验证；ZCode 套餐内置 4.5V 仍可用，且已经实战验证、准确度高，是 ZCode 默认视觉入口。当前 Codex/TokenHub 3D 适配器只验证到 `hy-3d-3.1` 提交受理，生模结果→绑骨→动作→Unity 导入端到端未验证；单次约 ¥5，等真实项目需要时顺带验证。DeepSeek 按量 API 在北京时间 `[12:00, 18:00)` 禁用，其他时段也优先使用 GLM 套餐。下方冲突旧表述均按本段和 `PROJECT_BRIEF.md` 解释。
+> **本阶段临时覆盖**：GLM 额度恢复前由 Terra 承担具体实现/常规复核，Sol 总编排非必要不下场，只做拆解、门禁、验收并对结果负责；本次无人值守阶段 18:00 前 DeepSeek 仅可轻量交叉验证、不得重活，18:00 后恢复正常路由，不永久改写原成本原则。
 
+> **2026-09-09 当前进展（跨窗口续接）**：M6.3 未提交工作树已完成 C2a 海克斯操作适配模型与 C2b 英雄升级适配模型，二者修复后 Luna 复审均无未关闭阻断；当时冷启动 EditMode 265/265、`error CS=0`，纯 Model 的实机/制作人验收不适用。审核规则现改为固定每 5 个新子模块一批，尾批不足 5 个只在大模块收尾时审核；普通阻断返原源码提交模型判断/修复，只重提拦截项，同批连续 3 轮未收口才按 Flash→Terra、Terra→Sol 升级，升级模型有留证直接放行权。旧 C2a/C2b 保留既有审核证据，不计入新批、不重复提审。新批 `M6.3-B01` 当前 1/5：S01/C3a 道具操作适配模型机器门禁通过（定向 6/6、冷全量 271/271、`error CS=0`），证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B01-S01-tool-command-model.md`；未调用 Luna，全部改动仍未提交、未回滚既有脏工作树。
+
+> **2026-09-09 M6.3-B01-S02 收口**：C2c 英雄升级面板已接入 `GameBootstrap`，面板支持折叠、显示 EP/六英雄升级状态、单击购买与结果反馈，并由 `SelectionInteractionCoordinator` 纳入世界输入拦截；Editor-only InputAudit 记录 toggle/action/result。最终定向 EditMode 3/3、冷全量 274/274、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B01-S02-upgrade-panel.md`。批次现为 2/5，严格待凑批，未调用 Luna；工程门禁通过，真实点击/布局与制作人验收待后续 Play。工作树仍未提交，未回滚既有改动。
+
+> **2026-09-09 M6.3-B01-S03 收口**：C2d 海克斯面板已消费既有 `HexCommandModel` 并接入 `GameBootstrap`，闭合抽取、三选一、查看手牌与释放操作；沙包使用当前单选 ID，面板命中纳入统一世界输入拦截，Editor-only InputAudit 记录 toggle/action/result。最终定向 EditMode 4/4、冷全量 278/278、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B01-S03-hex-panel.md`。批次现为 3/5，未调用 Luna；工程门禁通过待凑批，真实点击/目标传递/多分辨率布局及制作人验收待 Play。工作树仍未提交，未回滚既有改动。
+
+> **2026-09-09 M6.3-B01-S04 收口**：C3b 道具操作面板已消费既有 `ToolCommandModel` 并接入 `GameBootstrap` 与选择协调层；攻城锥采用“武装后点当前可见建筑”，临时阵地采用“武装后点地图内空格”，EP 不足不进入模式，成功退出、失败保留重选，按钮/右键/框选可取消，目标点击不改当前选择。最终定向 EditMode 5/5、独立冷全量 283/283、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B01-S04-tool-panel.md`。批次现为 4/5，未调用 Luna；工程门禁通过待凑批，真实点击/目标指示/多分辨率布局及制作人验收待 Play。工作树仍未提交，未回滚既有改动。
+
+> **2026-09-09 M6.3-B01-S05 收口**：C1b 建筑废墟重建入口已接入既有建筑命令模型/面板：仅当前可见且拥有正式 BuildingId 的废墟可重建，不要求选中主将；经既有 `DestroySystem.Rebuild` 按配置扣 1 EP、归重建者并恢复满血；EP 不足、非废墟、迷雾、临时阵地废墟和非法动作均安全拒绝且无副作用。最终冷定向 EditMode 11/11、独立冷全量 288/288、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B01-S05-building-rebuild.md`。B01 已严格收齐 5/5，已仅发起一次 Luna 整批第 1 轮审核，不重复 C2a/C2b；工程验收待批审裁决，实机/制作人验收待 Play。工作树仍未提交，未回滚既有改动。
+
+> **2026-09-09 M6.3-B01 批审放行**：Luna 对 S01–S05 完成唯一一次第 1 轮隔离整批审核，未发现阻断项、未经授权的 Sim/API 改动或架构冲突；`review_check.py` 对报告和 S05 绑定产物通过。审核证据 `D:\DevTools\glm-pipeline\reviews\M6.3-B01-luna-r1.md`（SHA256 `D1ACA145496045ADDD6FE29C252B20F0AC500C79893D0747EC6897C3CC0AA5FD`）。工程验收放行，无需返 Terra 修复、复审或升级；真实点击/遮挡/多分辨率布局和制作人清晰度/手感仍待 Play。工作树仍未提交，未回滚既有改动。
+
+> **2026-09-09 M6.3-B01 Play 黑盒验收尝试（阻断）**：Terra 读取 B01 索引、Luna 报告及 `shot.ps1`/`input_check.ps1` 后，以 `D:\Unity\Editor\Unity.exe -projectPath D:\DevTools\IronCurtain` 成功冷启动 Unity 6（PID 26964，项目加载完成、许可证刷新成功）。但 Codex 当前 CUA 原生应用枚举连续两次均为空，无法锁定 Unity 窗口并注入受控真实鼠标输入；当前工具集中也无 Unity MCP。故**未运行** `input_check.ps1`，未产生点击、截图或 InputAudit，不能把编辑器加载或 EditMode 结果冒充实机验收。代码缺陷：未发现/未判定；未建 B02。实机验收仍待有可用窗口控制面后覆盖升级、海克斯、道具和废墟重建的成功/失败、输入拦截、反馈与目标模式。工程验收=通过；实机验收=阻断待重试；制作人验收=待验。工作树未提交、未回滚。
+
+> **2026-09-09 Unity MCP 连接修复（部分完成/环境阻断）**：按既有配置核对 `C:\Users\HP\.codex\config.toml` 的 `unityMCP = http://127.0.0.1:8080/mcp` 与 `D:\DevTools\start-mcp-server.cmd` 后，仅启动一次本地 HTTP 服务；`127.0.0.1:8080` 监听（PID 5220，TCP 探测成功），`GET /mcp` 因未作 MCP 协商返回预期 `406`。仅启动一个 Unity 6 编辑器（PID 33964，`-projectPath D:\DevTools\IronCurtain`，响应正常）；Editor.log 确认本地 `com.coplaydev.unity-mcp@file:D:\DevTools\unity-mcp-main\MCPForUnity` 包已解析。当前 CUA 原生表面仍为 `apps: []`，本会话工具清单亦无 Unity MCP 项，不能以允许的电脑控制完成编辑器内 `Ctrl+Alt+M`→Start；8080 未见 Unity 端已建立连接。因此 server↔Unity **未连接，未宣称通过**；未改业务源码、未启动第二个 Unity、未执行真实输入。最小后续：保持服务监听，重开一个能在会话初始化加载 Unity MCP 且 CUA 可见 Unity 的任务，执行 Start 后以 MCP 工具调用和本地已建立连接双证据收口。工作树未提交、未回滚。
+
+> **2026-09-09 Unity MCP 自动连接补查（配置已落、仍待编辑器安全重开）**：只读追踪插件源码确认 `MCPForUnity.Editor.Services.HttpAutoStartHandler`（`[InitializeOnLoad]`）在 `MCPForUnity.AutoStartOnLoad=true` 且 HTTP transport/local scope 时，待编辑器空闲后确认 8080 可达并调用 `MCPServiceLocator.Bridge.StartAsync()`；这正是窗口 Start 的桥接会话入口。当前该 EditorPrefs 原先未设置，已仅写入公开配置值 `MCPForUnity.AutoStartOnLoad_h2539145689=1`；local scope 已存在，HTTP transport 未设置时按插件默认 true。该处理**只在下次 Unity 启动或域重载生效**，运行中的 PID 33964 不轮询该偏好；无安全的远程 `executeMethod`/附加入口，CUA 仍为 `apps: []`，故为保留潜在未保存编辑器状态未强杀或重启。服务仍监听，尚无 Unity→8080 会话；未改项目业务或插件源码。后续应由用户安全关闭并重开当前 Unity（自动连接）或在可控 UI 点 Start，然后用已建立连接和 MCP 工具调用验收；Codex MCP 工具确实需在新任务/会话初始化时装载，但新会话本身不能替代编辑器连接。工作树未提交、未回滚。
+
+> **2026-09-09 Unity MCP 无重启域重载尝试（未收口，已停止）**：为避免重启 Unity，仅更新已加载本地 MCP 包 `Editor/Services/HttpAutoStartHandler.cs` 的文件时间戳（不改字节内容）；Unity watcher 确实完成一次脚本重编译与 `domain reloads=1`（`error CS=0`），编辑器 PID 33964 始终响应。随后 45 秒检查 Editor.log 未出现 `[HTTP Auto-Start]`、`Server ready` 或 `Session connected`，`127.0.0.1:8080` 仍仅监听且无 Unity→8080 established socket；说明仅靠本次安全 reimport 未让自动桥接实际运行，原因在现会话状态不可安全确认。按风险界限停止，不再连续触发 reload，也未强杀编辑器或改业务/插件源码。仍需可控 UI 的 Start 或用户安全重开 Unity；若只为 Codex 工具发现则另开会话初始化 MCP，但它不替代该桥接。工作树未提交、未回滚。
+
+> **2026-09-09 Unity MCP 安全重启收口（通过）**：确认 PID 33964 仅为本次连接启动、期间未编辑后，调用 `CloseMainWindow()`；返回 true 且进程在 3 秒内正常退出，未强杀、未出现保存/确认阻塞。确认零个 Unity 残留后，仅启动一个 `D:\Unity\Editor\Unity.exe -projectPath D:\DevTools\IronCurtain`（PID 32140）。已设置的 `MCPForUnity.AutoStartOnLoad=1` 在新编辑器生效：Editor.log 明确记录 `Server ready on http://127.0.0.1:8080`、`Session connected`，网络也确认 `127.0.0.1:38770 -> 127.0.0.1:8080 Established`，即 server↔Unity 已连接。未改业务或插件源码、未进行真实输入/Play 验收。当前 Codex 会话工具清单仍无 Unity MCP（启动时已完成工具装载），故**若需工具调用仍应新开任务/会话**；不需要再重开已连通的 Unity。工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02-S01 收口**：Terra 补齐 EP 顶栏反馈：显示当前/上限、己方资源点数量和每点周期（常规 90 秒、加时 60 秒），无效配置安全降级为 `EP --`；不改 Sim 经济规则。最终定向冷 EditMode 9/9、冷全量 290/290，`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B02-S01-ep-status.md`。B02 当前 1/5，严格待凑批、未调用 Luna/DeepSeek/GLM；工程验收通过，实机与制作人验收仍待（既有 CUA 控制面阻断未解除）。工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02-S02 收口**：Terra 补齐升级/海克斯/道具三操作面板互斥与道具目标模式收束：打开一者折叠其余；从道具武装切到升级/海克斯会取消目标并保留反馈。首次冷启动出现 `CS0246`，确认资产数据库未纳入外部新增源码且旧 DLL 测试结果为伪绿后已废弃；协调器移入已跟踪 `GameBootstrap.cs` 并重跑，最终定向冷 EditMode 10/10、冷全量 293/293、`error CS=0`。证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B02-S02-panel-exclusivity.md`。B02 当前 2/5，严格待凑批、未调用 Luna/DeepSeek/GLM；工程验收通过，实机/制作人验收待验，工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02-S03 收口**：Terra 补齐海克斯无效状态反馈：模型显式提供可用性；配置/阵营无效时面板显示“状态不可用”并收束“抽取三张（0 EP）”误导动作，正常抽选链路不变。最终定向冷 EditMode 7/7、冷全量 293/293、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B02-S03-hex-availability.md`。B02 当前 3/5，严格待凑批、未调用 Luna/DeepSeek/GLM；工程验收通过，实机/制作人验收待验，工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02-S04 收口**：Terra 补齐道具无效状态反馈：仅 `ToolCommandState.Valid` 时展示攻城锥/临时阵地按钮；无效时反馈“道具状态不可用”，不再展示误导性的 0 EP 动作。既有安全拒绝、目标模式与结算不变。最终定向冷 EditMode 6/6、冷全量 294/294、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B02-S04-tool-availability.md`。B02 当前 4/5，严格待凑批、未调用 Luna/DeepSeek/GLM；工程验收通过，实机/制作人验收待验，工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02-S05 收口**：Terra 将建筑目标覆盖层纳入操作面板协调器：打开升级/海克斯/道具会以 `panel_switch` 清除中心建筑目标，避免覆盖层叠加；不改 Sim 建筑命令。最终定向冷 EditMode 10/10、冷全量 294/294、`error CS=0`，证据 `D:\DevTools\glm-pipeline\evidence\M6.3-B02-S05-building-overlay.md`。B02 已严格收齐 5/5，现仅发起一次 Luna 整批第 1 轮审核；工程验收待批审裁决，实机/制作人验收待验，工作树未提交、未回滚。
+
+> **2026-09-09 M6.3-B02 批审放行**：Luna 对 S01–S05 完成唯一一次第 1 轮隔离整批审核，无 `LUNA-H` 阻断、未发现 B02 范围内未授权 Sim/API 改动或确定性回归；`review_check.py` 对报告与 S05 绑定产物通过。审核证据 `D:\DevTools\glm-pipeline\reviews\M6.3-B02-luna-r1.md`（SHA256 `05B40A7F243D44CF7CB85D0FB491F3028C13A6DC5BB9B7BF792A346D50DC7E0E`）。工程验收放行，无需返 Terra 修复、复审或升级；真实点击/遮挡/多分辨率及制作人对文案、布局和手感验收仍待 Play。工作树未提交、未回滚。
+
+> **2026-09-09 GLM 会话收尾交接（真实输入通道打通 + 额度事故复盘）**：
+> 1. **Terra 实机验收阻断已有解**：Codex CUA `apps: []` 枚举失败对 **PowerShell OS 级注入不成立**——`mouse_event/keybd_event`（SetProcessDPIAware，物理像素坐标）不依赖任何窗口枚举。可复用脚本：`D:\DevTools\team-pipeline\input_check.ps1`（产将点击/框选拖拽/右键/T 键序列+CopyFromScreen 截屏）、`shot.ps1`、`pixel_diff.ps1`（本地像素差分，写好**未跑**）、`view_frame.ps1`（Paint 查帧）。坐标定位法：截屏→4.5v 读像素坐标→注入。注意：CUA 像素门在运行动画的 Game 视图上恒 stale（frame_live_owner_changed），勿再走 CUA 点击。
+> 2. **NEXT_DELIVERY#1 真实输入检查结果（在 M6.3 B01/B02 之前的旧代码树上执行）**：30 秒注入序列全链跑通并留证。可信证据（帧指纹核对过的两轮 4.5v 读数）：点"将:镇岳"→槽0 进"镇岳(等位)"、无红字、人口 3/5；22s 后→人口 4/5、4 英雄脚下绿选中圈+"按 T 键自动布阵"提示 → **产将/出生/框选三环实机证据到手**。右键移动与 T 布阵：注入已执行、帧已落盘（`D:\DevTools\shots\input_check\s01–s07.png` + editor.log），但视觉读数轮次因帧切换失误作废、像素差分未跑——**按三态口径记：实机验收=待复核（差分脚本现成）**。AI 冒烟部分（此前已完成）：m6.6 4 帧+FastResult 2 帧 4.5v 审读通过，UI 遗留=顶栏与总览面板拥挤遮挡、底部按钮裁切出屏。
+> 3. **额度事故复盘（已面陈用户，根因→预防）**：主因=GLM 生成端复读事故（单模型单线程全链包办→上下文超载→检测到证据链可疑后原地自我审计循环→数千行重复输出）；次因=4.5v 全屏 2560×1440 大图多轮调用（贵且未裁剪未设上限）+引导式提问诱发迎合性读数。预防四条：可测事实先本地脚本（像素差分/打点）后视觉；视觉仅读语义且先核帧指纹、开放性提问、每任务 ≤2 次；验证通道一次失败即切换或升级、禁止原地元分析循环；GLM 只承担有界上下文的执行/验证子模块（新工作流 v2 的分批+任务卡预算天然防此事故）。
+> 4. 工作树 76 个未提交文件中：`Assets/Editor/PlayAndCapture.cs` 新增 InteractivePlay 菜单（进 Play 不挂自动截图，供人工/注入操作）为 GLM 所加，其余为 Terra M6.3 B01/B02 产物（按其记录待实机验收后统一处理）。当前无 Unity 实例在跑（本会话末核实）；8080 MCP server 状态未核实，按上文 Unity MCP 各条记录处置。
+
+> **2026-09-09 用户拍板·架构与产品决策(本段优先)**:①协作架构临时改为 GLM 全权(总编排+执行+写码),`glm-5.3-flash` 任审查员;②**临时阵地外观保留不改**,"碰撞体积待美术管线建模阶段精确化"(用户明示不急);③**相机视野改制**:默认视野宽=1/5 地图宽(57.2m,原 96m/1/3),滚轮缩放(下缩上放,范围 22-150m),方向键+WASD 平移(修复编辑器内边缘滚动不可达,bug2 主修),已落地 `CameraRig.cs` 重写;④**占地底板改细描边框**+单位/建筑脚盘缩小约 55%、发光调淡(bug4 修复,`EntityView.cs`);EditMode 294/294、error CS=0(`shots/play_check/results_cam.xml`)。⑤确认英雄建模早已导入(M6.0f),"方块人"观感=士兵仍程序化占位+相机太远;士兵正式模型走美术管线后期。⑥制作人实机反馈待修:bug1 迷雾敌人显隐疑似"从基地方向瞬移"(嫌疑=补兵行军视图未接雾过滤/显隐跳变,待深挖)。
+>
+> **2026-09-09 GLM 全权轮·三项落地(294/294,error CS=0,`shots/play_check/results_v2.xml`)**:①**bug1 迷雾"瞬移"已修**——根因=雾隐藏期间 EntityView 位置不同步,雾散重现时从残留位置 Lerp 滑移到实时位置(用户观察到"从基地方向瞬移");修复=隐藏→可见瞬间直接落位实时坐标(`EntityView.Tick`);行军视图经查雾过滤正常(BoardView.ApplyFog 覆盖全部单位)。②**将整体放大 20%**(身高档 2.30/2.14/1.94)。③**士兵程序化兵种建模**(用户拍板:士兵不走美术管线省成本)——`BuildSoldier(hero)` 按主将六兵种区分剪影与配色(磐石石色方盾短刃/镇岳钢甲重锤/断峰亮银长矛/逐风淡青平枪/坠日红黄弓弧/星落紫杖发光珠),躯干=阵营色、盔武=兵种色,放大 1.15 倍保远景观感;BoardView 为士兵解析主将 Hero(主将亡回退默认)。美术焦点留给主将。待实机 Play 视觉确认+flash 审查。
+>
+> **2026-09-09 GLM 全权轮·大模块收口(NEXT_DELIVERY#1+#2 完成,294/294 五轮全绿)**:
+> ①**bug2 真因修复**:相机初始位姿与焦点参数矛盾(摆 col143 注册焦点 col40)→ _offset 恒带 +103m 横向偏差,小地图/键盘/边缘全错位;改为焦点正上方同构偏移+常量单一来源,点哪=中心在哪(用户拍板)。②**海克斯全链实机闭环**(制作人现场确认):draw ok→choose「曲径通幽」ok→use ok,含 NotInDrawWindow/MatchEnded 拒绝路径;轮询探针法(不依赖时间估算)。③**测试提速**:Interactive Play 6x 菜单+ic.speed SessionState(CaptureRunner 应用并打日志防残留惊喜)。④**glm-5.3-flash 审查员上岗**(首单 7 条:修 4——键盘被面板悬停误禁/滚轮面板误缩放/材质 Instantiate 孤儿×4/士兵材质无缓存;驳回 1——血条边界推导不成立;记债 2——兵力统计闭包 O(将×实体)@2Hz、Flat 无缓存)。⑤制作人审核图入库桌面《待审核图片》(01_相机视野 6 张/02_士兵兵种 2 张/04_界面与操作 2 张)。⑥实机验收结论:产将/框选/移动/T布阵/升级(成功+已升级+EP不足)/海克斯(全链)/道具(武装/放置 ok/InvalidTarget/panel_switch 取消)/互斥/再来一局——InputAudit 全证据(editor2-5.log);制作人验收(手感/审美)待看图+上手。
+>
+> **2026-09-09 制作人验收轮**:①**镜头手感+滚轮缩放:制作人试过无问题(验收通过)**;小地图点击理论已修待上手复核。②**士兵"灰模"=配色 bug 非未做**——原配色照搬英雄低饱和色(亮银/石色字面即灰)且远景 21px 不可读;修复=阵营色/兵种色提饱和提亮+士兵放大 1.25;像素统计实证:同视角饱和蓝像素 51→1546。③**受击反馈补齐**(动作三件套=移动/普攻/受击,制作人拍板口径):移动+普攻=全体英雄复用镇岳 idle/walk/attack(M6.0f 既有),受击=新增模型级闪白(EntityView MPB 白闪 0.18s,士兵/将通用,不污染共享材质;原仅血条背板闪白且士兵无血条=零反馈)。④制作人规矩入档:动作复用违和由制作人视觉把关反馈,模型不猜制作人抽象描述。294/294(results_v6)、编译零错。Unity 实例 14432 留运行供制作人上手(w01_soldiers_new.png 已入待审核图片)。
+>
+> **2026-09-09 深夜·美术管线贴图事故修复+新指令包**:
+> ①**贴图事故入档(踩坑#12)**:绑骨 FBX 内嵌彩色贴图 Unity 解不开(tex=NULL/0.8灰=灰模,制作人肉眼判"颜色没跟着建模进来");诊断=FBX 字节扫描(每英雄 2×4096² PNG+小 JPG,均值色判别 diffuse/法线)+批处理 dump;修复=字节级抽取→1024 重采样入 Tex/→GenerateHeroMats 生成 HeroMat_{Hero}.mat→EntityView 直挂(去掉整体染色,阵营走血条)。制作人验收:及格。**新模型入库必跑 GenerateHeroMats+dump 确认 tex 非 NULL。**
+> ②**血条不可见根因**:公告板朝向反(面片背对相机被背面剔除,历史性从未显示);一行修复,屏外窗口截图像素验证蓝条 1142px(修复前 0)。
+> ③**免打扰视觉验证通道确立(制作人在用电脑期间)**:窗口化启动+立即 MoveWindow 屏外(-2500,0)→不抢焦点/屏幕无窗/帧缓冲照常渲染→ScreenCapture 正常(22:27 实证 4 张)。batchmode 无渲染不可用于截图。
+> ④**敌方士兵**:已覆盖(同一兵种建模系统,躯干=阵营色,红方主将磐石/断峰/坠日同款兵种色)。
+> ⑤**制作人新指令包(游戏侧剩余)**:英雄动作管线化——磐石/镇岳共用现有挥砍✓;星落=举杖+紫射线(代码做);坠日=拉弓+前端红后端黄射线(代码做,匹配攻速),小兵=更细更短的紫/红射线(代码做,制作人验收调整);逐风=骑乘坐姿/匍匐冲锋/马奔跑/前刺(美术管线生成);断峰普攻套逐风刺出,升级后枪花走管线。大地图=hy 3D 世界模型生成(先确认模型身份)。建筑=每类 3 样式八视图(制作人挑)→3D+废墟样式。另有音画闭环+武器挂接。
+>
+> **2026-09-09 深夜二批·士兵统一+弹道+血条水平(制作人"全做好再叫我"指令)**:①血条歪斜修复(公告板改用相机 up 对齐,正交相机下屏幕水平);②**士兵统一规格(制作人拍板)**:躯干=阵营色/头部=主将主色(主色库去红蓝歧义:镇岳钢银/坠日琥珀金)/武器=主将武器缩小版·中性灰剪影,磐石盾板与星落发光珠移除(灭"一人一块色块");③**远程弹道系统**:SimEvent 增 AttackerId(加法式,294/294 不破),BeamFx(渐变 LineRenderer 自发光)——坠日主将红→黄/星落主将紫,士兵更细(0.05)更短(72%射程);近战无弹道;拉弓/举杖姿势待动画资产(管线/后续)。④建筑样式样张×3 已生成入《待审核图片/05_建筑样式》(A 石造棱堡/B 木骨旗帜/C 魔幻水晶),制作人挑方向后批量八视图+3D+废墟。⑤敌方士兵确认同系统覆盖。证据:m6.6 t30/t60 帧;弹道因 0.14s 生命未被 4 点截图命中,留待实战观察。
+>
+> **2026-09-09 三批·制作人问答与仓库整备**:①建筑风格拍板=**A 石造棱堡**;**旗帜颜色由代码随阵营生成**(生成图一律无旗帜无阵营色,EntityView 既有 AddFlag 阵营色机制承接)→ 八视图批量×8(四类+四废墟)已后台生成入《待审核图片/05_建筑样式/八视图_批次1》(生图→人工确认→3D,红线不变)。②磐石士兵疑问澄清(代码事实):士兵从不加载主将 FBX、从不挂 Animator(动画仅主将路径赋值)——"像磐石"是旧版磐石兵团灰主色+盾板观感,统一规格后已变;非镇岳兵。③PROJECT_STATE 自证:当日 24 条dated条目,grep 可查,防幻觉以文件为准。④**01_概念图 阶段废弃(制作人拍板:统一八视图)**,旧内容归档 00_台账/过程存档/01_概念图_2026-09-09_用户废弃。⑤**美术资源补入仓库**:六英雄 diffuse 贴图(1024²)入 03_3D建模/IronCurtain/_共用贴图/(Unity Tex/ 同步);建筑样张 A/B/C 入 00_台账/过程存档/建筑样式样张_2026-09-09/;台账三行补记。06_仓库目录现为 00_台账/02_八视图/03_3D建模/04_3D动作。
+>
+> **2026-09-09 四批·"士兵像主将"案收口+Hub 疑问**:制作人二次目击精确描述("兵营附近冒出一个主将领着十几二十个一模一样的主将往前线走,三主将原地发呆")。**破案**:①行军纵队=补兵行军纯表现(ReinforceSystem→MarchOrigin→ReinforceMarchView,从兵营/主基走向前线兵团,设计如此);②"一模一样的主将"=旧版士兵样式(人形小方块+武器板)远景难辨——统一规格新样式已上线(躯干=阵营色/头=主将主色/灰武器,2 倍裁切证据 r0_column_zoom.png+soldiers_t30_full.png 入待审核图片);③士兵无攻击动画(代码实证:Animator 仅主将路径赋值;RegimentBehaviorSystem 自动进攻只驱动主将);④"主将发呆"=索敌未触发/波次时机,非掉队;⑤SpawnSoldier 全链 IsSoldier=true 唯一赋值点(SpawnGeneral 20 兵/补兵同路径),Sim 数据无瑕。**Unity Hub"没项目"**:我全程 CLI 直启(-projectPath 绕过 Hub),项目实体在 D:\DevTools\IronCurtain(git/代码完好,101 未提交),Hub→Open from disk 添加一次即入列。
+>
+> **2026-09-09 五批·"磐石军团"悬案铁案收口**:制作人三次目击精确化("双方大量磐石在河道互砍,大小一致带攻击动画;20 个左右跟着一个往前线;初始三主将原地不动")。**运行时数据转储定性(DiagSoldierViews,域重载安全版,屏外窗口跑):soldiers=120,soldiersWithFBXAnim=0(零士兵挂主将模型/动画),generals=6,buildings=9——当前构建士兵渲染无瑕**。真身=**AI 产将流**:AiSystem.FillProduction——simple AI 恒产磐石,Normal AI 磐石/断峰交替(每 3 个插一个镇岳)——将死名额释放即再产,长局里双方源源不断产出磐石系主将走向河道互砍,共享同一 HeroAnimator 攻击动画;目击时段恰逢未贴图期(全员灰模同脸)+"一个领着 20 个"=产出的满编兵团(1 主将+20 旧样式灰士兵,旧士兵与灰主将远景难分)。初始三将不动=索敌未触发(交战在河道,不在其视野)。**可选平衡项(待制作人拍板):AI 选将随机化/混编,避免全屏磐石。**⑥建筑八视图批次1×8 全部完成(含断连重试)入《待审核图片/05_建筑样式/八视图_批次1/》(生图→人工确认→3D 红线)。诊断工具沉淀:DiagSoldierViews(批处理/屏外窗口可跑)、DumpHeroMats。
+>
+> **2026-09-09 六批·"士兵为什么全跑了"质询复核(制作人抓住推理漏洞)**:DiagRegimentCohesion 运行时探针(t=90s 复现局):**六个初始主将全部 Idle 于出生位,各 20/20 士兵在 4 米内,near=20 far=0——零士兵离队,兵随将走铁律完好**。制作人看到的行军大队=产出的满编兵团(红方 AI 持续产+测试期我手点产将)+补兵流,灰模时代无法与"初始士兵"区分所致。副发现:①t=90s 存活的产出主将为 0(疑被蓝方箭塔 col108 在跨图行军途中击杀,产出→行军→箭塔→阵亡循环,待观察是否合理);②InteractivePlay 蓝方无 AI(Build 传 null),我此前测试局里的蓝方产出全是手点。探针工具沉淀 DiagRegimentCohesion。
+>
+> **2026-09-09 七批·真 bug 落网(制作人坚持目击为真,推翻我"看错"结论)**:"主将身边一个士兵没剩,士兵在河道-箭塔间乱串不打架,主将全程不动"——**根因=攻城令只派士兵不带动主将**:SiegeSystem.TryIssueRegimentOrder 把选中主将展开为全部士兵,CommitOrders 只给士兵挂 TargetBuildingId+行军目标(AI 波次每轮触发);RegimentSystem.Tick 中带攻城目标的士兵跳过编队跟随→跨图独行;目标建筑易主/被毁中途清标→士兵折返,新令再派→来回乱串;主将按"将留守城外"字面实现原地不动。我首轮探针未覆盖该条件(蓝 AI 关闭+红波次未触发),教训:探针必须覆盖触发条件。**修复=OrderGeneralStaging:攻城令同时给主将发"建筑城外集结点"(碰撞半径+5 朝主将方向,椭圆钳制),主将随军推进、不进交换圈,兵团原子性恢复。**契约变更同步三测试(旧"主将不动"断言→"主将获集结点+随军移动+确定性"):294/294 全绿(results_v14)。
+>
+> **2026-09-09 八批·攻城语义重设计(制作人定稿 GDD 原始顺序)**:①**兵团原子=兵随主将**(非主将随军):攻城令只下主将——`OrderGeneralMarch`:主将挂 `TargetBuildingId` 标记+行军至城外集结点(碰撞半径+5);士兵下令时不受令,靠编队跟随随行;**主将到位后 `SiegeSystem.Tick` 新增第 0 步放兵**(距建筑<半径+8 且无行军目标→本兵团未受令士兵 CommitOrders 入场,增援到位可续补;建筑失效/意图撤销清标记)。保留孤将独立攻/占原语义(到达判定未过滤主将,T10 教训:看不见的依赖,改动最小化)。②**偏好与下令解耦**:BuildingCommandModel.Execute 无选中兵团→仅 SetIntent 记录偏好不动军队("已记录进攻偏好(未选中兵团,不下令)");新增 OrderPreferred=选中兵团点城按现有偏好直接下令(无偏好默认可占领→占领/否则摧毁),协调层 TargetBuilding 分支挂钩(有选中即快速下令),面板 TryOrderPreferred+InputAudit。③AI 波次同走新语义(将行军→兵随→到位放兵)。契约三测再更新(下令时兵不受令/到位放兵/确定性含标记),294/294(results_v17)。
+>
+> **2026-09-10·七条定稿全落地(294/294 results_v23,编译零错)**:①偏好=敌方据点属性:可逐点单独设置、设置不动任何军队(BuildingCommandModel.SetPreference);②框选军队点城:有偏好按偏好直接进攻,无偏好拒绝并提示"请先设置该据点进攻偏好"(OrderPreferred 不再默认);③先框选+悬停城池出偏好 UI:选完偏好→偏好记录+选中兵团立即按偏好进攻;④偏好修改全局生效(building.Intent 单源,AI/攻城链同读);⑤偏好可见性:已设偏好的敌方据点头顶常显小标签(占领/摧毁,黄字),悬停时标签上方出现 [占领][摧毁] 选择 UI(BuildingCommandPanel DrawHoverSelector/DrawPreferenceMarkers,InputAudit 记 building_pref);⑥士兵全程可见(仅雾/驻军隐藏,属正常);**⑦兵团缩编 20→12 兵**:平时(行军/跟随/驻立)一律 3×4 纵队跟主将身后,警戒/交火(Attacking/AutoKind≠0)转圆圈包围主将(SlotOffset 双态);出生点碰撞改螺旋搜索(圆阵贴建筑时径向外推会撞更深)。连锁测试更新 23 处(20/21/31/120→12/13/31(三团)/72 等),全绿。
+>
+> **2026-09-10·审核通过→3D 提交+连锁审计+烟雾(294/294 results_v25)**:①建筑八视图批次1 制作人审核通过,3D 提交跑通(hy-3d-3.1,踩坑三连:Prompt 与 image_base64 互斥/multi_view 上限 7 张/view_type 枚举为 [back,left,right,top,bottom,left_front,right_front],旧 left_side 报错);建筑裁切映射 v1=right_front,v2=right,v4=back,v6=left,v7=left_front,底面无航拍不传;输出降 800px 解 payload 超时;主基地 .glb/.obj 已产出,余 7 栋轮询中。②**连锁审计(制作人指令)**:全库扫描兵数/阵型硬编码→仅 ProductionSystem 出生校验自算行列(未跟 SlotOffset 双态),已统一为 SlotOffset 探针(294/294);ReinforceSystem/AI/血量/占领全走 SoldiersPerGeneral 常量,零残留。③**建筑分阶段烟雾(BuildingSmokeFx)**:≥75%无烟;50-75%微微轻烟(灰,3/s);25-50%偏浓黑烟(暗棕,8/s);≤25%浓黑烟(深黑,16/s);摧毁(Rubbled)烟停(HpFrac→0 → stage3→Rubbled 后烟停? 实现为 Rubbled 传 0 = stage 3 浓黑,待制作人确认摧毁态要不要保留余烟)。URP 粒子 Unlit,半球发射+上飘。
+>
+> **2026-09-10·余烟定稿(294/294 results_v26)**:摧毁态保留余烟——浓黑烟 8 秒线性衰减熄灭(SetHpFraction 增 destroyed 参数,BuildingSmokeFx Update 驱动);Rubbled→余烟,重建→血量恢复重新按段位。建筑 3D:主基地+废墟已出 glb,余 6 栋轮询中。
+>
+> **2026-09-10 深夜·建筑 3D 全链完成+工作流 v3+换窗准备**:
+> ①**建筑 3D×8 全部产出并入库 Unity**:glb→Blender 无头转 fbx(embed_textures)→Assets/Resources/Models/Buildings/(8 栋 fbx 33-37MB);贴图字节级抽取(PNG 16-19MB→1024² 重渲染~1.3MB)入 Tex/;8 张 diffuse 就位待材质挂接(GenerateBuildingMats 待写,与 HeroMat 同流程)。管线踩坑三连:Prompt 与 image_base64 互斥/multi_view 上限 7/view_type 枚举 [back,left,right,top,bottom,left_front,right_front]。
+> ②**烟雾余烟定稿**+ProductionSystem 阵型统一+连锁审计——见上文。
+> ③**工作流 v3 落地**(桌面文件夹+六角色卡全同步):Astra 仅策划案/束手无策;GLM 5.3 全包代码(套餐管饱);DeepSeek 按量仅异构审查(每大模块收口一次);审查员异构双审;制作人=第 0 级裁决。
+> ④294/294 五连绿(results_v22~v27)。
+> **换窗待办**:a) GenerateBuildingMats 菜单(贴图→URP 材质→EntityView 换装,同 HeroMat 流程);b) EntityView BuildBuilding 改读新 fbx(替换 Kenney tower-square 系列);c) 废墟态=*_废墟.fbx(Rubbled 切换);d) 旗帜仍走 AddFlag 代码(阵营色,生成图无旗帜);e) Unity 接线后一次 Play&Capture 屏外截图给制作人看效果;f) 音画闭环+武器挂接;g) 逐风骑乘管线;h) AI 选将随机化待拍板。
+>
+> **2026-09-10 新窗·建筑 Unity 接线 a~e 全落地(294/294 results_v29/v30,`error CS=0`)**:
+> ①**GenerateBuildingMats**(Assets/Editor/GenerateBuildingMats.cs,45 行):Tex/{名}_0.png→URP Lit BuildingMat_{名},8 材质(四类+四废墟)批处理落盘,日志 `D:/DevTools/shots/play_check/bldmat2.log` made=8。
+> ②**EntityView 换装**:新增 BuildingModelName/BuildingMaterial(懒加载缓存)/AddBuildingPiece/TryArt;BuildBuilding 四类先走正式 fbx,资源缺失回退 Kenney 占位(保 EditMode/无资源可跑);正式材质直挂不走 grey/tint(阵营识别=旗帜/血条/占地描边,同英雄拍板);资源点据点与非据点共用模型统一 7.0 高,据点辉光点升到 _topY+0.3。
+> ③**废墟切换**:SetRubbled 走 Buildings/{名}_废墟.fbx+BuildingMat_废墟,4.0 高;无正式模型回退 Kenney cart/siege-tower-demolished+rocks。
+> ④**首接 bug 修复×2(本窗实证)**:(a) **Blender fbx root X-90 旋转坑**:AddPiece 清旋转致模型躺倒+量高失真(兵营目标 6.2 实测 10.7),AddBuildingPiece 改为保留 prefab 旋转自算归一+按包围盒贴地水平居中,修后兵营 y=6.2/资源点 y=7.0 分毫不差;(b) **edit 模式首帧废帧**:第一次 Camera.Render() 输出纯色帧(实测全屏 (92,195,255) 纯青,m6.1 时代 t10 帧同象),CaptureBatch 增加预热渲染弃用首帧,修后 t10 主色 55% 雾色正常。
+> ⑤**验收链**:冷全量 EditMode v28 294/294→修 bug→v29 294/294(日志含 CS2001 残留:删临时诊断脚本后立即跑,缓存引用;v30 复跑干净 `error CS=0`);临时工具 TempRuinCheck(真实 Sim+真实视图,置废墟/40%/15% 血)实证废墟残垣+贴图+贴地,验后已删;CaptureBatch cap7 四帧全有效,t10 基地 3-4 栋石造建筑纹理/旗帜/血条正常无渲染异常,t120 战斗帧 1 建筑冒烟+2 处废墟(烟雾分段与废墟切换实战生效);4.5V 目检两轮(基底特写+final_bld_sheet)。截图 `D:/DevTools/shots/m6.2_*.png / base_topdown.png / final_bld_sheet.png`。
+> ⑥物理行:GenerateBuildingMats.cs 45、CaptureBatch.cs 118(增预热 8 行);EntityView.cs 740(存量 641 已超 300,本次净增 99,未重构——拆分留待后续任务卡授权)。工作树未提交、未回滚。制作人对建筑观感终审待看 m6.2_*.png。
+> **换窗待办(更新)**:f) 音画闭环+武器挂接;g) 逐风骑乘管线;h) AI 选将随机化待拍板;i) 制作人过目 m6.2 截图拍板建筑观感(尺寸/朝向/旗帜位置微调随批)。
+>
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):
-> 1. 通读本文件(统一规格+进度+红线+坑全在此);
+> 1. 通读 `docs/PROJECT_BRIEF.md`；本文件只在需要详细规格/历史时定向检索;
 > 2. `git log --oneline -8` 对齐最近落地;
-> 3. 从「进度」节第一个未完成项继续,按既有协议(门禁→GLM→测试→全绿即 commit→归档本文件);
+> 3. 从「进度」节第一个未完成项继续,按 `docs/team/PROTOCOL.md` v3（任务包→门禁→暂存→哈希审查→原子落盘→分级验收）执行;
 > 4. 只读下一个模块**需要的**文件(grep 定位优先),不要整库通读,防上下文再次膨胀;
 > 5. 每个模块收口后主动提示用户"可以开新窗",由用户决定。
-> 红线速查:GLM 消耗必须有收益/生图必人工复核后才生3D/编排者非必要不下场/全绿即 commit 未测绿禁止 commit/Sim 禁 UnityEngine/**多模态预检必做且风险点必主动上报原因**(2026-09-06 新增)/**凡涉"看"必走内置 4.5v,其他易幻觉视觉模型不入验收管线**(2026-09-06 拍板,hy-vision 退役验收岗;**2026-09-07 晚拍板(用户,权威):①hy-vision-2.0-instruct 彻底退役视觉岗(含兜底),替代第二视觉=经标定测试选拔的评价好的模型;②视觉验收双向互证为常态(4.5v+第二视觉交叉),单一模型不可用时,仅 4.5v(用户明示信任)可单独放行,其余任何视觉模型无单独放行权;③deepseek 全系禁止执行美术管线侧职责(仅代码逻辑挑刺岗);④禁止向制作人交付 debug 视图——动画验收必须穿模型渲染,模型验收必须成品视角渲染。实证:hy-vision 两轮漏判绑骨碎面,4.5v 与用户人眼判损坏**)/**3D 建模入库后须经人工复核通过方准生产动作**(2026-09-07 新增)。
+> 红线速查（2026-09-08 当前）:结果与效果优先且禁止无效 token 消耗/优先 GLM 套餐/DeepSeek 北京时间 12:00–18:00 禁用/生图人工确认后才生 3D/3D 人工复核后才生动作/约 ¥5 的 3D 不做纯连通性测试/Sim 禁 UnityEngine/AI 输出先暂存且绑定哈希审查/测试绿不替代产品验收/视觉按端路由（ZCode=内置4.5V，Codex=原生 GPT 优先、`glm-5v-turbo` 补充）/模型与动画必须交成品视角证据。
 >
 > ## ★ 2026-09-05 新 Agent 流程(换窗后生效,用户拍板)
 > - **deepseek-v4-pro(结构化转述)**:阅读用户报告/拍板内容,结构化输出给主编排;**输出必须严格贴合原文意思**,不增删改动。
 > - **GPT(主编排,用户拟接入 GPT-6 Astra / GPT-5.6 Sol)**:拆解需求、规划整体、分发任务、检查验收。
-> - **美术与代码模型不变**:程序主程=GLM-5.3(glm_call.py);视觉验收=**ZCode 内置 4.5v 视觉 MCP(2026-09-06 拍板独占非人工视觉验收:凡涉"看"必经它,易幻觉视觉模型不入管线)**;生图/3D/动画=TokenHub 管线(team-pipeline);审美终审=用户。
+> - **当前分工**:程序主程与常规复核优先 GLM 套餐，主编排=GPT；DeepSeek 仅必要异构/高风险审查且受 12:00–18:00 禁用窗约束。ZCode 视觉=套餐内置 4.5V，Codex 视觉=原生 GPT 优先、按量 `glm-5v-turbo` 补充；生图=Seedream，3D/绑骨/动作当前适配器待真实任务端到端验证；审美终审=用户。
 
 ## 1. 任务与目标
 把《铁幕:前线》GDD v1.6 做成**单线闭环可玩 Demo**,完成度=产品级与 demo 之间(打磨后可发布)。
@@ -94,30 +190,31 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 | 角色 | 模型 | 调用方式 |
 |---|---|---|
 | 代码主力 | GLM-5.3 | **Anthropic 兼容端点**:`https://open.bigmodel.cn/api/anthropic/v1/messages`,header `x-api-key: <key>`,`anthropic-version: 2023-06-01`,必须 `"thinking":{"type":"disabled"}` |
-| 视觉验收 | **ZCode 内置 4.5v 视觉 MCP**(`mcp__4_5v_mcp__analyze_image`;**2026-09-06 拍板独占非人工视觉验收**:凡涉"看"的环节——测试取画面/截图验收/向主编排反馈视觉信息——必经 4.5v;原图分辨率、不耗项目任何 key;**hy-vision-2.0-instruct 同日退役验收岗**(M6.2 盲测 3 错 2:缩图幻觉/编造第一印象),其 TokenHub 管线保留仅作生图链路配套,不再进验收管线) | ZCode 客户端内置,`mcp__4_5v_mcp__analyze_image` 只吃远程 URL(先 Read 本地图得 CDN URL 再喂);与程序化打点互补:小文字 UI 仍以程序化计数为最终裁决 |
-| 结构化转述→逻辑挑刺 | deepseek-v4-pro | **挑刺岗常驻(2026-09-06 拍板)**:ZCode provider 直连 `deepseek_review.py`+`review_check.py` 门禁;窄口径=逻辑/时序/状态类;**v4-pro 须 thinking disabled**(默认开思考吃光 max_tokens);兼结构化转述(无视觉) |
+| 视觉验收 | ZCode 内置 4.5V / Codex 原生 GPT + glm-5v-turbo 补充 | ZCode 4.5V 套餐内且实战已验证；Codex 原生 GPT 优先做联合判断，GLM-5V 按量用于补充/交叉验证；项目缺陷集标定前无独立放行权，精确数值程序化优先 |
+| 常规复核→必要异构挑刺 | GLM-5.3 → DeepSeek | 默认 `glm_review.py`；DeepSeek 仅必要/高风险且北京时间 12:00–18:00 禁用 |
 | 总编排候选 | Kimi K3(待用户接入) | 2.8T MoE/1M ctx/Agent 强(Tau2);API ¥20 输入(缓存命中 ¥2)/¥100 输出 per 1M;**Kimi Coding Plan ¥49-699 五档,K3 需 Moderato(¥99)起**;社区已有"K3 主编排+GLM 主程序"同构实践;接入路径=Anthropic 兼容端点进 ZCode(同 bigmodel 模式) |
-| 主编排(换窗后) | GPT(6 Astra / 5.6 Sol,待用户接入) | 拆解/规划/分发/验收 |
-| 生图/3D/动画 | TokenHub 管线(team-pipeline) | seedream 生图 / hy-3d-3.0 3D / hy-3d-motion 动画 |
+| 主编排 | GPT-6 Astra | 已接入；拆解/规划/分发/证据裁决 |
+| 生图/3D/动画 | TokenHub 管线 | Seedream 有单图证据；当前 3D 适配器仅提交受理，绑骨/动作未验证 |
+- **2026-09-08 模型可用性复核**：`gpt-6-astra`、`glm-5.3`、`glm-5-turbo`、`deepseek-v4-pro/flash` 已经请求实测可调用；文本/代码执行默认优先 GLM 套餐。Codex 直连 GLM-4.5V 无图像权限，但 ZCode 内置 4.5V 正常且实战已验证；Codex 视觉改为原生 GPT 优先，TokenHub `glm-5v-turbo` 补充。Seedream 有单图产物证据；当前 HY-3D-3.1 仅“提交受理”。
 - **API key 位置**:`C:\Users\HP\.zcode\v2\config.json` → provider["builtin:bigmodel-coding-plan"].options.apiKey(明文,勿外传/勿回显)。读取代码见 `D:\DevTools\vision-mcp\glm_vision.py::get_api_key()`
 - ⚠️ OpenAI 格式通道(open.bigmodel.cn/api/paas/v4)**无余额**(429),禁用
 - 代码调用脚本:`D:\DevTools\glm-pipeline\glm_call.py`
 
 ## 4. 基础设施
-- **Unity MCP**:服务端 `D:\DevTools\unity-mcp-main\Server\.venv\Scripts\mcp-for-unity.exe`,HTTP 模式常驻 `http://127.0.0.1:8080`(启动脚本 `D:\DevTools\start-mcp-server.cmd`);插件 com.coplaydev.unity-mcp v10.2 已挂进项目 manifest(file: 相对 Packages 目录);编辑器内 **Ctrl+Alt+M 开窗口点 Start** 才连接(每次新项目/重开编辑器都要点)
-- **视觉验收(2026-09-06 起)**:**ZCode 内置 4.5v 独占**——需要"看"时:Read 工具打开 PNG(自动上传得 CDN URL)→ `mcp__4_5v_mcp__analyze_image` 分析;免费、原图分辨率。**2026-09-07 用户授权降级通道**:4.5v 不可用(本会话 Read 图片 Unsupported)时,用 hy-vision-2.0-instruct 兜底——`team-pipeline/vision_compare.py`(多图对比/单图问答,1600px JPEG 提速),结论标注模型来源;审美终审仍归用户。旧 CLI `glm_vision.py`/`vision_qa.py`(hy-vision)已退役验收岗,仅存档
+- **Unity MCP**:服务端 `D:\DevTools\unity-mcp-main\Server\.venv\Scripts\mcp-for-unity.exe`,HTTP 模式常驻 `http://127.0.0.1:8080`(启动脚本 `D:\DevTools\start-mcp-server.cmd`);插件 com.coplaydev.unity-mcp v10.2 已挂进项目 manifest(file: 相对 Packages 目录);`MCPForUnity.AutoStartOnLoad` 已启用，编辑器正常重开会自动连接；**Ctrl+Alt+M 开窗口点 Start** 仅作自动连接故障时的手动回退。
+- **视觉验收(2026-09-08 当前)**:ZCode 优先套餐内置 4.5V（实战已验证）；Codex 优先原生 GPT 视觉做图片与代码/日志联合判断，按量 TokenHub `glm-5v-turbo` 只作批量预检、补充或交叉验证；按 `docs/team/VISUAL_CALIBRATION.md` 完成项目标定前都只提供风险线索。审美终审归用户。
 - 截屏:`powershell Add-Type System.Windows.Forms...CopyFromScreen` 存 PNG(见历史会话,或写脚本)
 - 手册:`D:\DevTools\设置手册_Unity_MCP与引擎安装.md`(引擎/MCP/视觉系统全部文档)
 
 ## 5. 工作流协议(每模块)
 - **美术管线(TokenHub,2026-09-05 已建;生图端点 2026-09-07 修正)**:`D:/DevTools/team-pipeline/`(config.json 存 key + tokenhub.py 核心库 + gen_image.py/gen_3d.py CLI + README.md)。任何会话照 README 即可调用:生图(POST `/v1/wand/si-image/generation`,响应 `data[].url` 直链 2048×2048;**旧 `/v1/images/generations` 会把正确模型名误报「服务ID不存在」假象,已废弃**)、3D 提交(POST /v1/api/3d/submit)、3D 查询(POST /v1/api/3d/query,必须带 model)、完成后 data[].url 下载 glb。性价比档位:3D 默认 hy-3d-3.0(草稿 express,高配 3.1 除非必要不用);**生图默认 seedream-image-v5.0-pro(2026-09-07 用户拍板:生产可控性更强、价格与 lite 同)**;**hy-3d-3.1 官方支持八视图多角度输入**(混元生3D 产品概述原文;首单应测单图 vs 八视图增益;八视图图源用 pro 图生图、一致性风险需预检)。key 已于 2026-09-07 按用户提供的新 key 更新(config.json)。
-- **专家团架构(2026-09-05 用户拍板)**:三层结构——总监层(制作人=用户终审/技术总监=编排)、专家层(主策划/美术总监/资产生成/程序主程=GLM-5.3/音效)、验收层(视觉=**内置 4.5v(2026-09-06 起独占)**/测试=断言体系/逻辑挑刺=deepseek)。角色卡在 `docs/team/agents/`,编排协议+验收矩阵+分权红线在 `docs/team/PROTOCOL.md`,花名册在 `docs/team/ROSTER.md`。每个专家=模型+角色卡;待接入模型由用户提供 API 后登记。**总监不写业务代码,代码全交 GLM-5.3;验收只查输入对输出对(黑盒),不审实现;审美/手感终审永远在用户。**
-1. 提示词在 `D:\DevTools\IronCurtain\docs\prompts\m<X>.<Y>-*.md`(六段式:GDD 摘录/接口契约/现状/硬验收/输出格式)
-2. `python glm_call.py <prompt> -o <out>` → 解析 `// FILE: <path>` 标记落盘到 Assets
-3. 编辑器自动编译(或 batchmode)→ 读 `C:\Users\HP\AppData\Local\Unity\Editor\Editor.log` 找 `error CS`
-4. 有错:错误文本回喂 GLM-5.3 修复(≤3 轮),简单错自行修
-5. 编译绿 → EditMode 断言(-batchmode -runTests)或纯 C# 测试 → 截图 → vision 验收 → 用户审
-6. 每模块绿后更新本文件「进度」节
+- **专家团架构(2026-09-08 v3)**:制作人=用户终审，技术总监=GPT 主编排；GLM 套餐负责代码候选和常规复核，DeepSeek 仅在允许时段做必要异构/高风险挑刺，脚本/编译器/测试裁决硬事实。详见 `docs/team/PROTOCOL.md`、`MODEL_ROUTING.md` 与 `ROSTER.md`。
+1. 用 `build_task_packet.py` 从六段式规格、Git 基线和目标源码全文生成任务包。
+2. `glm_call.py` 产出候选；依次跑 API/static/rewrite 门禁。
+3. `parse_files.py <out>` 只写暂存区和 `manifest.json`，不改项目。
+4. 默认由 `glm_review.py` 绑定 manifest 哈希复核；必要且时段允许时加 DeepSeek 异构审查。主编排逐条裁决，`review_check.py` 确认零阻断。
+5. `parse_files.py --apply <stage>` 在全部基线哈希一致时原子落盘。
+6. 编译 → EditMode 断言 → 按风险补长线冒烟/截图 → 技术验收 → 用户审；完成后更新短摘要和本历史账本。
 
 ## 6. 架构约定
 - asmdef 三层:IronCurtain.Sim(noEngineReferences,纯 C# 确定性)/ IronCurtain.View(Unity)/ IronCurtain.Tests
@@ -135,7 +232,7 @@ GDD 原文:`D:\DevTools\IronCurtain\docs\GDD原文-铁幕前线.txt`。
 - [ ] M6.0e 美术底模管线首模验证(装 Blender 4.5.9 便携版✅ / 无头渲染冒烟✅ smoke.png;**风格已拍板:卡通-4 类(其脸型大体风格=全体将领基准),镇岳=钢甲/钢锤/全覆盔只露目缝/肌肉甲/高 20%;定稿概念图=镇岳_定稿v3_2(用户最终选定)**;进展:GLM 脚本首模镇岳_v1 已否(用户评<60 分:结构差距/拐杖姿势,人工调优成本过高→图生3D 路线);**图生3D 首单镇岳_v2 跑通**:hy-3d-3.1 多视角(image_base64 正面+multi_view_images 5 视角)→glb(29976 面)+四视图预检全绿,用户复核通过(四视图无问题+材质塑料感=metallic0/rough0.5 已诊断,钢版参数已固化 final glb);八视图=单图合集 turnaround 裁切(独立生成会角度聚团+部件漂移,踩坑档案在仓库 README);**④绑骨完成:hy-3d-rigging(输入=生成任务 COS 完整签名 URL,file_3d={url,type}),28 骨 Unity Humanoid 风格,姿态预检全绿;⑤动作×3 完成:hy-3d-motion 文生动作(idle150帧/walk/smash),动画骨架 Mixamo 经典命名→Unity Humanoid 重定向解决;03 最终版=镇岳_v2_rigged.fbx;**;重跑成功(2026-09-07 晚):A-pose 标准姿势图治本(4.5v 六项预检)→v3 生成(4.5v 验干净)→v3 绑骨 28骨(4.5v 验:肩部无碎面/裙甲无互穿——v2 碎裂根因=拄锤姿势+持武器,已入踩坑档案);03 目录=镇岳_v3_rigged.fbx+四视图.png(双份);动画三段复用;**五英雄批量八视图进行中(2026-09-07 晚下单:身高 A=镇岳/B=男标/C=女标,宽度同档;磐石=石人 C+A 左盾右半身长大刀石色/断峰=儒将 B+AB 亮银长矛高马尾/逐风=骑兵 B+B 长枪淡青含马/坠日=B+A 太阳双目大弓背箭袋红黄/星落=女 C+C 微曲线法杖(武器仅改外观不改数据)星空紫;每角色 3-5 变体共 18 张,用户挑定稿:磐石1/断峰2/逐风2/坠日2/星落3)**;**五英雄批量 3D 链完成(2026-09-07 深夜):A-pose 空手图×5(4.5v 预检全过)→3D 生成+绑骨×5(28骨各,A-pose 治本批量验证成功,无一碎面)→4.5v 成品验收全过(特征/体格/风格);03 目录各角色=rigged.fbx+四视图.png(双份);高度原始 1.73-2.00,入库 Unity 时按身高档标准化(磐石C/断峰B/逐风B/坠日B/星落C,镇岳A=1.92);武器(盾/刀/枪/弓/杖)分离件待产;**Unity 接线完成(M6.0f):9 fbx 入库 Humanoid 化+HeroAnimator 三态+EntityView 换装(身高档 A/B/C)+动画驱动;227/227 全绿;Play 截图 4.5v 验收过(新模型生效/动画姿态呈现/Humanoid 重定向成功,bind pose 手臂弯游戏中不可见);剩:穿模录屏 MP4 人看版+用户 Play 终审****(fbx+动画入工程/Humanoid 重定向/材质/EntityView 换装/穿模录屏 MP4)**;详见 docs/美术底模管线.md)
 - [ ] 美术风格定稿(Seedream 批量概念图候选→用户挑方向,再启动底模生成)
 - [ ] M7 收口打包 / 新手教学内容(待用户定稿)
-- [ ] GPT 总编排交接准备(交接载体=本文件+docs/team/+team-pipeline README)
+- [x] **GPT 总编排交接 v3（2026-09-08）**：短启动摘要 `PROJECT_BRIEF.md`、模型路由/角色卡/视觉标定、任务包生成、暂存+基线哈希+原子落盘、独立审查哈希绑定、自动证据台账已落地；桌面保留 v2 历史并新增 v3 说明书。
 - [ ] **待用户编辑器 Play 审(累积)**:M6.2 顶栏/飘字/射程圈/路径线 + M6.1 小地图/雾/镜头手感 + M8.6 框选/行军/占地底板 + M8.7 撤退按钮
 
 ### 已完成(细节见 git log 各 commit;★=含独有教训)
@@ -194,13 +291,12 @@ M3.3 时代契约(正式 ≤9/D24 Exit/D26 优先级/D27 回血等)已被 **M8.3
 1.  静态门禁:命名空间白名单/Sim 层禁 UnityEngine/重复类型/FILE 白名单
 2.  重写检测:改动>70% 打回(修改类任务)
 3.  API 门禁 **v3(2026-09-06 升级)**:未知类型构造/枚举成员/已知类型成员对照拦截;扫描范围=Sim+View+Editor+Tests 全符号库(含 const 带初始化值/泛型多 token 字段);Unity/URP 类型与静态类白名单;输出内类型与字段/局部变量链豁免(编译器兜底);输出剥注释/字符串/尾部摘要。**历史五大输出 875 条误报归零、负样本(幻想类型/枚举/成员)全拦、m8.7 真拦截保留**——每模块不再需要人工 triage 与 allowed.txt 备案
-执行顺序:GLM 输出 → api_gate → static_gate → rewrite_detector(修改类)→ parse_files → 编译 → 测试
-GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出文件>
-检查:命名空间白名单(IronCurtain.Sim)/Sim 层禁 UnityEngine/重复类型定义/FILE 路径白名单。5ms 拦截退化重写类输出,通过后再 parse_files.py。
+执行顺序（2026-09-08 v3）:任务包 → GLM 输出 → api_gate → static_gate → rewrite_detector → parse_files 暂存 → 哈希绑定独立审查/裁决 → review_check → 原子 apply → 编译 → 测试/冒烟。
+检查:命名空间白名单(IronCurtain.Sim)/Sim 层禁 UnityEngine/重复类型定义/FILE 路径白名单；`parse_files.py` 默认只允许 `Assets/` 且不直接覆盖工程。
 
 ## 8a. 版本库(2026-09-06 起)
 - 项目根 `D:\DevTools\IronCurtain` 已 git init(main 分支,tag m8.4d=首个基线)。
-- **约定:全绿即 commit**(每个模块/修复轮测试全绿后立刻提交,信息注明模块与测试数);GLM 落盘后、测试未绿前**禁止 commit**;事故恢复=`git checkout -- <文件>` 或 `git reset --hard`(以最后一次全绿 commit 为锚)。
+- **约定:证据闭环后 commit**：测试全绿是必要证据之一，不自动代表无回归/产品验收。未闭环产物可留工作树或显式 WIP 分支，禁止冒充已验收基线；事故恢复优先用 Git 非破坏性检查与精确文件恢复。
 - .gitignore 已排除 Library/Temp/日志/TestResults;Assets(含 .meta)与 docs 全部入库。
 
 ## 8. 已知坑(务必遵守)
@@ -214,9 +310,9 @@ GLM 输出落盘前先跑:python D:/DevTools/glm-pipeline/static_gate.py <输出
 - **Unity 许可证**:直接启动 Unity.exe 会"No ULF license found"退出 → 必须先启动 Unity Hub(它会拉起 LicensingClient),再启 Unity;Hub 未登录但 LicensingClient 会给 personal serial
 - **M6 表现层工作流(重要)**:截图验收=编辑器菜单 IronCurtain/Play & Capture(热键 Ctrl+Shift+Alt+P)→ 场景内 CaptureRunner 按 sim 10/30/60/120s 拍 4 张到 D:/DevTools/shots/(Speed=3x,蓝方配 Normal AI 对打);触发热键用 PowerShell SetForegroundWindow+SendKeys(见 workspace/win_focus.ps1);**Play 运行期间禁止改脚本**(会热重载丢 Sim 字段刷 NRE,GameBootstrap 已有防护但勿依赖)
 - CUA(电脑控制)与 Unity 交互时频繁断连(broker 超时),Unity 编译/导入期间不可用;只读操作在空闲时可用
-- **GLM 末 FILE 块尾部外溢 markdown 摘要(M8.7 事故)**:无围栏包裹的"改动摘要"曾被 parse_files 原样写入 cs 尾部→已根治(parse_files.py 对 .cs 内容遇行首 `**` 截断,自测通过);落盘后仍建议 `git diff` 核对尾部
+- **GLM 末 FILE 块尾部外溢 markdown 摘要(M8.7 事故)**:旧版曾原样写入或静默截断；2026-09-08 起 `parse_files.py` 发现 `.cs` 中疑似无围栏摘要会整批拒绝，禁止解析器悄悄改写模型产物。
 - 外部写 .cs 新文件后 Unity 可能不自动编译 → 前台激活编辑器+SendKeys ^r 强制刷新;或 kill 编辑器走 batchmode 编译
-- **glm_call.py -o 输出路径的父目录必须已存在**(不会自动建目录;M6.1 首跑 -o out/xx.md → 生成 12 分钟 75k tokens 全部丢失只剩 FileNotFoundError,重烧一轮)。惯例:输出直接放 glm-pipeline/ 根(m6.x.out.md),用前 ls 确认
+- **glm_call.py 输出丢失事故（已于 2026-09-08 根治）**:旧版在昂贵调用完成后才发现 `-o` 父目录不存在；新版先创建/探测输出目录、原子写入，`stop_reason=max_tokens` 时保存 `.partial` 并失败退出，禁止截断产物继续流转。
 - **IMGUI 纹理上下颠倒坑**:GUI.DrawTexture 把纹理 v=0(=SetPixels32 第 0 行)画在 rect 底部;Sim row0=北=顶部 → 直接画必颠倒。修法:像素行序翻转 或 GUI.DrawTextureWithTexCoords(rect, tex, Rect(0,1,1,-1)) 垂直翻转(MinimapPanel 已两处落地)
 - **batchmode 跑测试禁止带 -quit**:`-runTests -quit` 组合会启动即退出、测试全跳过且 exit 0(伪绿);不带 -quit 测试完自动退出,失败 exit 2。编译检查可用 `-quit -executeMethod` 但跑测试绝不能加
 - **小文字 UI(飘字/血条数字)的视觉验收局限**:1920p 原图里十几像素高的 TextMesh,缩图压缩后基本不可读;**2026-09-06 起 4.5v 原图验收已覆盖此场景(hy-vision 缩图管线退役)**;最终裁决顺序仍=程序化计数(打点)>4.5v 原图识别>人眼。字号根治待 M6.6 新相机(单位放大 ~3 倍)

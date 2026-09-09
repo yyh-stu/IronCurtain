@@ -48,6 +48,17 @@ namespace IronCurtain.View
             return "将 " + sim.PopulationOf(side) + "/" + sim.PopulationCapOf(side);
         }
 
+        /// <summary>M6.3 EP 操作反馈：存量、资源点来源和当前阶段每点获取周期。</summary>
+        public static string EpText(SimCore sim, Side side)
+        {
+            if (sim == null || sim.Game == null || sim.Game.Ep == null) return "EP --";
+            double interval = sim.Phase == MatchPhase.Overtime && sim.Game.Match != null
+                ? sim.Game.Match.OvertimeEpInterval : sim.Game.Ep.IntervalSeconds;
+            if (interval <= 0d) return "EP " + sim.EpOf(side).ToString("0.#") + "/" + sim.Game.Ep.Cap;
+            return "EP " + sim.EpOf(side).ToString("0.#") + "/" + sim.Game.Ep.Cap + " · "
+                + sim.OwnedResourcePointsOf(side) + "点/" + interval.ToString("0.#") + "秒";
+        }
+
         public static BuildingSnapshot EnemyBaseSnapshot(SimCore sim, Side viewer, Side target)
         {
             var b = FindBase(sim, target);

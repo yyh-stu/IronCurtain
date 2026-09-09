@@ -20,13 +20,15 @@ namespace IronCurtain.Sim
         public SimEventType Type;
         public int SubjectId;
         public float Amount;
+        public int AttackerId; // 2026-09-09 弹道表现:DamageDealt 的攻击者(0=无/塔/ unspecified)
 
-        public SimEvent(long tick, SimEventType type, int subjectId, float amount = 0f)
+        public SimEvent(long tick, SimEventType type, int subjectId, float amount = 0f, int attackerId = 0)
         {
             Tick = tick;
             Type = type;
             SubjectId = subjectId;
             Amount = amount;
+            AttackerId = attackerId;
         }
 
         public override string ToString() => $"[{Tick}] {Type} #{SubjectId}";

@@ -48,6 +48,7 @@ namespace IronCurtain.View
                 GUI.Label(new Rect(228f, y - 4f, 110f, 22f), TopBarModel.HpText(_myBase.Hp, _myBase.MaxHp), label);
             }
             GUI.Label(new Rect(344f, y - 7f, 110f, 24f), TopBarModel.PopText(_sim, _side), label);
+            GUI.Label(new Rect(458f, y - 7f, 180f, 24f), TopBarModel.EpText(_sim, _side), label);
 
             var clockStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
             clockStyle.normal.textColor = Color.white;

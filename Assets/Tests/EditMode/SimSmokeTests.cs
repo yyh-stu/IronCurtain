@@ -70,7 +70,7 @@ namespace IronCurtain.Tests
                 else generals++;
             }
             Assert.AreEqual(6, generals, "开局双方各 3 将");
-            Assert.AreEqual(120, soldiers, "6 将 × 20 兵满编");
+            Assert.AreEqual(72, soldiers, "6 将 × 12 兵满编");
         }
 
         [Test]

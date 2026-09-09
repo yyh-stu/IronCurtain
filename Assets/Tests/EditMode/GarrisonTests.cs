@@ -67,8 +67,9 @@ public class GarrisonTests
     {
         var g1 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 140));
         var g2 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 165));
-        var all = SoldiersOf(g1).Concat(SoldiersOf(g2)).ToList();
-        Assert.GreaterOrEqual(all.Count, 31, "两兵团应提供 31 名士兵");
+        var g3 = Gen(Side.Blue, HeroId.DuanFeng, new GridPos(5, 190)); // 2026-09-10 12 兵/团:三团 36 ≥ 31
+        var all = SoldiersOf(g1).Concat(SoldiersOf(g2)).Concat(SoldiersOf(g3)).ToList();
+        Assert.GreaterOrEqual(all.Count, 31, "三兵团应提供 31 名士兵");
         string err;
         bool ok30 = GarrisonSystem.EnterFormal(sim, all.Take(30).Select(x => x.Id).ToList(), blueBarracks.Id, out err);
         Assert.IsTrue(ok30, "前 30 名应成功入城");
@@ -86,7 +87,8 @@ public class GarrisonTests
     {
         var g1 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 140));
         var g2 = Gen(Side.Blue, HeroId.DuanFeng, new GridPos(10, 140));
-        var all = SoldiersOf(g1).Concat(SoldiersOf(g2)).ToList();
+        var g3 = Gen(Side.Blue, HeroId.ZhuiRi, new GridPos(15, 140)); // 2026-09-10 12 兵/团:三团 36 ≥ 31
+        var all = SoldiersOf(g1).Concat(SoldiersOf(g2)).Concat(SoldiersOf(g3)).ToList();
         string err;
         Assert.IsTrue(GarrisonSystem.EnterTemp(sim, all.Take(30).Select(x => x.Id).ToList(), blueBarracks.Id, out err), "30 名临时登记应成功");
         Assert.AreEqual(30, blueBarracks.GarrisonTemp.Count, "临时容量 30");
@@ -95,7 +97,7 @@ public class GarrisonTests
         Assert.AreEqual(0, extra.TempGarrisonId, "第 31 名不登记");
         Assert.IsFalse(blueBarracks.GarrisonTemp.Contains(extra.Id), "不在临时列表");
         Assert.AreEqual(0, extra.GarrisonBuildingId, "未入城");
-        Assert.AreEqual(g2.Id, extra.GeneralId, "第 31 名留在兵团跟随主将");
+        Assert.AreEqual(g3.Id, extra.GeneralId, "第 31 名留在兵团跟随主将(12 兵制下属第三团)");
     }
 
     [Test]

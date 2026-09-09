@@ -83,7 +83,7 @@ namespace IronCurtain.Tests
             AiSystem.Configure(sim, Side.Blue, AiTier.Simple);
             Run(60);
             Assert.IsFalse(sim.IsUpgraded(Side.Blue, HeroId.ZhenYue), "简单 AI 不应买升级");
-            Assert.IsNull(HexSystem.ActiveOf(Side.Blue), "简单 AI 不应抽海克斯");
+            Assert.IsNull(HexSystem.ActiveOf(sim, Side.Blue), "简单 AI 不应抽海克斯");
             Assert.AreEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, redTower.Id), "简单 AI 不应下达攻城意图");
         }
 
@@ -128,7 +128,10 @@ namespace IronCurtain.Tests
             Run(900); // 至 ~1805 tick,进入 3 分钟节点窗口
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
             Run(25);
-            Assert.IsNotNull(HexSystem.ActiveOf(Side.Blue), "3 分钟节点窗口内普通 AI 应抽一张海克斯");
+            Assert.IsNotNull(HexSystem.ActiveOf(sim, Side.Blue), "3 分钟节点窗口内普通 AI 应抽一张海克斯");
+            Assert.AreEqual(1f, sim.EpOf(Side.Blue), 0.001f, "升级 2EP + 抽取 2EP；释放不得二次扣费");
+            Assert.AreEqual(0, HexSystem.PendingChoicesOf(sim, Side.Blue).Count, "AI 应完成三选一");
+            Assert.AreEqual(0, HexSystem.HandOf(sim, Side.Blue).Count, "AI 应立即释放所选卡");
         }
 
         [Test]
@@ -136,12 +139,12 @@ namespace IronCurtain.Tests
         {
             RevealBuilding(Side.Blue, redTower);
             // 将兵制(M8.4b 名额 4):波次门槛按兵团计=2(旧 8 只单兵口径作废)
-            SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(0, 3));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
             Run(25);
             Assert.AreEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, neutral.Id), "1 兵团不应触发集结");
 
-            SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(1, 3)); // 第 2 兵团
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95)); // 第 2 满编兵团
             Run(25);
             // 蓝塔视野自动揭示中立点 → 波次首选中立(占中立优先)
             Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "2 兵团应触发对中立点的攻城意图");
@@ -160,8 +163,8 @@ namespace IronCurtain.Tests
             }
             RevealBuilding(Side.Blue, redTower);
             RevealBuilding(Side.Blue, redBarracks);
-            for (int i = 0; i < 8; i++)
-                SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(i % 3, 3 + i / 3));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95));
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
             Run(25);
             Assert.AreNotEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, redTower.Id), "应选择驻军更少的红塔(弱侧)");
@@ -172,8 +175,8 @@ namespace IronCurtain.Tests
         {
             RevealBuilding(Side.Blue, neutral);
             RevealBuilding(Side.Blue, redTower);
-            for (int i = 0; i < 8; i++)
-                SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(i % 3, 3 + i / 3));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95));
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
             Run(25);
             Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "优先占领中立资源点");

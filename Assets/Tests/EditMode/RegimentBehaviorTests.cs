@@ -151,8 +151,8 @@ namespace IronCurtain.Tests
 
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 100));
             var soldiers = SoldiersOf(sim, g.Id);
-            Assert.AreEqual(20, soldiers.Count);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id); // 杀 15 → 5/20
+            Assert.AreEqual(12, soldiers.Count);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 杀 7 → 5/12(12 兵制)
             sim.ReinforcePool[Side.Blue] = 10;
 
             int Count() => SoldiersOf(sim, g.Id).Count;

@@ -49,8 +49,8 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 40; i++) sim.Step(); // 脱战计时越过 3s
 
             var aSoldiers = SoldiersOf(sim, a.Id);
-            Assert.AreEqual(20, aSoldiers.Count);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(aSoldiers[i].Id); // A 团剩 5
+            Assert.AreEqual(12, aSoldiers.Count);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(aSoldiers[i].Id); // A 团剩 5(12 兵制)
             Assert.AreEqual(5, SoldiersOf(sim, a.Id).Count);
 
             sim.ReinforcePool[Side.Blue] = 30;
@@ -61,9 +61,9 @@ namespace IronCurtain.Tests
             Assert.IsNull(error);
 
             var after = SoldiersOf(sim, a.Id);
-            Assert.AreEqual(20, after.Count, "A 团应补满 20");
-            Assert.AreEqual(20, SoldiersOf(sim, b.Id).Count, "B 团满编不补");
-            Assert.AreEqual(15, ReinforceSystem.PoolOf(sim, Side.Blue), "池剩 30-15=15");
+            Assert.AreEqual(12, after.Count, "A 团应补满 12");
+            Assert.AreEqual(12, SoldiersOf(sim, b.Id).Count, "B 团满编不补");
+            Assert.AreEqual(23, ReinforceSystem.PoolOf(sim, Side.Blue), "池剩 30-7=23(12 兵制:补 7)");
 
             var slots = new HashSet<int>();
             foreach (var s in after)
@@ -72,7 +72,7 @@ namespace IronCurtain.Tests
                 Assert.AreEqual(a.Hero, s.Hero, "变装=主将 Hero");
                 Assert.IsTrue(slots.Add(s.FormationSlot), "FormationSlot 不重复");
             }
-            Assert.AreEqual(20, slots.Count, "槽号 0..19 各一次");
+            Assert.AreEqual(12, slots.Count, "槽号 0..11 各一次");
         }
 
         [Test]
@@ -83,7 +83,7 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 40; i++) sim.Step();
 
             var soldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 12 兵制杀 7 剩 5
             a.SecondsSinceCombat = 0.5f; // 交战中
             foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 0.5f;
 
@@ -106,7 +106,7 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 40; i++) sim.Step();
 
             var soldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 12 兵制杀 7 剩 5
             a.SecondsSinceCombat = 4f; // 已脱战
             foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
 
@@ -115,8 +115,8 @@ namespace IronCurtain.Tests
             string error;
             bool ok = ReinforceSystem.RequestReinforce(sim, Side.Blue, out error);
             Assert.IsTrue(ok, "脱战 3s 后应可补兵: " + error);
-            Assert.AreEqual(15, SoldiersOf(sim, a.Id).Count, "补入 10 后共 15");
-            Assert.AreEqual(0, ReinforceSystem.PoolOf(sim, Side.Blue), "池清空");
+            Assert.AreEqual(12, SoldiersOf(sim, a.Id).Count, "补满 12 编制");
+            Assert.AreEqual(3, ReinforceSystem.PoolOf(sim, Side.Blue), "池剩 10-7=3(12 兵制)");
         }
 
         [Test]
@@ -127,7 +127,7 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 40; i++) sim.Step();
 
             var soldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 12 兵制杀 7 剩 5
             a.SecondsSinceCombat = 4f;
             foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
 
@@ -137,7 +137,7 @@ namespace IronCurtain.Tests
             Assert.IsTrue(ReinforceSystem.RequestReinforce(sim, Side.Blue, out error));
 
             var after = SoldiersOf(sim, a.Id);
-            Assert.AreEqual(20, after.Count);
+            Assert.AreEqual(12, after.Count);
             Entity fresh = null;
             foreach (var s in after)
                 if (s.FormationSlot == 0) fresh = s;
@@ -173,7 +173,7 @@ namespace IronCurtain.Tests
             var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 110));
             for (int i = 0; i < 40; i++) sim.Step();
             var soldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 12 兵制杀 7 剩 5
             a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
             sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
             string error;
@@ -199,7 +199,7 @@ namespace IronCurtain.Tests
             var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 110));
             for (int i = 0; i < 40; i++) sim.Step();
             var soldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(soldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(soldiers[i].Id); // 12 兵制杀 7 剩 5
             a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
             sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
             string error;
@@ -223,12 +223,12 @@ namespace IronCurtain.Tests
             var b = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhenYue, new GridPos(15, 140));
             for (int i = 0; i < 40; i++) sim.Step();
             var aSoldiers = SoldiersOf(sim, a.Id);
-            for (int i = 0; i < 15; i++) sim.RemoveEntity(aSoldiers[i].Id);
+            for (int i = 0; i < 7; i++) sim.RemoveEntity(aSoldiers[i].Id); // 12 兵制
             a.SecondsSinceCombat = 4f; foreach (var s in SoldiersOf(sim, a.Id)) s.SecondsSinceCombat = 4f;
             sim.ReinforcePool[Side.Blue] = 10; sim.ReinforceAccum[Side.Blue] = 0f;
             string error;
             Assert.IsTrue(ReinforceSystem.RequestReinforce(sim, Side.Blue, out error), error);
-            Assert.AreEqual(15, SoldiersOf(sim, a.Id).Count, "补入 10 后共 15");
+            Assert.AreEqual(12, SoldiersOf(sim, a.Id).Count, "补满 12 编制");
             foreach (var s in SoldiersOf(sim, a.Id))
                 Assert.IsNull(s.MarchOrigin, "无建筑时新兵应即时落位(MarchOrigin=null)");
         }

@@ -41,6 +41,14 @@ namespace IronCurtain.EditorTools
             var fogView = Object.FindFirstObjectByType<FogView>();
             var floatText = Object.FindFirstObjectByType<FloatingTextView>();
 
+            // 首帧预热:edit 模式下第一次 Camera.Render() 会产出纯色废帧(URP shader 未就绪,
+            // 实测 t10 全屏 (92,195,255) 纯青),先渲染一帧弃用
+            var warmup = new RenderTexture(64, 64, 24);
+            cam.targetTexture = warmup;
+            cam.Render();
+            cam.targetTexture = null;
+            Object.DestroyImmediate(warmup);
+
             for (int i = 0; i < Marks.Length; i++)
             {
                 long targetTick = (long)(Marks[i] * boot.Sim.Config.TickRate);

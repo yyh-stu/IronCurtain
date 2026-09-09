@@ -40,9 +40,25 @@ namespace IronCurtain.View
             gameObject.AddComponent<CaptureRunner>();
             var selection = gameObject.AddComponent<SelectionSystem>();
             selection.Init(Sim, Cam);
+            var buildingCommands = gameObject.AddComponent<BuildingCommandPanel>();
+            buildingCommands.Init(Sim, Side.Blue, selection.SelectedIds);
+            selection.SetBuildingCommandPanel(buildingCommands);
+#if UNITY_EDITOR
+            var inputAudit = gameObject.AddComponent<InputAuditProbe>();
+            inputAudit.Init(Sim);
+#endif
 
             var topBar = gameObject.AddComponent<TopBarPanel>();
             topBar.Init(Sim, Side.Blue);
+            var upgrades = gameObject.AddComponent<UpgradeCommandPanel>();
+            upgrades.Init(Sim, Side.Blue);
+            var hexes = gameObject.AddComponent<HexCommandPanel>();
+            hexes.Init(Sim, Side.Blue, selection.SelectedIds);
+            var tools = gameObject.AddComponent<ToolCommandPanel>();
+            tools.Init(Sim, Side.Blue);
+            selection.SetToolCommandPanel(tools);
+            var commandPanels = new CommandPanelCoordinator();
+            commandPanels.Attach(upgrades, hexes, tools, buildingCommands);
             var result = gameObject.AddComponent<ResultPanel>();
             result.Init(Sim, Side.Blue);
             var ftGo = new GameObject("FloatingText");
@@ -90,8 +106,12 @@ namespace IronCurtain.View
             Cam.farClipPlane = 300f;
             Cam.orthographic = true;
             Cam.orthographicSize = 27f;
-            go.transform.position = new Vector3(143f, 55f, -50f);
-            go.transform.LookAt(new Vector3(143f, 0f, -12f));
+            // 2026-09-09 bug2 真因修复:相机必须摆在初始焦点正上方同构偏移,
+            // 原摆在 col143 → CameraRig._offset 恒带 +103 米横向偏差,小地图/键盘怎么挪都错位,
+            // 两边基地被推出视野。用户拍板:鼠标点哪里,视图中心就在哪里。焦点常量见 CameraRig。
+            float fx = CameraRig.InitFocusCol, fz = 3f - CameraRig.InitFocusRow;
+            go.transform.position = new Vector3(fx, 55f, fz - 38f);
+            go.transform.LookAt(new Vector3(fx, 0f, fz));
             var data = go.AddComponent<UniversalAdditionalCameraData>();
             data.renderPostProcessing = true;
             go.AddComponent<AudioListener>();
@@ -126,4 +146,39 @@ namespace IronCurtain.View
             vol.profile = profile;
         }
     }
+
+    /// <summary>M6.3 操作面板互斥：展开一个入口时折叠其余入口，避免遮挡和目标模式歧义。</summary>
+    public sealed class CommandPanelCoordinator
+    {
+        private UpgradeCommandPanel _upgrades;
+        private HexCommandPanel _hexes;
+        private ToolCommandPanel _tools;
+        private BuildingCommandPanel _building;
+
+        public void Attach(UpgradeCommandPanel upgrades, HexCommandPanel hexes, ToolCommandPanel tools,
+            BuildingCommandPanel building = null)
+        {
+            _upgrades = upgrades;
+            _hexes = hexes;
+            _tools = tools;
+            _building = building;
+            _upgrades?.SetOpenedCallback(() => Opened(CommandPanelKind.Upgrade));
+            _hexes?.SetOpenedCallback(() => Opened(CommandPanelKind.Hex));
+            _tools?.SetOpenedCallback(() => Opened(CommandPanelKind.Tool));
+        }
+
+        private void Opened(CommandPanelKind opened)
+        {
+            _building?.ClearTarget("panel_switch");
+            if (opened != CommandPanelKind.Upgrade) _upgrades?.SetExpanded(false);
+            if (opened != CommandPanelKind.Hex) _hexes?.SetExpanded(false);
+            if (opened != CommandPanelKind.Tool) _tools?.CancelTargeting("panel_switch");
+            if (opened != CommandPanelKind.Tool) _tools?.SetExpanded(false);
+#if UNITY_EDITOR
+            InputAudit.Log("command_panel opened=" + opened + " result=exclusive");
+#endif
+        }
+    }
+
+    public enum CommandPanelKind : byte { Upgrade, Hex, Tool }
 }

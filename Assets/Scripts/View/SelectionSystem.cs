@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Text;
 using IronCurtain.Sim;
 using UnityEngine;
-
 namespace IronCurtain.View
 {
     /// <summary>
@@ -14,66 +13,46 @@ namespace IronCurtain.View
         private const float PickRadius = 3f;      // 点选主将命中半径(米)
         private const float RingRadius = 1.3f;    // 选中圈半径(米)
         private const float HintDuration = 2.5f;  // 提示淡出时长(秒)
-
         private static readonly Plane GroundPlane = new Plane(Vector3.up, Vector3.zero);
-
         private SimCore _sim;
         private Camera _cam;
         private readonly List<int> _selected = new List<int>();
-
+        private SelectionInteractionCoordinator _interaction;
+        public IReadOnlyList<int> SelectedIds => _selected;
         private bool _dragging;
         private Vector2 _dragStart;
         private string _selKey = "";
-
         private readonly List<GameObject> _rings = new List<GameObject>();
         private GameObject _ringRoot;
         private float _hintT; // 提示剩余显示时间(秒)
-
         private GameObject _marker;
         private Material _markerMat;
         private float _markerT;
         private Rect _retreatBtnRect; // M8.7 撤退按钮占位(兼做点击穿透过滤)
-
         // M6.2 单选射程圈
         private GameObject _rangeRing;
         // M6.2 移动路径线(单位 id → 线;Update 每帧自管建/刷/拆)
         private readonly Dictionary<int, LineRenderer> _paths = new Dictionary<int, LineRenderer>();
-
         public void Init(SimCore sim, Camera cam)
         {
             _sim = sim;
             _cam = cam;
+            _interaction = new SelectionInteractionCoordinator(sim, Side.Blue, _selected);
         }
-
-        private bool MouseOverPanel
-        {
-            get
-            {
-                Vector2 m = Input.mousePosition;
-                // 面板 Rect 为 GUI 坐标(y 从顶起),鼠标 y 从底起,需翻转
-                // 撤退按钮 Rect 仅在有选中时参与拦截(清空选择后残留旧值会让该区域左键永久失效——盲测挑出)
-                return BarracksOverviewPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
-                    // 顶栏常驻拦截(屏幕最顶部横条)
-                    || TopBarPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
-                    // 小地图区域点击不穿透到世界
-                    || MinimapPanel.LastPanelRect.Contains(new Vector2(m.x, Screen.height - m.y))
-                    || (_selected.Count >= 1 && _retreatBtnRect.Contains(new Vector2(m.x, Screen.height - m.y)));
-            }
-        }
-
+        public void SetBuildingCommandPanel(BuildingCommandPanel panel) => _interaction.AttachBuildingPanel(panel);
+        public void SetToolCommandPanel(ToolCommandPanel panel) => _interaction.AttachToolPanel(panel);
+        private bool MouseOverPanel => SelectionInteractionCoordinator.IsPointerOverUi(_selected.Count, _retreatBtnRect);
         private void Update()
         {
             if (_sim == null || _cam == null) return;
             PruneSelection();
             _hintT = Mathf.Max(0f, _hintT - Time.deltaTime);
-
             HandleLeftButton();
             HandleRightButton();
             HandleFormationKey();
             UpdateRings();
             UpdateMarker();
         }
-
         private void PruneSelection()
         {
             for (int i = _selected.Count - 1; i >= 0; i--)
@@ -83,7 +62,6 @@ namespace IronCurtain.View
                     _selected.RemoveAt(i);
             }
         }
-
         private void HandleLeftButton()
         {
             if (Input.GetMouseButtonDown(0) && !MouseOverPanel)
@@ -93,17 +71,19 @@ namespace IronCurtain.View
             }
             if (!Input.GetMouseButtonUp(0) || !_dragging) return;
             _dragging = false;
+            if (MouseOverPanel) { SelectionInteractionCoordinator.LogBlockedLeftRelease(); return; }
             Vector2 m = Input.mousePosition;
             float dx = m.x - _dragStart.x, dy = m.y - _dragStart.y;
             bool click = dx * dx + dy * dy < 64f; // 屏幕位移平方和 <64px² = 点选
             if (click)
             {
-                int id = PickGeneral();
-                _selected.Clear();
-                if (id != 0) _selected.Add(id);
+                bool hasGroundPoint = RayGround(out var wp);
+                _interaction.HandleWorldClick(PickGeneral(), hasGroundPoint,
+                    hasGroundPoint ? new SimVec2(wp.x, 3f - wp.z) : default);
             }
             else
             {
+                _interaction.CloseTargetForBoxSelection();
                 var rect = Rect.MinMaxRect(
                     Mathf.Min(_dragStart.x, m.x), Mathf.Min(_dragStart.y, m.y),
                     Mathf.Max(_dragStart.x, m.x), Mathf.Max(_dragStart.y, m.y));
@@ -117,8 +97,8 @@ namespace IronCurtain.View
                     if (rect.Contains(new Vector2(sp.x, sp.y), true)) _selected.Add(e.Id);
                 }
             }
+            SelectionInteractionCoordinator.LogSelection(click, _selected);
         }
-
         private int PickGeneral()
         {
             Vector3 wp;
@@ -143,24 +123,24 @@ namespace IronCurtain.View
             if (best != 0) return best;      // 主将优先
             return soldierGeneral;           // 命中士兵 → 其主将
         }
-
         private void HandleRightButton()
         {
-            if (!Input.GetMouseButtonDown(1) || _selected.Count == 0 || MouseOverPanel) return;
+            if (!Input.GetMouseButtonDown(1) || MouseOverPanel) return;
+            if (_interaction.CancelToolTargeting("right_click") || _selected.Count == 0) return;
             Vector3 wp;
             if (!RayGround(out wp)) return;
             var grid = new SimVec2(wp.x, 3f - wp.z).ToGrid();
             foreach (var id in _selected)
                 _sim.SetMoveTarget(id, grid, true);
+            SelectionInteractionCoordinator.LogMoveCommand(grid, _selected);
             SpawnMarker(wp);
         }
-
         private void HandleFormationKey()
         {
-            if (Input.GetKeyDown(KeyCode.T) && _selected.Count >= 2)
-                RegimentFormationSystem.Apply(_sim, _selected);
+            if (!Input.GetKeyDown(KeyCode.T) || !_interaction.ShouldApplyFormation(MouseOverPanel)) return;
+            RegimentFormationSystem.Apply(_sim, _selected);
+            _interaction.LogFormationApplied();
         }
-
         private bool RayGround(out Vector3 wp)
         {
             wp = Vector3.zero;
@@ -170,7 +150,6 @@ namespace IronCurtain.View
             wp = ray.GetPoint(enter);
             return true;
         }
-
         private void UpdateRings()
         {
             var key = BuildKey();
@@ -225,14 +204,12 @@ namespace IronCurtain.View
                 _paths[id] = lr;
             }
         }
-
         private string BuildKey()
         {
             var sb = new StringBuilder();
             foreach (var id in _selected) sb.Append(id).Append(',');
             return sb.ToString();
         }
-
         private void RebuildRings()
         {
             foreach (var r in _rings) if (r != null) Destroy(r);
@@ -273,7 +250,6 @@ namespace IronCurtain.View
                 }
             }
         }
-
         private void SpawnMarker(Vector3 wp)
         {
             if (_marker != null) Destroy(_marker);

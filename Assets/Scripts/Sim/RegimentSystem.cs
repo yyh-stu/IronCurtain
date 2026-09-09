@@ -8,9 +8,9 @@ namespace IronCurtain.Sim
     /// </summary>
     public static class RegimentSystem
     {
-        public const int SoldiersPerGeneral = 20;
+        public const int SoldiersPerGeneral = 12; // 2026-09-10 制作人拍板:20→12(画面过乱)
         public const int FormationRows = 4;   // 4 行 × 5 列,行列距 1.0 米
-        public const int FormationCols = 5;
+        public const int FormationCols = 3; // 行军纵队 3×4(2026-09-10 制作人拍板)
 
         public static SimVec2 FacingOf(Entity g)
         {
@@ -28,11 +28,20 @@ namespace IronCurtain.Sim
 
         public static SimVec2 SlotOffset(Entity g, int slot)
         {
+            // 2026-09-10 制作人定稿:平时(行军/跟随/驻立)一律 3×4 纵队跟在主将后方,美观;
+            // 警戒/交火(索敌接战中)改圆圈包围主将,主将为圆心
+            bool combat = g.State == EntityState.Attacking || g.AutoKind != 0;
             var facing = FacingOf(g);
-            var perp = new SimVec2(facing.Y, -facing.X);
+            if (combat)
+            {
+                float angle = slot * (System.MathF.PI * 2f / SoldiersPerGeneral);
+                var dir = new SimVec2(System.MathF.Cos(angle), System.MathF.Sin(angle));
+                return new SimVec2(dir.X * facing.X - dir.Y * facing.Y, dir.X * facing.Y + dir.Y * facing.X) * 2.6f; // 圆圈随朝向整体旋转,主将为圆心
+            }
+            var perpC = new SimVec2(facing.Y, -facing.X);
             int row = slot / FormationCols;
             int col = slot % FormationCols;
-            return facing * -(row + 1) + perp * (col - 2);
+            return facing * -(row + 1.2f) + perpC * (col - (FormationCols - 1) * 0.5f);
         }
 
         public static void Tick(SimCore sim, float dt)
@@ -43,6 +52,7 @@ namespace IronCurtain.Sim
             {
                 if (e.Kind != EntityKind.Unit || !e.IsSoldier || e.State == EntityState.Dead) continue;
                 if (e.GarrisonBuildingId != 0) continue;
+                if (e.TargetBuildingId != 0) continue; // 攻城命令临时脱离跟随，由 SimCore.MoveUnits 驱动入场。
 
                 var g = e.GeneralId != 0 ? sim.GetEntity(e.GeneralId) : null;
                 if (g != null && g.Kind == EntityKind.Unit && g.State != EntityState.Dead)
@@ -122,9 +132,28 @@ namespace IronCurtain.Sim
         {
             var off = SlotOffset(general, slot);
             var target = atPos ?? general.PosF + off;
-            // 防崩(与 ReinforceSystem 补兵槽位同款):出生点撞建筑占地/贴其他单位 → 沿槽向外推 1m×3 次;仍堵保留原抛出语义
-            for (int t = 0; t < 3 && !SpawnPointFree(sim, target); t++)
-                target = TerrainMap.ClampToEllipse(target + off.Normalized());
+            // 防崩(2026-09-10 圆阵/纵队适配):理想点被占 → 螺旋搜索(径向+环绕各向),
+            // 找不到再保留原抛出语义;圆阵贴建筑时径向外推会撞更深,环绕跳位才能解。
+            if (!SpawnPointFree(sim, target))
+            {
+                SimVec2 found = target; bool ok = false;
+                for (int ring = 1; ring <= 3 && !ok; ring++)
+                {
+                    float rd = ring * 0.8f;
+                    for (int a = 0; a < 12; a++)
+                    {
+                        float ang = a * (System.MathF.PI * 2f / 12f) + ring * 0.26f;
+                        var cand = TerrainMap.ClampToEllipse(target + new SimVec2(System.MathF.Cos(ang) * rd, System.MathF.Sin(ang) * rd));
+                        if (SpawnPointFree(sim, cand)) { found = cand; ok = true; break; }
+                    }
+                }
+                if (ok) target = found;
+                else
+                {
+                    for (int t = 0; t < 3; t++)
+                        target = TerrainMap.ClampToEllipse(target + off.Normalized());
+                }
+            }
             var s = sim.SpawnEntity(general.Side, EntityKind.Unit, target.ToGrid());
             s.IsSoldier = true;
             s.FormationSlot = slot;

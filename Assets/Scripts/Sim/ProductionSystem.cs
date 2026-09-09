@@ -112,12 +112,13 @@ namespace IronCurtain.Sim
                     { tooClose = true; break; }
                 if (tooClose) continue;
 
-                // 兵团整体出生校验:满编 20 兵阵型不得压建筑占地、不得贴既有单位(并行产将时错峰)
+                // 兵团整体出生校验:满编兵阵型不得压建筑占地、不得贴既有单位(并行产将时错峰)
+                // 2026-09-10:改用 SlotOffset 统一(12 兵双态:出生时主将 Idle→圆阵)
                 bool formationClear = true;
+                var probeG = new Entity(0, b.Side, EntityKind.Unit, cand, 1f) { PosF = center };
                 for (int s2 = 0; s2 < RegimentSystem.SoldiersPerGeneral && formationClear; s2++)
                 {
-                    int rr = s2 / RegimentSystem.FormationCols, cc = s2 % RegimentSystem.FormationCols;
-                    var sp = new SimVec2(center.X - dir * (rr + 1), center.Y - dir * (cc - 2));
+                    var sp = center + RegimentSystem.SlotOffset(probeG, s2);
                     var scell = sp.ToGrid();
                     if (occupied.Contains(((long)scell.Row << 32) | (uint)scell.Col)) { formationClear = false; break; }
                     foreach (var e2 in sim.Entities.Values)
