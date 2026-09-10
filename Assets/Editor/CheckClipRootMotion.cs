@@ -141,11 +141,12 @@ namespace IronCurtain.EditorTools
             {
                 foreach (var binding in bindings)
                 {
-                    // Mixamo 等命名形如 "mixamorig:Hips",统一小写比对,且只认骨骼位置曲线
-                    // (非骨骼根的 m_LocalPosition 属于骨架层级,不在此列;普通属性曲线 propertyName 不同)。
-                    string pathLower = binding.path.ToLowerInvariant();
-                    bool isHips = pathLower.EndsWith("hips") || pathLower.EndsWith("pelvis")
-                        || pathLower.EndsWith("hips/") == false && pathLower.Contains("hips"); // 兼容嵌套路径
+                    // 骨盆骨骼判定(第 4 轮修复):按 '/' 取路径最后一段作为骨骼自身名,
+                    // 剥离 "mixamorig:" 这类命名空间前缀后与 hips/pelvis 做不区分大小写的
+                    // 等值比较。此前用 Contains("hips") 会把 "mixamorig:Hips/Spine" 等
+                    // 含 "hips" 的子路径误判为骨盆,导致取到错误曲线。
+                    string boneName = LastPathSegment(binding.path);
+                    bool isHips = boneName == "hips" || boneName == "pelvis";
                     if (binding.type != typeof(Transform) && binding.type != typeof(Animator)) continue;
                     if (!isHips) continue;
 
@@ -167,9 +168,13 @@ namespace IronCurtain.EditorTools
                 }
             }
 
-            // 两条路径都没有读到:可能是非 Humanoid/Generic 且无 Hips 曲线,或导入配置异常,
-            // 需人工确认。附带 bindingsSample 便于日后快速定位曲线实际长什么样。
-            if (!hasX && !hasZ && !hasY)
+            // 记录缺失的水平轴:双轴缺失说明缺水平数据,单轴缺失按 0 计并标记 (部分轴) 供人工复核。
+            var partialAxes = new List<string>();
+            if (!hasX) partialAxes.Add("x");
+            if (!hasZ) partialAxes.Add("z");
+
+            // X 与 Z 都缺失:不是"原地",而是缺少水平数据,归入无数据类别。
+            if (!hasX && !hasZ)
             {
                 noData++;
                 var sample = new List<string>();
@@ -186,7 +191,7 @@ namespace IronCurtain.EditorTools
                 {
                     ["file"] = file, ["clip"] = clip.name, ["durationSec"] = clip.length,
                     ["rangeX"] = 0f, ["rangeZ"] = 0f, ["netX"] = 0f, ["netZ"] = 0f, ["netHorizontal"] = 0f, ["rangeY"] = 0f,
-                    ["verdict"] = "无数据"
+                    ["verdict"] = "无数据", ["partialAxes"] = partialAxes
                 };
                 if (sample.Count > 0) entry["bindingsSample"] = string.Join("; ", sample);
                 else entry["bindingsSample"] = "";
@@ -196,6 +201,7 @@ namespace IronCurtain.EditorTools
 
             // 主判据:净位移(首末帧水平位移的模)。循环播放下净位移才会累积,
             // 造成"模型漂离光环/血条";瞬时摆幅只作往复位移的参考分类。
+            // 缺失的单个水平轴按 0 计入,分类阈值与语义不变。
             float netHorizontal = Mathf.Sqrt(netX * netX + netZ * netZ);
             float swing = Mathf.Max(rangeX, rangeZ); // Y 极差是正常步伐起伏,不计入判定
 
@@ -216,16 +222,30 @@ namespace IronCurtain.EditorTools
                 inplace++;
             }
 
+            string partialMark = partialAxes.Count > 0 ? " (部分轴)" : "";
             sb.Append($"[rootmotion] {label} | 时长 {clip.length:F1}s | 净位移 {netHorizontal:F2}m" +
                       $"(X极差{rangeX:F2}/ Z极差{rangeZ:F2}/ Y极差{rangeY:F2})" +
-                      $" | 判定={verdict}\n");
+                      $" | 判定={verdict}{partialMark}\n");
 
             report.Add(new Dictionary<string, object>
             {
                 ["file"] = file, ["clip"] = clip.name, ["durationSec"] = clip.length,
                 ["rangeX"] = rangeX, ["rangeZ"] = rangeZ, ["netX"] = netX, ["netZ"] = netZ,
-                ["netHorizontal"] = netHorizontal, ["rangeY"] = rangeY, ["verdict"] = verdict
+                ["netHorizontal"] = netHorizontal, ["rangeY"] = rangeY, ["verdict"] = verdict,
+                ["partialAxes"] = partialAxes
             });
+        }
+
+        // 取骨骼路径最后一段并剥离命名空间前缀(形如 "mixamorig:" 的 "xxx:"),
+        // 返回小写骨骼名;空路径返回空串(空串不会等于 hips/pelvis,天然排除)。
+        private static string LastPathSegment(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return "";
+            int slash = path.LastIndexOf('/');
+            string segment = slash >= 0 ? path.Substring(slash + 1) : path;
+            int colon = segment.LastIndexOf(':');
+            if (colon >= 0) segment = segment.Substring(colon + 1);
+            return segment.ToLowerInvariant();
         }
 
         private static void WriteJson(List<Dictionary<string, object>> report)
@@ -243,6 +263,12 @@ namespace IronCurtain.EditorTools
                     if (!first) json.Append(", ");
                     first = false;
                     if (kv.Value is string s) json.Append($"\"{kv.Key}\": \"{s}\"");
+                    else if (kv.Value is List<string> axes)
+                    {
+                        var items = new List<string>();
+                        foreach (var a in axes) items.Add($"\"{a}\"");
+                        json.Append($"\"{kv.Key}\": [{string.Join(", ", items)}]");
+                    }
                     else if (kv.Value is float f) json.Append($"\"{kv.Key}\": {f:0.###}");
                     else json.Append($"\"{kv.Key}\": {kv.Value}");
                 }
