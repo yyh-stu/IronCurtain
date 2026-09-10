@@ -23,6 +23,15 @@ namespace IronCurtain.View
             return m;
         }
 
+        // 2026-09-10 制作人目击"血条随摄像头变动出灰色杂质"根因=UI 材质受光照(Lit);
+        // UI 元素(血条/光环/刻度)一律 Unlit 纯色,不受场景光影响
+        public static Material Unlit(Color c)
+        {
+            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            m.SetColor("_BaseColor", c);
+            return m;
+        }
+
         public static Material Flat(Color albedo, float smoothness = 0.4f)
         {
             return Mat(albedo, 0f, smoothness, Color.black, 0f);
@@ -138,6 +147,22 @@ namespace IronCurtain.View
                 m.SetTriangles(idx, s);
             }
             m.RecalculateNormals();
+            // 2026-09-10 血条贴图化:补平面 UV(取顶点 xy 归一)——对血条 quad 精确,对 box 粗略无碍
+            if (m.uv == null || m.uv.Length == 0)
+            {
+                var uvs = new Vector2[all.Count];
+                if (all.Count > 0)
+                {
+                    float minX = all[0].x, maxX = all[0].x, minY = all[0].y, maxY = all[0].y;
+                    foreach (var v3 in all) { minX = Mathf.Min(minX, v3.x); maxX = Mathf.Max(maxX, v3.x); minY = Mathf.Min(minY, v3.y); maxY = Mathf.Max(maxY, v3.y); }
+                    float sx = maxX - minX, sy = maxY - minY;
+                    for (int i2 = 0; i2 < all.Count; i2++)
+                        uvs[i2] = sx > 0.0001f && sy > 0.0001f
+                            ? new Vector2((all[i2].x - minX) / sx, (all[i2].y - minY) / sy)
+                            : new Vector2(0.5f, 0.5f);
+                }
+                m.SetUVs(0, new List<Vector2>(uvs));
+            }
             return m;
         }
 
@@ -190,6 +215,30 @@ namespace IronCurtain.View
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             return go;
         }
+
+        // 贴图化平面(2026-09-10 血条质感升级:木框+渐变贴图条体)
+        public static GameObject DecoTextured(Material mat, Vector3 lpos, Vector2 size, Transform parent, string name = "decoTex")
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = lpos;
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            go.AddComponent<MeshFilter>().sharedMesh = QuadMesh();
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
+        }
+
+        private static Mesh QuadMesh()
+        {
+            if (_texQuad == null)
+            {
+                var v = new List<Vector3>(); var t = new List<int>();
+                Quad(v, t, new Vector3(-0.5f, -0.5f, 0), new Vector3(0.5f, -0.5f, 0), new Vector3(0.5f, 0.5f, 0), new Vector3(-0.5f, 0.5f, 0));
+                _texQuad = CreateMesh(new List<Vector3>[] { v }, new List<int>[] { t });
+            }
+            return _texQuad;
+        }
+        private static Mesh _texQuad;
 
         // 圆环(平躺;2026-09-10 王者荣耀式阵营环光环)
         public static GameObject DecoRing(Material mat, Vector3 lpos, float radius, float width, Transform parent, string name = "decoRing")

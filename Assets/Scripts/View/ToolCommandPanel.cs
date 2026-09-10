@@ -120,7 +120,7 @@ namespace IronCurtain.View
             GUI.skin.font = ViewAssets.UiFont(14);
             LastPanelRect = PanelRectFor(Screen.width, Screen.height,
                 BarracksOverviewPanel.LastPanelRect.yMax + 8f, _expanded);
-            GUI.Box(LastPanelRect, "");
+            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
             GUILayout.BeginArea(new Rect(LastPanelRect.x + 8f, LastPanelRect.y + 6f,
                 Mathf.Max(0f, LastPanelRect.width - 16f), Mathf.Max(0f, LastPanelRect.height - 12f)));
             DrawHeader();

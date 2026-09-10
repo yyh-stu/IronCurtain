@@ -200,7 +200,7 @@ namespace IronCurtain.View
         private void InitMats()
         {
             if (_g != null) return;
-            _bk = ViewAssets.Flat(new Color(0.18f, 0.18f, 0.20f));
+            _bk = ViewAssets.Unlit(new Color(0.18f, 0.18f, 0.20f));
             _g = ViewAssets.Mat(Color.green, 0f, 0.4f, Color.green, 0.8f);
             _y = ViewAssets.Mat(new Color(1f, 0.85f, 0f), 0f, 0.4f, new Color(1f, 0.85f, 0f), 0.8f);
             _r = ViewAssets.Mat(Color.red, 0f, 0.4f, Color.red, 0.8f);
@@ -223,10 +223,10 @@ namespace IronCurtain.View
         private static void EnsureHpMats()
         {
             if (_hpMatBlue != null) return;
-            _hpMatBlue = ViewAssets.Flat(new Color(0.25f, 0.55f, 1f), 0.35f);
-            _hpMatRed = ViewAssets.Flat(new Color(0.98f, 0.28f, 0.22f), 0.35f);
-            _hpMatNeutral = ViewAssets.Flat(new Color(0.62f, 0.62f, 0.62f), 0.35f);
-            _hpMatShield = ViewAssets.Flat(new Color(0.78f, 0.80f, 0.84f), 0.35f);
+            _hpMatBlue = ViewAssets.Unlit(new Color(0.25f, 0.55f, 1f));
+            _hpMatRed = ViewAssets.Unlit(new Color(0.98f, 0.28f, 0.22f));
+            _hpMatNeutral = ViewAssets.Unlit(new Color(0.62f, 0.62f, 0.62f));
+            _hpMatShield = ViewAssets.Unlit(new Color(0.78f, 0.80f, 0.84f));
         }
         private Material FactionHpMat()
         {
@@ -399,13 +399,17 @@ namespace IronCurtain.View
             _hpRoot = root.transform;
             // 王者样式:深色背板略大一圈 + 阵营色血条;建筑条高×2(2026-09-10 制作人拍板)
             _barH = _e.Kind == EntityKind.Building ? _h * 2f : _h;
-            _hpBack = ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w + 0.08f, _barH + 0.05f), root.transform, "Back").transform;
+            // 2026-09-10 血条质感:贴图槽底(灰度木框渐变条×暗 tint),fill 内缩微边
+            var slateMat = UiSkin.HpSlate();
+            _hpBack = (slateMat != null
+                ? ViewAssets.DecoTextured(slateMat, Vector3.zero, new Vector2(_w + 0.10f, _barH + 0.06f), root.transform, "Back")
+                : ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w + 0.08f, _barH + 0.05f), root.transform, "Back")).transform;
             _hpFill = ViewAssets.DecoQuad(FactionHpMat(), Vector3.zero, new Vector2(_w, _barH), root.transform, "Fill").transform;
             EnsureHpMats();
             // 刻度:主将 10 血一格,建筑 40 血一格(制作人拍板,格数随血量非百分比)
             int per = _e.Kind == EntityKind.Building ? 40 : 10;
             int seg = _e.MaxHp > 0f ? Mathf.Max(1, Mathf.FloorToInt(_e.MaxHp / per)) : 1;
-            Material tickMat = ViewAssets.Flat(new Color(0.08f, 0.09f, 0.11f, 0.9f));
+            Material tickMat = ViewAssets.Unlit(new Color(0.08f, 0.09f, 0.11f));
             for (int i = 1; i < seg; i++)
             {
                 float x = -_w * 0.5f + _w * i / seg;
@@ -526,7 +530,7 @@ namespace IronCurtain.View
             // 2026-09-10 制作人拍板:农药样式阵营环——阵营色细环+超淡同色填充(不再用个体主色)
             // 2026-09-10 制作人拍板:环细到 1/8;环内填充盘彻底删除(多次反馈)
             Color c = TeamGlowColor();
-            Material ringMat = ViewAssets.Mat(c * 0.25f, 0f, 0.6f, c, 1.1f);
+            Material ringMat = ViewAssets.Unlit(c);
             ViewAssets.DecoRing(ringMat, new Vector3(0f, 0.02f, 0f), radius, radius * 0.0075f, parent, "GlowRing");
         }
 

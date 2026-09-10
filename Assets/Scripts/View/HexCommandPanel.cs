@@ -58,7 +58,7 @@ namespace IronCurtain.View
             float bottom = MinimapPanel.LastPanelRect.height > 0f
                 ? MinimapPanel.LastPanelRect.yMin - 8f : Screen.height - 10f;
             LastPanelRect = PanelRectFor(Screen.width, Screen.height, top, bottom, _expanded);
-            GUI.Box(LastPanelRect, "");
+            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
             GUILayout.BeginArea(new Rect(LastPanelRect.x + 8f, LastPanelRect.y + 6f,
                 Mathf.Max(0f, LastPanelRect.width - 16f), Mathf.Max(0f, LastPanelRect.height - 12f)));
             DrawHeader();

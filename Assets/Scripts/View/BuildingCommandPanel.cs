@@ -166,7 +166,7 @@ namespace IronCurtain.View
             const float width = 340f;
             const float height = 132f;
             LastPanelRect = new Rect(Screen.width * 0.5f - width * 0.5f, Screen.height - 210f, width, height);
-            GUI.Box(LastPanelRect, "");
+            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
             GUILayout.BeginArea(new Rect(LastPanelRect.x + 12f, LastPanelRect.y + 8f, width - 24f, height - 16f));
             GUILayout.BeginHorizontal();
             GUILayout.Label(info.Title, TitleStyle());
