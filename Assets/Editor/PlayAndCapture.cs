@@ -1,6 +1,8 @@
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace IronCurtain.EditorTools
 {
@@ -45,7 +47,29 @@ namespace IronCurtain.EditorTools
             SessionState.SetBool("ic.fastresult", false);
             SessionState.SetBool("ic.inputaudit", true);
             SessionState.SetFloat("ic.speed", 1f);
+            EnableGameViewInput();
             EditorApplication.EnterPlaymode();
+        }
+
+        // 2026-09-10 实测:GameView 工具栏"Play Mode 输入开关"(手柄图标)默认禁用时,
+        // OS 级真鼠标点击全部被编辑器吞掉(三轮点击零响应的根因)。进 Play 前反射强制启用。
+        private static void EnableGameViewInput()
+        {
+            try
+            {
+                var gvType = typeof(EditorWindow).Assembly.GetTypes().FirstOrDefault(t => t.Name == "GameView");
+                if (gvType == null) { Debug.LogWarning("[play] GameView type missing"); return; }
+                var prop = gvType.GetProperty("disableInputEvents",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                if (prop == null || !prop.CanWrite) { Debug.LogWarning("[play] disableInputEvents missing"); return; }
+                int n = 0;
+                foreach (var w in Resources.FindObjectsOfTypeAll(gvType))
+                {
+                    if ((bool)prop.GetValue(w)) { prop.SetValue(w, false); n++; }
+                }
+                Debug.Log($"[play] gameview input enabled (cleared {n})");
+            }
+            catch (System.Exception ex) { Debug.LogWarning("[play] enable input failed: " + ex.Message); }
         }
 
         [MenuItem("IronCurtain/Interactive Play 6x")]

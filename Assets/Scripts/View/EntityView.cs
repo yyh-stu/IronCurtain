@@ -12,6 +12,11 @@ namespace IronCurtain.View
         private Entity _e;
         private Side _side;
         private GameObject _model, _gr, _chunks;
+        // 动画漂移补偿(2026-09-10):身体基准位+骨盆初始位
+        private GameObject _body;
+        private Vector3 _bodyBase;
+        private Transform _hips;
+        private Vector3 _hips0;
         private Transform _hpRoot, _hpFill, _shFill;
         private float _w = 1.7f, _h = 0.26f, _deadT = -1f, _topY = 3.5f;
         private bool _dead, _rubbled;
@@ -508,9 +513,10 @@ namespace IronCurtain.View
 
         private void AddGlowDisc(Transform parent, float radius, Color? glowColor = null)
         {
+            // 2026-09-10 制作人目击修复:方盒冒充圆盘(俯视正方形色块)→真圆盘网格
             Color c = glowColor ?? TeamGlowColor();
             Material glow = ViewAssets.Mat(c * 0.2f, 0f, 0.7f, c, 0.55f);
-            ViewAssets.DecoBox(glow, new Vector3(0f, 0.02f, 0f), new Vector3(radius * 2f, 0.025f, radius * 2f), parent, "GlowDisc");
+            ViewAssets.DecoDisc(glow, new Vector3(0f, 0.02f, 0f), radius * 2f, parent, "GlowDisc");
         }
 
         private void AddFlag(Transform parent, Vector3 pos, float height)
@@ -721,6 +727,7 @@ namespace IronCurtain.View
             // 骑手上马:脚底抬到鞍位(肩高1.5 的约 0.7,截图迭代),整体随马 bob
             body.transform.SetParent(_mountRoot.transform, true);
             body.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+            _bodyBase = body.transform.localPosition; // 骑乘基准位(漂移补偿用)
             var anim = body.GetComponent<Animator>();
             // 骑乘动画三段接管(骑坐/冲锋/前刺);controller 缺席时退回代码摆腿兜底
             if (anim != null && RiderCtrl != null)
@@ -744,8 +751,18 @@ namespace IronCurtain.View
 
         private void LateUpdate()
         {
-            // play 模式:动画更新后覆盖骑姿;edit 模式(CaptureBatch)由 Tick 补调
+            // play 模式:动画更新后覆盖骑姿/补偿漂移;edit 模式(CaptureBatch)由 Tick 补调
             ApplyRidePose();
+            CompensateAnimDrift();
+        }
+
+        // 动画漂移补偿(2026-09-10):AI 动画骨骼带全局位移(非原地),模型会漂离脚下光环/血条。
+        // 每帧把骨盆 XZ 位移从身体局部位置中扣除(绝对式,不累计);Y 不补(保留步伐起伏)。
+        private void CompensateAnimDrift()
+        {
+            if (_body == null || _hips == null) return;
+            var d = _hips.localPosition - _hips0;
+            _body.transform.localPosition = _bodyBase - new Vector3(d.x, 0f, d.z);
         }
 
         private void ApplyRidePose()
@@ -762,6 +779,10 @@ namespace IronCurtain.View
         {
             _model = NewModelRoot();
             var body = AddPiece(_model.transform, HeroModelName(hero), HeroTargetHeight(hero), 0f);
+            // 2026-09-10 制作人目击修复:AI 动画非原地(骨骼带全局位移,移动中模型漂离脚下光环/血条
+            // 约一个身位)。补偿:每帧把骨盆(Hips)的 XZ 动画位移从身体上减去,前进交给 Sim 根驱动。
+            _body = body;
+            if (body != null) _bodyBase = body.transform.localPosition;
             if (body != null)
             {
                 // 2026-09-09 管线修复:美术彩色贴图直挂(绑骨 FBX 内嵌贴图 Unity 解不开,已抽取生成 HeroMat);
@@ -785,6 +806,8 @@ namespace IronCurtain.View
                 _anim = body.GetComponent<Animator>();
                 if (_anim == null) _anim = body.AddComponent<Animator>();
                 if (HeroCtrl != null) _anim.runtimeAnimatorController = HeroCtrl;
+                _hips = _anim.GetBoneTransform(HumanBodyBones.Hips);
+                if (_hips != null) _hips0 = _hips.localPosition;
                 // 2026-09-10 武器分离件挂手骨;逐风骑战马(资产缺失静默跳过)
                 AttachWeapons(hero, body);
                 if (hero == HeroId.ZhuFeng) MountHorse(body);

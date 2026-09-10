@@ -161,6 +161,36 @@ namespace IronCurtain.View
             return go;
         }
 
+        // 真圆盘(俯视正圆;2026-09-10 修"方形光环"观感 bug,替代 DecoBox 冒充的圆盘)
+        private static Mesh _discMesh;
+        public static GameObject DecoDisc(Material mat, Vector3 lpos, float diameter, Transform parent, string name = "decoDisc")
+        {
+            if (_discMesh == null)
+            {
+                var v = new List<Vector3>(); var t = new List<int>();
+                const int seg = 24;
+                const float y = 0f;
+                v.Add(new Vector3(0f, y, 0f)); // 中心
+                for (int i = 0; i <= seg; i++)
+                {
+                    float a = i / (float)seg * Mathf.PI * 2f;
+                    v.Add(new Vector3(Mathf.Cos(a) * 0.5f, y, Mathf.Sin(a) * 0.5f));
+                }
+                for (int i = 1; i <= seg; i++)
+                {
+                    t.Add(0); t.Add(i + 1); t.Add(i); // 单面朝上
+                }
+                _discMesh = CreateMesh(new List<Vector3>[] { v }, new List<int>[] { t });
+            }
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = lpos;
+            go.transform.localScale = new Vector3(diameter, 1f, diameter);
+            go.AddComponent<MeshFilter>().sharedMesh = _discMesh;
+            go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            return go;
+        }
+
         public static GameObject DecoQuad(Material mat, Vector3 lpos, Vector2 size, Transform parent, string name = "decoQ")
         {
             if (_quadMesh == null)
