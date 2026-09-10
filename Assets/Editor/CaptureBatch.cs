@@ -46,7 +46,12 @@ namespace IronCurtain.EditorTools
             var warmup = new RenderTexture(64, 64, 24);
             cam.targetTexture = warmup;
             cam.Render();
-            cam.targetTexture = null;
+            cam.targetTexture = null;            // 2026-09-10 重大修复:edit 模式下 URP Volume 后处理默认不参与 Camera.Render()
+            // (实测 Bloom/ACES/ColorAdjustments 全部无效,saturation=100 无变化)。
+            // 强制初始化 Volume 管理器并更新全局 Volume,让批处理截图真实反映后处理效果。
+            // URP Volume 在 edit mode 的激活:Initialize 会重置 VolumeManager 状态栈,
+            // 随后首帧 Camera.Render 即按全局 Volume 应用后处理
+            UnityEngine.Rendering.VolumeManager.instance.Initialize();
             Object.DestroyImmediate(warmup);
 
             for (int i = 0; i < Marks.Length; i++)

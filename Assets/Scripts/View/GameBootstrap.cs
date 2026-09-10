@@ -131,8 +131,11 @@ namespace IronCurtain.View
             light.color = new Color(1f, 0.98f, 0.93f);
             light.intensity = 1.05f;
             go.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
-            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.55f, 0.56f, 0.58f, 1f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(0.62f, 0.78f, 0.98f);
+            RenderSettings.ambientEquatorColor = new Color(0.74f, 0.67f, 0.54f);
+            RenderSettings.ambientGroundColor = new Color(0.40f, 0.31f, 0.23f);
+            RenderSettings.ambientIntensity = 1.2f;
         }
 
         private void CreatePostProcess()
@@ -142,6 +145,10 @@ namespace IronCurtain.View
             bloom.threshold.Override(0.55f);
             bloom.intensity.Override(1.7f);
             bloom.scatter.Override(0.7f);
+            var colorAdjustments = profile.Add<ColorAdjustments>(true);
+            colorAdjustments.saturation.Override(32f);
+            colorAdjustments.contrast.Override(22f);
+            colorAdjustments.postExposure.Override(0.35f);
             var tone = profile.Add<Tonemapping>(true);
             tone.mode.Override(TonemappingMode.ACES);
             var go = new GameObject("PostProcess");
