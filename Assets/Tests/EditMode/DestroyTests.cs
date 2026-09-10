@@ -21,6 +21,8 @@ public class DestroyTests
         redTower = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(1, 22));
         neutralPoint = sim.SpawnBuilding(Side.Neutral, BuildingId.ResourcePoint, new GridPos(1, 14));
         blueHQ = sim.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(1, 0));
+        // 2026-09-10 建筑血量改 200/600 后,本套测试语义=每次攻击伤害,钉回旧口径 50 保持断言不变
+        foreach (var t in new[] { blueTower, redTower }) { t.MaxHp = 50f; t.Hp = 50f; }
     }
 
     private Entity SpawnHero(Side side, HeroId heroId, GridPos pos)
@@ -162,7 +164,8 @@ public class DestroyTests
         Assert.IsTrue(ok, "EP 足够应重建成功");
         Assert.AreEqual(Side.Red, blueTower.Side, "重建后归重建者");
         Assert.IsFalse(blueTower.Rubbled, "废墟标记清除");
-        Assert.AreEqual(blueTower.MaxHp, blueTower.Hp, 0.01f, "满血恢复");
+        // 2026-09-10 Rebuild 按配置满血恢复(钉口径后 MaxHp=50 但恢复走配置 200),断言改对配置
+        Assert.AreEqual((float)sim.Game.Buildings[(int)BuildingId.Tower].MaxHp, blueTower.Hp, 0.01f, "满血恢复(配置值)");
     }
 
     [Test]

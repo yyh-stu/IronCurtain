@@ -42,7 +42,7 @@ namespace IronCurtain.Tests
         {
             var sim = NewSim();
             var tower = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(15, 120));
-            tower.Hp = 50f;
+            tower.Hp = 50f; tower.MaxHp = 50f; // 2026-09-10 建筑血量改 200 后钉回旧口径
             GiveOneEp(sim, Side.Blue);
             var model = new ToolCommandModel(sim, Side.Blue);
 

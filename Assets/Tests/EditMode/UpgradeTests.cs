@@ -134,6 +134,7 @@ public class UpgradeTests
         GiveEp(Side.Red, 2);
         sim.BuyUpgrade(Side.Red, HeroId.ZhuFeng, out _);
         var tower = sim.SpawnBuilding(Side.Blue, BuildingId.Tower, new GridPos(15, 114));
+        tower.Hp = 50f; tower.MaxHp = 50f; // 2026-09-10 建筑血量改 200 后钉回旧口径
         var zf = SpawnHero(Side.Red, HeroId.ZhuFeng, new GridPos(15, 113));
         zf.TargetBuildingId = tower.Id;
         tower.Intent = SiegeIntent.Destroy;
@@ -143,6 +144,7 @@ public class UpgradeTests
         Assert.AreEqual(50f - 14f, tower.Hp, 0.01f, "飞掠每击 7×2=14");
 
         var rb = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(15, 130));
+        rb.Hp = 50f; rb.MaxHp = 50f;
         var bzf = SpawnHero(Side.Blue, HeroId.ZhuFeng, new GridPos(15, 129)); // 蓝方未升级
         bzf.TargetBuildingId = rb.Id;
         rb.Intent = SiegeIntent.Destroy;

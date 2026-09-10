@@ -19,7 +19,8 @@ namespace IronCurtain.View
         private Vector3 _hips0;
         private Transform _hpRoot, _hpFill, _shFill;
         // 2026-09-10 制作人拍板:血条农药样式——固定长约 2.5 英雄宽(2.4m)、每 10 点血一条刻度线
-        private float _w = 2.4f, _h = 0.14f, _deadT = -1f, _topY = 3.5f;
+        private float _w = 2.4f, _h = 0.21f, _deadT = -1f, _topY = 3.5f;
+        private float _barH; // 实际条高:主将=_h,建筑=_h×2(2026-09-10 制作人拍板)
         private bool _dead, _rubbled;
         // 2026-09-10 建筑正式 fbx 已挂(BuildingMat 直挂,不走 grey/tint 回退)
         private bool _bldArt;
@@ -241,7 +242,7 @@ namespace IronCurtain.View
             bool show = _e.Kind == EntityKind.Building || t < 0.999f
                 || (_e.Kind == EntityKind.Unit && !_e.IsSoldier);
             _hpRoot.gameObject.SetActive(show);
-            _hpFill.localScale = new Vector3(_w * t, _h, 1f);
+            _hpFill.localScale = new Vector3(_w * t, _barH, 1f);
             _hpFill.localPosition = new Vector3(-_w * (1f - t) * 0.5f, 0f, 0f);
         }
 
@@ -265,7 +266,8 @@ namespace IronCurtain.View
             if (_e == null) return;
             bool isB = _e.Kind == EntityKind.Building;
             bool hidden = !isB && (_e.GarrisonBuildingId != 0 || _fogUnitHidden);
-            bool vis = !hidden && !_rubbled && !(isB && _fogBuildingUnknown);
+            // 2026-09-10 制作人拍板:迷雾只隐藏敌方将兵单位;建筑永远可见可点(否则没法设进攻偏好)
+            bool vis = !hidden && !_rubbled;
             if (_model != null && _model.activeSelf != vis)
             {
                 // 2026-09-09 bug1 修复:雾散/出驻重现时直接落位实时坐标,
@@ -273,18 +275,12 @@ namespace IronCurtain.View
                 if (vis && !isB) transform.position = BoardView.WorldPos(_e.PosF);
                 _model.SetActive(vis); _hpRoot.gameObject.SetActive(!hidden);
             }
-            if (isB && _fogBuildingUnknown)
-            {
-                // 建筑未知:血条与驻军点也全部隐藏
-                if (_hpRoot != null && _hpRoot.gameObject.activeSelf) _hpRoot.gameObject.SetActive(false);
-                if (_gr != null && _gr.activeSelf) _gr.SetActive(false);
-            }
             if (!hidden && !MarchHold)
             {
                 Vector3 target = isB ? BoardView.WorldPos(_e.Pos) : BoardView.WorldPos(_e.PosF);
                 if (isB) transform.position = target;
                 else transform.position = Vector3.Lerp(transform.position, target, 1f - Mathf.Exp(-14f * dt));
-                if (!(isB && _fogBuildingStale)) SetHp(_e.Hp, _e.MaxHp); // Stale=冻结血条(不刷新)
+                SetHp(_e.Hp, _e.MaxHp);
             }
             if (_hitT > 0f)
             {
@@ -390,7 +386,7 @@ namespace IronCurtain.View
             {
                 // 2026-09-10 制作人拍板:盾条=血条右侧灰色段,长度与血同尺度(盾值/最大生命)
                 float len = _w * Mathf.Clamp01(_e.Shield / _e.MaxHp);
-                _shFill.localScale = new Vector3(len, _h * 0.8f, 1f);
+                _shFill.localScale = new Vector3(len, _barH * 0.8f, 1f);
                 _shFill.localPosition = new Vector3(_w * 0.5f + len * 0.5f + 0.04f, 0f, 0f);
             }
         }
@@ -401,20 +397,22 @@ namespace IronCurtain.View
             root.transform.SetParent(transform, false);
             root.transform.localPosition = new Vector3(0f, _e.Kind == EntityKind.Building ? _topY + 0.9f : 2.7f, 0f);
             _hpRoot = root.transform;
-            // 王者样式:深色背板略大一圈 + 阵营色血条
-            _hpBack = ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w + 0.08f, _h + 0.05f), root.transform, "Back").transform;
-            _hpFill = ViewAssets.DecoQuad(FactionHpMat(), Vector3.zero, new Vector2(_w, _h), root.transform, "Fill").transform;
+            // 王者样式:深色背板略大一圈 + 阵营色血条;建筑条高×2(2026-09-10 制作人拍板)
+            _barH = _e.Kind == EntityKind.Building ? _h * 2f : _h;
+            _hpBack = ViewAssets.DecoQuad(Instantiate(_bk), Vector3.zero, new Vector2(_w + 0.08f, _barH + 0.05f), root.transform, "Back").transform;
+            _hpFill = ViewAssets.DecoQuad(FactionHpMat(), Vector3.zero, new Vector2(_w, _barH), root.transform, "Fill").transform;
             EnsureHpMats();
-            // 每 10 点生命一条竖刻度线(制作人拍板:10 血一格,非百分比;血量不同格数不同)
-            int seg = _e.MaxHp > 0f ? Mathf.Max(1, Mathf.FloorToInt(_e.MaxHp / 10f)) : 1;
+            // 刻度:主将 10 血一格,建筑 40 血一格(制作人拍板,格数随血量非百分比)
+            int per = _e.Kind == EntityKind.Building ? 40 : 10;
+            int seg = _e.MaxHp > 0f ? Mathf.Max(1, Mathf.FloorToInt(_e.MaxHp / per)) : 1;
             Material tickMat = ViewAssets.Flat(new Color(0.08f, 0.09f, 0.11f, 0.9f));
             for (int i = 1; i < seg; i++)
             {
                 float x = -_w * 0.5f + _w * i / seg;
-                ViewAssets.DecoQuad(tickMat, new Vector3(x, 0f, 0.01f), new Vector2(0.035f, _h), root.transform, "Tick" + i);
+                ViewAssets.DecoQuad(tickMat, new Vector3(x, 0f, 0.01f), new Vector2(0.035f, _barH), root.transform, "Tick" + i);
             }
             // 盾条:血条右侧灰色(UpdateShield 驱动长度/位置)
-            _shFill = ViewAssets.DecoQuad(_hpMatShield, Vector3.zero, new Vector2(_w, _h * 0.8f), root.transform, "Shield").transform;
+            _shFill = ViewAssets.DecoQuad(_hpMatShield, Vector3.zero, new Vector2(_w, _barH * 0.8f), root.transform, "Shield").transform;
             _shFill.gameObject.SetActive(false);
         }
 
@@ -526,11 +524,10 @@ namespace IronCurtain.View
         private void AddGlowDisc(Transform parent, float radius, Color? glowColor = null)
         {
             // 2026-09-10 制作人拍板:农药样式阵营环——阵营色细环+超淡同色填充(不再用个体主色)
+            // 2026-09-10 制作人拍板:环细到 1/8;环内填充盘彻底删除(多次反馈)
             Color c = TeamGlowColor();
             Material ringMat = ViewAssets.Mat(c * 0.25f, 0f, 0.6f, c, 1.1f);
-            ViewAssets.DecoRing(ringMat, new Vector3(0f, 0.02f, 0f), radius, radius * 0.06f, parent, "GlowRing");
-            Material fillMat = ViewAssets.Mat(c * 0.12f, 0f, 0.7f, c, 0.16f);
-            ViewAssets.DecoDisc(fillMat, new Vector3(0f, 0.015f, 0f), radius * 1.88f, parent, "GlowDisc");
+            ViewAssets.DecoRing(ringMat, new Vector3(0f, 0.02f, 0f), radius, radius * 0.0075f, parent, "GlowRing");
         }
 
         private void AddFlag(Transform parent, Vector3 pos, float height)

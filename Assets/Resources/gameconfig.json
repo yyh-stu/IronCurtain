@@ -89,7 +89,7 @@
     {
       "Id": 0,
       "Name": "大本营",
-      "MaxHp": 200,
+      "MaxHp": 600,
       "Attack": 0,
       "AttackIntervalSec": 0,
       "SplashDamage": 0,
@@ -106,7 +106,7 @@
     {
       "Id": 1,
       "Name": "兵营",
-      "MaxHp": 80,
+      "MaxHp": 200,
       "Attack": 0,
       "AttackIntervalSec": 0,
       "SplashDamage": 0,
@@ -123,7 +123,7 @@
     {
       "Id": 2,
       "Name": "资源点",
-      "MaxHp": 60,
+      "MaxHp": 200,
       "Attack": 0,
       "AttackIntervalSec": 0,
       "SplashDamage": 0,
@@ -140,7 +140,7 @@
     {
       "Id": 3,
       "Name": "箭塔",
-      "MaxHp": 50,
+      "MaxHp": 200,
       "Attack": 18,
       "AttackIntervalSec": 2.5,
       "SplashDamage": 12,

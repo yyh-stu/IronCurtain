@@ -60,6 +60,8 @@ namespace IronCurtain.View
             if (id == 0) return;
             var b = _model.Sim.GetEntity(id);
             if (b == null) return;
+            // 2026-09-10 制作人目击修复:自家建筑不弹占领/摧毁偏好(偏好=对可进攻据点;与常显标签同过滤)
+            if (b.Side == _model.Player) return;
             var sp = WorldToScreenAbove(b, 2.6f);
             // 已设偏好小标签(第 5 条:未设不可见)
             if (b.Intent != SiegeIntent.None && b.IntentIssuer == _model.Player)
