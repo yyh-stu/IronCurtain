@@ -43,6 +43,9 @@ namespace IronCurtain.View
             var buildingCommands = gameObject.AddComponent<BuildingCommandPanel>();
             buildingCommands.Init(Sim, Side.Blue, selection.SelectedIds);
             selection.SetBuildingCommandPanel(buildingCommands);
+            // 2026-09-10 两阶段 BGM(参考平安京):敌方首建筑被推/占领时切后期曲;音频缺席时自静默
+            var bgm = gameObject.AddComponent<BgmController>();
+            bgm.Init(Sim, Side.Blue);
 #if UNITY_EDITOR
             var inputAudit = gameObject.AddComponent<InputAuditProbe>();
             inputAudit.Init(Sim);
