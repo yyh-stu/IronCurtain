@@ -29,7 +29,9 @@
 - Unity MCP 连接修复（2026-09-09）**已收口**：`D:\DevTools\start-mcp-server.cmd` 的 HTTP 服务正在 `127.0.0.1:8080` 监听；已启用插件公开配置 `MCPForUnity.AutoStartOnLoad=1`（HTTP local scope）。仅触碰本地 MCP 包 `HttpAutoStartHandler.cs` 时间戳的域重载未触发桥接，随后对本次为连接启动且未编辑的 Unity（PID 33964）发送 `CloseMainWindow()` 并确认正常退出（未强杀）；确认没有遗留 Unity 后只重启一个 `D:\DevTools\IronCurtain` 编辑器（PID 32140）。自动连接成功：Editor.log 记录 `Server ready on http://127.0.0.1:8080`、`Session connected`，且 PID 32140 到 127.0.0.1:8080 的 TCP 为 `Established`。未改业务/插件源码，未伪造实机验收。**本会话**的工具清单仍无 Unity MCP，因此若需实际 MCP 工具调用，仍须新开 Codex 任务/会话以在初始化时装载；连接本身已不再需要重开 Unity。
 - 美术：六英雄模型均已生成/绑骨；只有镇岳有三段原始动作，工程让六英雄共用。武器挂接、专属动作和穿模型 MP4 尚未收口；旧管线真实产物不等于 Codex 新适配器已经验证。
 - 建筑 3D 已全链接线（2026-09-10）：四类+四废墟 fbx 入库、BuildingMat_×8 生成、EntityView 换装（材质直挂、Kenney 回退保留）、废墟切换、CaptureBatch 首帧预热修复；294/294（results_v30）。制作人对建筑观感终审待看 `D:/DevTools/shots/m6.2_*.png`。
-- 武器分离件×7+逐风战马已全链完成（2026-09-10 无人值守段）：生成→3D→Blender fbx→WeaponMat_×8→EntityView 手骨挂接+骑乘（LateUpdate 骑姿+行军 bob）；294/294（results_v32）。晨审 `D:/DevTools/shots/lineup_all.png`/`lineup_zhufeng.png`；音频方案已立文档 `docs/音频方案.md` 待拍板；正式骑乘动作（hy-3d-motion）与 AI 随机化仍待。
+- 武器分离件×7+逐风战马已全链完成并通过制作人验收（2026-09-10）；正式骑乘三段动画已接线（RiderAnimator）。
+- **当前架构（v5）**：ZCode 主模型=GLM 5.3（代码全包+日常主编排）；**边看边改类全部归 DeepSeek**（美术总监+Unity 实机 bug 全权，见桌面工作流 v5 与 `docs/team/`）；异构审查=DeepSeek（3 子模块审代码/大模块审架构/首次全局目标审一次）。
+- **换窗待办（2026-09-10 深夜落档）**：①美术线已交割 DeepSeek（交接便签 `D:/DevTools/glm-pipeline/specs/ART-HANDOFF.md`——R1 已完成+URP edit 模式后处理不生效的发现+剩余项）；②大地图=AI 生成局部 tile+代码批量铺（制作人将换窗用 DeepSeek 直接做）；③GLM 侧下一批候选：穿模录屏/骑乘动画打磨/UI 按钮全量铺。
 - 待制作人 Play 终审：M6.1、M6.2、M8.6、M8.7、M6.4a 的画面与手感。
 - 详细设计拍板、事故记录和里程碑证据继续查 `PROJECT_STATE.md`、Git log 与对应专题文档。
 
