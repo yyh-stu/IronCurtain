@@ -90,6 +90,12 @@ namespace IronCurtain.View
                     UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
             if (GUI.Button(new Rect(x + 305f, by, 150f, 34f), "继续观战"))
                 _dismissed = true;
+
+            // BGM 署名(CC-BY 4.0 要求,2026-09-10 定稿曲)
+            var credit = new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.MiddleCenter };
+            credit.normal.textColor = new Color(1f, 1f, 1f, 0.55f);
+            GUI.Label(new Rect(x, y + 344f, 560f, 16f),
+                "Music: Netherplace / Tower Defense / Our Mountain by Eric Matyas (soundimage.org)", credit);
         }
     }
 }

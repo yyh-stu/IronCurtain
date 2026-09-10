@@ -678,12 +678,16 @@ namespace IronCurtain.View
             }
         }
 
-        // ===== 2026-09-10 逐风骑乘:战马模型+上马位移+LateUpdate 骑姿覆盖 =====
+        // ===== 2026-09-10 逐风骑乘:战马模型+骑乘动画三段+行军 bob =====
         private Transform _mountRoot;
         private Transform _upLegL, _upLegR, _lowLegL, _lowLegR;
         private Quaternion _ul0, _ur0, _ll0, _lr0;
         private bool _mounted;
         private float _bobT;
+        // 骑乘专用动画(骑坐/冲锋/前刺,同 state 语义);缺失时退回代码摆腿
+        private static RuntimeAnimatorController _riderCtrl;
+        private static RuntimeAnimatorController RiderCtrl =>
+            _riderCtrl != null ? _riderCtrl : (_riderCtrl = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/RiderAnimator"));
 
         private void MountHorse(GameObject body)
         {
@@ -718,6 +722,12 @@ namespace IronCurtain.View
             body.transform.SetParent(_mountRoot.transform, true);
             body.transform.localPosition = new Vector3(0f, 1.05f, 0f);
             var anim = body.GetComponent<Animator>();
+            // 骑乘动画三段接管(骑坐/冲锋/前刺);controller 缺席时退回代码摆腿兜底
+            if (anim != null && RiderCtrl != null)
+            {
+                anim.runtimeAnimatorController = RiderCtrl;
+                return;
+            }
             if (anim != null)
             {
                 _upLegL = anim.GetBoneTransform(HumanBodyBones.LeftUpperLeg);
