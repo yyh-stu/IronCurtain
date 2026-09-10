@@ -12,6 +12,8 @@ namespace IronCurtain.EditorTools
     //   Unity.exe -batchmode -quit -projectPath <proj> -executeMethod IronCurtain.EditorTools.CaptureBatch.Run
     // 原理:edit 模式下反射调用 GameBootstrap.Awake 建全场景(Sim/相机/棋盘),
     // 手动步进 Sim 到 10/30/60/120s,相机按位 Camera.Render 到 RenderTexture 存 PNG。
+    // M3-S03: 环境变量 IC_SEQ=1 启用序列模式——同一机位连截 3 帧(间隔约 0.33s 游戏时间),
+    // 用于捕捉静态截图不可见的动态错位/漂移缺陷。不设 IC_SEQ 时行为与旧版完全一致。
     public static class CaptureBatch
     {
         private static readonly double[] Marks = { 10, 30, 60, 120 };
@@ -40,6 +42,11 @@ namespace IronCurtain.EditorTools
             var cam = Camera.main;
             var fogView = Object.FindFirstObjectByType<FogView>();
             var floatText = Object.FindFirstObjectByType<FloatingTextView>();
+
+            // M3-S03: 序列模式开关(环境变量 IC_SEQ=1);默认关闭,零侵入
+            bool seqMode = System.Environment.GetEnvironmentVariable("IC_SEQ") == "1";
+            // 序列帧间隔约 0.33s 游戏时间,按 TickRate 换算 tick 数(至少 1 tick)
+            int seqTicks = System.Math.Max(1, (int)(0.33 * boot.Sim.Config.TickRate));
 
             // 首帧预热:edit 模式下第一次 Camera.Render() 会产出纯色废帧(URP shader 未就绪,
             // 实测 t10 全屏 (92,195,255) 纯青),先渲染一帧弃用
@@ -83,11 +90,31 @@ namespace IronCurtain.EditorTools
                 string path = string.Format("D:/DevTools/shots/m6.2_{0}_t{1}s.png", i + 1, (int)Marks[i]);
                 SaveRender(cam, path);
                 Debug.Log("[CaptureBatch] " + path + " simTick=" + boot.Sim.Tick + " focus=" + (focus?.ToString() ?? "fixed")
-                    + " floatTexts=" + (floatText != null ? floatText.ActiveCount.ToString() : "n/a"));
+                    + " floatTexts=" + (floatText != null ? floatText.ActiveCount.ToString() : "n/a")
+                    + (seqMode ? " seqMode=1" : ""));
+
+                // M3-S03: 序列模式——主截图后同机位再截 _s2/_s3 两帧。
+                // 相机位置/朝向不动(不复算 focus),仅步进 Sim 让画面内容演进,保证像素级可比。
+                if (seqMode)
+                {
+                    for (int s = 2; s <= 3; s++)
+                    {
+                        for (int t = 0; t < seqTicks; t++) boot.Sim.Step();
+                        boot.Board.TickViews();
+                        if (fogView != null) fogView.RefreshNow();
+                        foreach (var v in Object.FindObjectsOfType<EntityView>())
+                            v.Tick(0.1f, cam);
+                        if (floatText != null) floatText.RenderFrame(0.1f);
+
+                        string seqPath = string.Format("D:/DevTools/shots/m6.2_{0}_t{1}s_s{2}.png", i + 1, (int)Marks[i], s);
+                        SaveRender(cam, seqPath);
+                        Debug.Log("[CaptureBatch] " + seqPath + " simTick=" + boot.Sim.Tick);
+                    }
+                }
             }
 
             Object.DestroyImmediate(go);
-            Debug.Log("[CaptureBatch] done");
+            Debug.Log("[CaptureBatch] done" + (seqMode ? " (seq)" : ""));
         }
 
         /// <summary>找当前交战点(Attacking 单位;主将优先,其次士兵);无交战返回 null。</summary>
