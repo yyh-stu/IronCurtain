@@ -46,6 +46,8 @@ namespace IronCurtain.View
             // 2026-09-10 两阶段 BGM(参考平安京):敌方首建筑被推/占领时切后期曲;音频缺席时自静默
             var bgm = gameObject.AddComponent<BgmController>();
             bgm.Init(Sim, Side.Blue);
+            var audio = gameObject.AddComponent<AudioSystem>(); // M3-S01 SFX 框架(事件驱动+对象池)
+            audio.Init(Sim);
 #if UNITY_EDITOR
             var inputAudit = gameObject.AddComponent<InputAuditProbe>();
             inputAudit.Init(Sim);

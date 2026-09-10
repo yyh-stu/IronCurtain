@@ -180,6 +180,12 @@ namespace IronCurtain.Sim
         public void AddEventListener(Action<SimEvent> listener) => _listeners.Add(listener);
         public void ClearEventListeners() => _listeners.Clear();
 
+        // 2026-09-10 公共接口加法扩展(主编排授权):AudioSystem OnDisable 防域重载重复注册
+        public void RemoveEventListener(System.Action<SimEvent> listener)
+        {
+            if (listener != null) _listeners.Remove(listener);
+        }
+
         // ===== 经济与生产挂钩(M2;M8.4b 人口→名额制)=====
 
         /// <summary>生成建筑实体(归属方 owner)。中立建筑无血量;已方建筑按配置填数值。</summary>
