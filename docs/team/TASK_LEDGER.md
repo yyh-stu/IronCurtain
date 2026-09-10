@@ -7,7 +7,7 @@
 ```powershell
 python D:\DevTools\glm-pipeline\record_task.py `
   --task-id M6.5-01 `
-  --model gpt-5.6-terra `
+  --model glm-5.3 `
   --manifest D:\DevTools\glm-pipeline\staging\M6.5-01\manifest.json `
   --review D:\DevTools\glm-pipeline\reviews\M6.5-01.md `
   --stop-reason end_turn `
