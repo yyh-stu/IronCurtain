@@ -191,6 +191,17 @@ namespace IronCurtain.View
             return go;
         }
 
+        // 圆环(平躺;2026-09-10 王者荣耀式阵营环光环)
+        public static GameObject DecoRing(Material mat, Vector3 lpos, float radius, float width, Transform parent, string name = "decoRing")
+        {
+            var v = new List<Vector3>(); var t = new List<int>();
+            AddRing(v, t, Vector3.zero, radius * 0.5f, width * 0.5f, 32);
+            var mesh = CreateMesh(new List<Vector3>[] { v }, new List<int>[] { t });
+            var go = AttachMesh(name, parent, mesh, new Material[] { mat });
+            go.transform.localPosition = lpos;
+            return go;
+        }
+
         public static GameObject DecoQuad(Material mat, Vector3 lpos, Vector2 size, Transform parent, string name = "decoQ")
         {
             if (_quadMesh == null)
