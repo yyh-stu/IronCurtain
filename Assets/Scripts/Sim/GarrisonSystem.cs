@@ -19,6 +19,7 @@ namespace IronCurtain.Sim
             if (!sim.Entities.ContainsKey(buildingId)) { error = "建筑不存在"; return false; }
             var b = sim.GetEntity(buildingId);
             var cfg = sim.BuildingConfigOf(b.Building.Value);
+            if (b.IsFort) { error = "堡垒不可驻军(2026-09-11 制作人:只可摧毁,持续攻击)"; return false; } // 堡垒豁免在配置读取前
             if (cfg.GarrisonFormal <= 0) { error = "该建筑不可驻军"; return false; }
             var accepted = new List<int>();
             foreach (var id in unitIds)
@@ -47,7 +48,8 @@ namespace IronCurtain.Sim
             error = null;
             if (!sim.Entities.ContainsKey(buildingId)) { error = "建筑不存在"; return false; }
             var b = sim.GetEntity(buildingId);
-            int cap = b.IsFort ? 3 : (b.Building == null ? 0 : sim.BuildingConfigOf(b.Building.Value).GarrisonTemp); // 堡垒驻军上限 3(D32)
+            if (b.IsFort) { error = "堡垒不可驻军(2026-09-11 制作人裁决)"; return false; } // 堡垒=只可摧毁的临时工事
+            int cap = b.Building == null ? 0 : sim.BuildingConfigOf(b.Building.Value).GarrisonTemp;
             if (cap <= 0) { error = "该建筑不可临时驻军"; return false; }
             var accepted = new List<int>();
             foreach (var id in unitIds)
@@ -238,7 +240,8 @@ namespace IronCurtain.Sim
                 if (b.Sealed) continue; // 封城期间不转
                 // 敌方攻城意图存续期间不转:临时驻军受保护,防止"转正后被交换杀死"
                 if (b.Intent != SiegeIntent.None && b.IntentIssuer != b.Side) continue;
-                int cap = b.IsFort ? 3 : (b.Building == null ? 0 : sim.BuildingConfigOf(b.Building.Value).GarrisonFormal);
+                if (b.IsFort) continue; // 堡垒不可驻军(2026-09-11),无转正一说
+                int cap = b.Building == null ? 0 : sim.BuildingConfigOf(b.Building.Value).GarrisonFormal;
                 while (b.GarrisonTemp.Count > 0 && b.GarrisonFormal.Count < cap)
                 {
                     var id = b.GarrisonTemp[0];

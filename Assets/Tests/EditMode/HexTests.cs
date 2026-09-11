@@ -151,22 +151,22 @@ public class HexTests
         Assert.AreEqual(HexUseError.None, HexSystem.TryUseHeld(sim, Side.Blue, HexId.IronWall), "激活铁壁防线");
         var fort = sim.Entities.Values.FirstOrDefault(e => e.Side == Side.Blue && e.Kind == EntityKind.Building && e.IsFort);
         Assert.IsNotNull(fort, "激活后应生成堡垒");
-        Assert.AreEqual(sim.Game.Tools.FortHp, fort.MaxHp, 0.01, "堡垒应为 30 血");
+        Assert.AreEqual(100f, fort.MaxHp, 0.01, "堡垒应为 100 血(2026-09-11 制作人裁决)");
 
-        var enemy = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(fort.Pos.Row + 0, fort.Pos.Col + 1));
+        var enemy = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(fort.Pos.Row + 0, fort.Pos.Col + 1)); // 堡垒为临时工事不受即时占领(2026-09-11),恢复 1 格贴身
         enemy.Hp = enemy.MaxHp = 100f;
         float hp0 = enemy.Hp;
         Advance(30); // 3 秒
         Assert.Less(enemy.Hp, hp0, "3 秒后 2 格内敌单位应受到堡垒伤害");
         Assert.AreEqual(hp0 - 15, enemy.Hp, 0.01, "应恰好受到 15 伤害");
 
+        // 2026-09-11 制作人裁决:堡垒不可驻军(只可摧毁,持续攻击,100 血)——驻军路径改为拒绝验证
         var unit = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(0, 0));
-        fort.GarrisonTemp.Add(unit.Id);
-        unit.GarrisonBuildingId = fort.Id;
+        string garrisonError;
+        Assert.IsFalse(GarrisonSystem.EnterTemp(sim, new[] { unit.Id }, fort.Id, out garrisonError), "堡垒应拒绝临时驻军");
+        Assert.AreEqual("堡垒不可驻军(2026-09-11 制作人裁决)", garrisonError);
         Advance(300); // 共 30 秒+,堡垒到期
         Assert.IsFalse(sim.Entities.ContainsKey(fort.Id), "30 秒后堡垒应消失");
-        Assert.AreEqual(0, unit.GarrisonBuildingId, "驻军应离城");
-        Assert.AreEqual(EntityState.Idle, unit.State, "离城单位应为 Idle");
     }
 
     [Test]

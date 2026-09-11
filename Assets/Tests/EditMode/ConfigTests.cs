@@ -93,7 +93,7 @@ public class ConfigTests
     {
         var c = Load();
         Assert.AreEqual(15.0, c.Tools.RamDamage);
-        Assert.AreEqual(30, c.Tools.FortHp);
+        Assert.AreEqual(100, c.Tools.FortHp); // 2026-09-11 制作人:堡垒 100 血
         Assert.AreEqual(3, c.Tools.FortGarrison);
         Assert.AreEqual(30.0, c.Tools.FortDurationSeconds);
         Assert.AreEqual(2.0, c.TowerGarrison.AttackPerGarrison);

@@ -136,17 +136,18 @@ public class VisionTests
         tower.Hp = 50f;
         var red = MakeUnit(Side.Red, HeroId.PanShi, 15, 116);
         sim.Step();
-        Assert.IsTrue(VisionSystem.IsBuildingKnown(sim, Side.Red, tower.Id), "红近战距塔 2 格,应揭示蓝塔");
-        Assert.AreEqual(50f, VisionSystem.LastKnownHp(sim, Side.Red, tower.Id).Value, 0.01f, "应记录当前血量 50");
+        // 2026-09-11 制作人裁决:敌军贴建筑即时占领 → 红方贴塔 2 格,塔已易主为红方
+        Assert.AreEqual(Side.Red, tower.Side, "贴身即占领(新规则)");
+        Assert.IsTrue(VisionSystem.IsBuildingKnown(sim, Side.Red, tower.Id), "红方对(已占领的)塔持续已知");
 
         sim.SetMoveTarget(red.Id, new GridPos(15, 136));
         Run(50);
         Assert.IsTrue(VisionSystem.IsBuildingKnown(sim, Side.Red, tower.Id), "过期后据点冻结,仍为已知");
-        Assert.AreEqual(50f, VisionSystem.LastKnownHp(sim, Side.Red, tower.Id).Value, 0.01f, "冻结在最后时刻血量");
 
         tower.Hp = 40f;
         sim.Step();
-        Assert.AreEqual(50f, VisionSystem.LastKnownHp(sim, Side.Red, tower.Id).Value, 0.01f, "无红方视野,冻结值不随实际血量变化");
+        // 塔已是红方自家:自家建筑始终已知,快照跟随实际值(即时占领后的语义)
+        Assert.AreEqual(40f, VisionSystem.LastKnownHp(sim, Side.Red, tower.Id).Value, 0.01f, "自家建筑快照随实值");
     }
 
     [Test]

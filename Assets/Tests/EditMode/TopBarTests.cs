@@ -57,8 +57,8 @@ public class TopBarTests
     public void T3_PopText()
     {
         Assert.AreEqual("将 0/" + sim.PopulationCapOf(Side.Blue), TopBarModel.PopText(sim, Side.Blue));
-        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 15, Col = 40 });
-        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 16, Col = 42 });
+        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 80, Col = 40 });
+        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 81, Col = 42 });
         Assert.AreEqual("将 2/" + sim.PopulationCapOf(Side.Blue), TopBarModel.PopText(sim, Side.Blue));
     }
 
@@ -126,18 +126,18 @@ public class TopBarTests
     [Test]
     public void T5_EnemyBaseSnapshot_Unknown()
     {
-        SpawnBuilding(Side.Blue, BuildingId.Base, 15, 20);
-        SpawnBuilding(Side.Red, BuildingId.Base, 15, 260); // 远离蓝视野
+        SpawnBuilding(Side.Blue, BuildingId.Base, 80, 20);
+        SpawnBuilding(Side.Red, BuildingId.Base, 80, 250); // 远离蓝视野
         Assert.IsNull(TopBarModel.EnemyBaseSnapshot(sim, Side.Blue, Side.Red));
     }
 
     [Test]
     public void T5b_EnemyBaseSnapshot_Known()
     {
-        SpawnBuilding(Side.Blue, BuildingId.Base, 15, 20);
-        var redBase = SpawnBuilding(Side.Red, BuildingId.Base, 15, 260);
+        SpawnBuilding(Side.Blue, BuildingId.Base, 80, 20);
+        var redBase = SpawnBuilding(Side.Red, BuildingId.Base, 80, 250);
         redBase.Hp = 777f;
-        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 15, Col = 258 }); // 紧贴红基地
+        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 80, Col = 248 }); // 紧贴红基地
         VisionSystem.Tick(sim, 0.1f);
         var s = TopBarModel.EnemyBaseSnapshot(sim, Side.Blue, Side.Red);
         Assert.IsNotNull(s);

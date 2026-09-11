@@ -80,6 +80,26 @@ namespace IronCurtain.Sim
                     MarkDisc(st, sim.Tick, cell, 0, false);
             }
 
+            // ---- 2.5) 城墙视野(2026-09-11 三路地图):完好段"墙外 10 米"条带 ----
+            // 沿段弧线采样(每 2 米一点,半径 R+5 处向外 10 米条带),不做椭圆过滤(与建筑盘一致)。
+            var wc = WallSystem.BaseCenter(side);
+            for (int lane = 0; lane < 3; lane++)
+            {
+                if (WallSystem.IsBroken(side, lane)) continue;
+                float a0 = WallSystem.LaneAngleOf(side, lane) - 26.6f / WallSystem.Radius;
+                float a1 = WallSystem.LaneAngleOf(side, lane) + 26.6f / WallSystem.Radius;
+                for (float a = a0; a <= a1; a += 2f / WallSystem.Radius)
+                {
+                    for (float rr = WallSystem.Radius - WallSystem.WallHalf; rr <= WallSystem.Radius + WallSystem.VisionRadius; rr += 4f)
+                    {
+                        int row = (int)(wc.Y + rr * System.Math.Sin(a));
+                        int col = (int)(wc.X + rr * System.Math.Cos(a));
+                        if (row < 0 || row >= Rows || col < 0 || col >= Cols) continue;
+                        st.LastSeen[row * 1000L + col] = sim.Tick;
+                    }
+                }
+            }
+
             // ---- 3) 视野精灵 ----
             TickSprite(sim, side, st);
 

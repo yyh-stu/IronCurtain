@@ -467,7 +467,7 @@
   },
   "Tools": {
     "RamDamage": 15.0,
-    "FortHp": 30,
+    "FortHp": 100,
     "FortGarrison": 3,
     "FortDurationSeconds": 30
   },

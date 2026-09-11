@@ -94,7 +94,9 @@ namespace IronCurtain.Sim
 
             float spd = e.MoveSpeed * TerrainMap.MoveFactor(e.PosF);
             float step = System.Math.Min(spd * dt, SimVec2.Distance(e.PosF, goal));
-            e.PosF = TerrainMap.ClampToEllipse(e.PosF + (goal - e.PosF).Normalized() * step);
+            var nextF = TerrainMap.ClampToEllipse(e.PosF + (goal - e.PosF).Normalized() * step);
+            // 三路城墙(2026-09-11):敌方完好段不可穿(自家走门洞);被挡则停留原位等待
+            e.PosF = WallSystem.CanPass(e.Side, nextF) ? nextF : e.PosF;
             // 建筑推出(与主将路径同语义,士兵不得穿墙)
             foreach (var b in sim.Entities.Values)
                 if (b.Kind == EntityKind.Building && !b.Rubbled && BuildingFootprint.Contains(b, e.PosF))

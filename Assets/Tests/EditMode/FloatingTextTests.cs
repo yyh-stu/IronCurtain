@@ -27,7 +27,7 @@ public class FloatingTextTests
     [Test]
     public void T1_OwnUnit_TryAdd()
     {
-        var u = SpawnUnit(Side.Blue, 15, 60);
+        var u = SpawnUnit(Side.Blue, 80, 60);
         Assert.IsTrue(_model.TryAdd(sim, Side.Blue, u.Id, 12.4f));
         Assert.AreEqual(1, _model.Items.Count);
         Assert.AreEqual("-12", _model.Items[0].Text);
@@ -37,7 +37,7 @@ public class FloatingTextTests
     [Test]
     public void T2_Rounding()
     {
-        var u = SpawnUnit(Side.Blue, 15, 60);
+        var u = SpawnUnit(Side.Blue, 80, 60);
         Assert.IsTrue(_model.TryAdd(sim, Side.Blue, u.Id, 12.5f));
         Assert.AreEqual("-13", _model.Items[0].Text);
         _model.Items.Clear();
@@ -48,7 +48,7 @@ public class FloatingTextTests
     [Test]
     public void T3_EnemyInvisible_TryAddFalse()
     {
-        var u = SpawnUnit(Side.Red, 15, 200); // 远离蓝视野
+        var u = SpawnUnit(Side.Red, 80, 200); // 远离蓝视野(红方腹地)
         Assert.IsFalse(_model.TryAdd(sim, Side.Blue, u.Id, 10f));
         Assert.AreEqual(0, _model.Items.Count);
     }
@@ -56,8 +56,8 @@ public class FloatingTextTests
     [Test]
     public void T4_EnemyVisible_TryAddTrue()
     {
-        SpawnUnit(Side.Blue, 15, 60);
-        var r = SpawnUnit(Side.Red, 15, 62); // 2 米内
+        SpawnUnit(Side.Blue, 80, 60);
+        var r = SpawnUnit(Side.Red, 80, 62); // 2 米内
         VisionSystem.Tick(sim, 0.1f);
         Assert.IsTrue(_model.TryAdd(sim, Side.Blue, r.Id, 10f));
         Assert.AreEqual(1, _model.Items[0].ColorKind);
@@ -66,9 +66,9 @@ public class FloatingTextTests
     [Test]
     public void T5_BuildingFogGate()
     {
-        var tower = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos { Row = 15, Col = 220 });
+        var tower = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos { Row = 80, Col = 220 });
         Assert.IsFalse(_model.TryAdd(sim, Side.Blue, tower.Id, 10f)); // 未知建筑
-        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 15, Col = 218 }); // 紧贴
+        sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos { Row = 80, Col = 218 }); // 紧贴
         VisionSystem.Tick(sim, 0.1f);
         Assert.IsTrue(_model.TryAdd(sim, Side.Blue, tower.Id, 10f));
     }
@@ -76,7 +76,7 @@ public class FloatingTextTests
     [Test]
     public void T6_Advance()
     {
-        var u = SpawnUnit(Side.Blue, 15, 60);
+        var u = SpawnUnit(Side.Blue, 80, 60);
         _model.TryAdd(sim, Side.Blue, u.Id, 10f);
         _model.Advance(0.7f);
         Assert.AreEqual(1, _model.Items.Count); // Age==Life 边界未超
@@ -87,7 +87,7 @@ public class FloatingTextTests
     [Test]
     public void T7_MaxActive()
     {
-        var u = SpawnUnit(Side.Blue, 15, 60);
+        var u = SpawnUnit(Side.Blue, 80, 60);
         int added = 0;
         for (int i = 0; i < 45; i++)
             if (_model.TryAdd(sim, Side.Blue, u.Id, i)) added++;
@@ -99,7 +99,7 @@ public class FloatingTextTests
     [Test]
     public void T8_DeadEntity()
     {
-        var u = SpawnUnit(Side.Blue, 15, 60);
+        var u = SpawnUnit(Side.Blue, 80, 60);
         u.State = EntityState.Dead;
         Assert.IsFalse(_model.TryAdd(sim, Side.Blue, u.Id, 10f));
     }

@@ -29,6 +29,22 @@ namespace IronCurtain.View
         public void HandleWorldClick(int generalId, bool hasGroundPoint, SimVec2 point)
         {
             if (_toolPanel != null && _toolPanel.TryHandleWorldClick(hasGroundPoint, point)) return;
+            // 2026-09-11 制作人裁决:框选军队点敌方城墙=拆墙(不走摧毁/占领意图)。
+            // 墙非实体,在此直接识别:选中主将 + 点击处是敌方完好墙段 → 行军至墙,推进逻辑自动拆。
+            if (hasGroundPoint && _selected.Count > 0 && WallSystem.HitEnemyWall(_sim, _player, point))
+            {
+                var wallPt = WallSystem.NearestWallPoint(_player, point);
+                foreach (int id in _selected)
+                {
+                    var g = _sim.GetEntity(id);
+                    if (g == null || g.IsSoldier || g.Kind != EntityKind.Unit || g.Side != _player) continue;
+                    _sim.SetMoveTarget(id, new GridPos((int)wallPt.Y, (int)wallPt.X), true);
+                }
+#if UNITY_EDITOR
+                InputAudit.Log("wall_breach_order at=" + wallPt);
+#endif
+                return;
+            }
             int buildingId = _buildingPanel != null && hasGroundPoint
                 ? BuildingCommandModel.PickVisibleBuilding(_sim, _player, point)
                 : 0;

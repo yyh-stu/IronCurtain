@@ -100,8 +100,9 @@ namespace IronCurtain.View
 
             bool neutral = b.Side == Side.Neutral;
             bool isBase = b.Building == BuildingId.Base;
-            bool capture = !isBase;
+            bool capture = !isBase && !b.IsFort;   // 堡垒只可摧毁(2026-09-11 制作人)
             bool destroy = !neutral;
+            if (b.IsFort && b.Side == _player) { capture = false; destroy = false; } // 己方堡垒:无需下令(临时工事,敌人来打它)
             if (!capture && !destroy)
                 return new BuildingCommandInfo(true, true, b.Id, title,
                     "当前建筑没有可用命令", generals, false, false, false, 0);

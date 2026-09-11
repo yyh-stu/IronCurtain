@@ -50,11 +50,11 @@ public class MinimapFogTests
     public void 镜头焦点钳制_边界与内部()
     {
         Assert.AreEqual(6f, MinimapLayout.ClampFocusX(-5f));
-        Assert.AreEqual(280f, MinimapLayout.ClampFocusX(999f));
+        Assert.AreEqual(264f, MinimapLayout.ClampFocusX(999f));
         Assert.AreEqual(150f, MinimapLayout.ClampFocusX(150f));
         Assert.AreEqual(6f, MinimapLayout.ClampFocusY(-5f));
-        Assert.AreEqual(24f, MinimapLayout.ClampFocusY(999f));
-        Assert.AreEqual(15f, MinimapLayout.ClampFocusY(15f));
+        Assert.AreEqual(154f, MinimapLayout.ClampFocusY(999f));
+        Assert.AreEqual(80f, MinimapLayout.ClampFocusY(80f));
     }
 
     [Test]

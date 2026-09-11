@@ -62,8 +62,9 @@ namespace IronCurtain.Sim
         private readonly Dictionary<Side, float> _epAccum = new Dictionary<Side, float>();
         private readonly Dictionary<Side, GridPos> _rally = new Dictionary<Side, GridPos>
         {
-            { Side.Blue, new GridPos(15, 270) },
-            { Side.Red, new GridPos(15, 16) },
+            // 三路地图(2026-09-11):默认集结点=中路前线桥西/东桥头(己方一侧)
+            { Side.Blue, new GridPos(80, 128) },
+            { Side.Red, new GridPos(80, 141) },
         };
 
         private readonly Dictionary<int, Entity> _entities = new Dictionary<int, Entity>();
@@ -169,6 +170,7 @@ namespace IronCurtain.Sim
             TowerCombatSystem.Tick(this, 1f / Config.TickRate);
             GarrisonSystem.Tick(this, 1f / Config.TickRate);
             DestroySystem.Tick(this, 1f / Config.TickRate);
+            InstantCaptureSystem.Tick(this, 1f / Config.TickRate); // 2026-09-11 制作人裁决:敌军贴建筑即占领(无交换)
             MatchClockSystem.Tick(this, 1f / Config.TickRate); // 对局时钟(M6.4a):时限/加时/积分判定
             HexSystem.Tick(this, 1f / Config.TickRate);
             VisionSystem.Tick(this, 1f / Config.TickRate);
@@ -330,7 +332,9 @@ namespace IronCurtain.Sim
                 delta = target - e.PosF;
                 float dist = delta.Magnitude;
                 float step = System.Math.Min(spd * perTick, dist);
-                e.PosF = TerrainMap.ClampToEllipse(e.PosF + delta.Normalized() * step);
+                var nextPos = TerrainMap.ClampToEllipse(e.PosF + delta.Normalized() * step);
+                // 三路城墙(2026-09-11):敌方完好段不可穿;被挡则原地等待(绕行/门洞由行为层收敛)
+                e.PosF = WallSystem.CanPass(e.Side, nextPos) ? nextPos : e.PosF;
                 PushOutOfBuildings(e);
                 e.PosF = TerrainMap.ClampToEllipse(e.PosF);
                 e.Pos = e.PosF.ToGrid();
@@ -447,7 +451,28 @@ namespace IronCurtain.Sim
                 Entity target = FindNearestEnemy(e, e.State == EntityState.Routing ? 1.4f : float.MaxValue);
                 if (target == null)
                 {
-                    if (e.State == EntityState.Attacking) e.State = EntityState.Idle;
+                    // 2026-09-11 制作人裁决:推进遇墙就拆——顶在敌方完好墙段上且冷却好 → 打墙
+                    if (WallSystem.BlockedByWall(e))
+                    {
+                        e.State = EntityState.Attacking;
+                        if (e.AttackCooldown <= 0f)
+                        {
+                            e.AttackCooldown = e.AttackIntervalSec * e.Status.AttackIntervalMultiplier;
+                            float wallDmg = e.Attack * (1f + e.Status.AttackBonus);
+                            // 2026-09-11 屏障特效:墙段事件(涟漪/击碎表现由 View 监听;加法式,参考 AttackerId 先例)
+                            var wallHit = WallSystem.HitEnemyPanel(e, e.PosF);
+                            if (wallHit != null)
+                            {
+                                int ws = (int)wallHit.Value.Owner;
+                                bool broke = WallSystem.Damage(wallHit.Value.Owner, wallHit.Value.Panel, wallDmg);
+                                Emit(new SimEvent(Tick, SimEventType.WallDamaged, wallHit.Value.Panel, wallDmg, e.Id, ws, e.PosF));
+                                if (broke)
+                                    Emit(new SimEvent(Tick, SimEventType.WallBroken, wallHit.Value.Panel, 0f, e.Id, ws));
+                            }
+                            Emit(new SimEvent(Tick, SimEventType.DamageDealt, e.Id, wallDmg, e.Id));
+                        }
+                    }
+                    else if (e.State == EntityState.Attacking) e.State = EntityState.Idle;
                     continue;
                 }
 

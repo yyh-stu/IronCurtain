@@ -7,6 +7,7 @@ namespace IronCurtain.Sim
         public static void Tick(SimCore sim, float dt)
         {
             var cleared = new List<int>();
+            var fortGone = new List<int>();
             foreach (var kv in sim.Entities)
             {
                 var e = kv.Value;
@@ -41,7 +42,10 @@ namespace IronCurtain.Sim
                 // 优先级 D26:射程内存在敌军单位 → 本 tick 不拆塔
                 if (EnemyInRange(sim, e)) continue;
 
-                // 攻击循环(冷却共享)
+                // 攻击循环(冷却共享)。兜底:AttackIntervalSec<=0 的单位(裸构造/配置缺失)
+                // 会让 AttackCooldown += 0 永不出循环 —— 2026-09-11 实测踩死过两轮测试,
+                // 属历史设计假定"单位必来自配置"的漏洞,这里直接挡掉。
+                if (e.AttackIntervalSec <= 0f) continue;
                 while (e.AttackCooldown <= 0f)
                 {
                     float dmg = (float)Rate(sim, e) * e.AttackIntervalSec;
@@ -61,6 +65,16 @@ namespace IronCurtain.Sim
                             b.Hp = 0f;
                             sim.SetWinner(e.Side);
                         }
+                        else if (b.IsFort)
+                        {
+                            // 2026-09-11 制作人:堡垒=某方放的临时防御工事,只有敌方会打它;
+                            // 被打掉应当**直接消失**,不留废墟(非可重建资产)。
+                            // 只有敌方打得动:己方摧毁令在 SiegeSystem.ValidateIntent 就被拒。
+                            // 注意:此处仍在 foreach (sim.Entities) 内,不能直接移除,循环后统一处理。
+                            b.Hp = 0f;
+                            fortGone.Add(b.Id);
+                            cleared.Add(b.Id);
+                        }
                         else
                         {
                             b.Rubbled = true;
@@ -75,6 +89,15 @@ namespace IronCurtain.Sim
                         break;
                     }
                 }
+            }
+
+            foreach (int fid in fortGone)
+            {
+                var b = sim.GetEntity(fid);
+                if (b == null) continue;
+                b.GarrisonFormal.Clear();
+                b.GarrisonTemp.Clear();
+                sim.RemoveEntity(fid);
             }
 
             if (cleared.Count > 0)
