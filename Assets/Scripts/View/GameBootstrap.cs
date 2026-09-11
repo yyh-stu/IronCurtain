@@ -22,7 +22,7 @@ namespace IronCurtain.View
         {
             if (Sim != null) return; // 域重载防护:已初始化则跳过
             var cfg = GameConfigParser.FromJson(Resources.Load<TextAsset>("gameconfig").text);
-            Sim = MatchSetup.Build(cfg, null, AiTier.Normal);
+            Sim = MatchSetup.Build(cfg, null, AiTier.Hard);
 
             CreateCamera();
             _rig = Cam.gameObject.AddComponent<CameraRig>();
@@ -30,6 +30,7 @@ namespace IronCurtain.View
             CreateLighting();
             CreatePostProcess();
 
+            AiSystem.LogHook = msg => Debug.Log(msg);   // AI 心跳日志(Sim 不引 UnityEngine,View 层转发)
             var boardGo = new GameObject("Board");
             boardGo.transform.SetParent(transform, false);
             Board = boardGo.AddComponent<BoardView>();

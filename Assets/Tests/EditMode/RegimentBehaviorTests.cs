@@ -147,7 +147,7 @@ namespace IronCurtain.Tests
             var home = sim.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(15, 30));
             home.Prod = new ProductionSet();
             sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 250));
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
 
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 100));
             var soldiers = SoldiersOf(sim, g.Id);

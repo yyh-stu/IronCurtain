@@ -4,40 +4,75 @@ using System.Linq;
 
 namespace IronCurtain.Sim
 {
-    public enum AiTier { Simple, Normal }
+    public enum AiTier { Simple, Hard }   // 2026-09-12 制作人两档:简单/困难(Normal 并入 Hard)
 
+    /// <summary>
+    /// AI(2026-09-12 制作人定稿·两档同一战术骨架):
+    /// 共用脚本(制作人方案)——立足(占前线驻防)→攻势(集结推一路,必含重装/战士/射手)→
+    /// 收复(失地优先:停攻分散夺回,全部收复再继续攻)。
+    /// 档位差异仅三点:
+    /// - 简单:不抽卡不海克斯不升级;驻防=前线每城1兵团+本方草坪箭塔2座各1兵团;**其余兵团只攻不防**
+    ///   (无回防/威胁响应/受挫撤退),有多少攻多少(波次不限4将);
+    /// - 困难:抽卡+海克斯+升级;驻防=前线每城2兵团(站稳脚跟);保留回防/威胁响应/受挫撤退;波次≤4将集结。
+    /// 补兵两档都做(战斗力核心机制)。
+    /// 防卡死五道保险(制作人担心点):①集结/阶段超时强制推进(40s);②驻防将可被波次抽走(非死锁资源);
+    /// ③收复失败>2次的失地跳过标记;④一切等待有 else 出口;⑤心跳日志(LogHook,View 层订阅转 Debug.Log,
+    /// Sim 不引 UnityEngine)。
+    /// </summary>
     public static class AiSystem
     {
         const int DecisionInterval = 20;
-        const int ReinforceInterval = 50;     // M8.5b:AI 自动补兵评估间隔(5s)
-        const int ReinforcePoolThreshold = 10; // 池 ≥10 才放,避免碎补
+        const int ReinforceInterval = 50;      // M8.5b:AI 自动补兵评估间隔(5s)——两档共用(战斗力核心)
+        const int ReinforcePoolThreshold = 10;
+        const int PhaseTimeoutTicks = 400;     // 保险①:阶段/集结超时(40s)强制推进
+        const float GuardRadiusF = 7f;         // 驻防将留守半径(城旁多少米算驻防)
+        const int RetakeFailLimit = 2;         // 保险③:同一失地夺回失败上限,超过跳过标记
+
+        /// <summary>心跳/决策日志钩子(View 层订阅转 Debug.Log;Sim 层禁 UnityEngine)。</summary>
+        public static Action<string> LogHook;
+
+        enum AiPhase { Establish, Offensive, Reclaim }
+
+        sealed class Wave
+        {
+            public int TargetId;
+            public int StartCount;
+            public List<int> Units = new List<int>();
+            public bool IsRetake;
+        }
 
         class AiState
         {
             public Side Side;
             public AiTier Tier;
-            public bool WaveActive;
-            public int WaveStartCount;
-            public List<int> WaveUnits = new List<int>();
-            public int NextLane;            // 2026-09-11 三路分推:波次目标路 0上/1中/2下,成功发波后轮转
-            public readonly System.Collections.Generic.Dictionary<int, float> BuildingHp
-                = new System.Collections.Generic.Dictionary<int, float>();          // 威胁判定:城血快照
-            public readonly System.Collections.Generic.Dictionary<int, long> DefendCooldown
-                = new System.Collections.Generic.Dictionary<int, long>();           // 威胁响应城级冷却
+            public AiPhase Phase = AiPhase.Establish;
+            public long PhaseSince;
+            public readonly List<Wave> Waves = new List<Wave>();
+            public readonly HashSet<int> LostIds = new HashSet<int>();       // 失地(被夺走的原己方城)
+            public readonly HashSet<int> SkipRetake = new HashSet<int>();    // 夺回失败超限,跳过
+            public readonly Dictionary<int, int> RetakeFails = new Dictionary<int, int>();
+            public readonly HashSet<int> OwnedSet = new HashSet<int>();      // 立足完成时的地盘快照
+            public readonly Dictionary<int, float> BuildingHp = new Dictionary<int, float>();
+            public readonly Dictionary<int, long> DefendCooldown = new Dictionary<int, long>();
+            public long LastHeartbeat;
+
+            public bool UseHexes => Tier == AiTier.Hard;          // 简单:不抽卡不升级
+            public bool DefendReflex => Tier == AiTier.Hard;      // 简单:只攻不防
+            public bool Retreat => Tier == AiTier.Hard;           // 简单:死战不撤
+            public int WaveCap => Tier == AiTier.Hard ? 4 : int.MaxValue;   // 简单:有多少攻多少
         }
 
         static readonly Dictionary<Side, AiState> _ais = new Dictionary<Side, AiState>();
 
         public static void Configure(SimCore sim, Side side, AiTier tier)
         {
-            _ais[side] = new AiState { Side = side, Tier = tier };
+            _ais[side] = new AiState { Side = side, Tier = tier, PhaseSince = sim.Tick };
         }
 
         public static void Reset() => _ais.Clear();
 
         public static void Tick(SimCore sim, float dt)
         {
-            // M8.5b:AI 自动补兵(Simple/Normal 共用,顶层入口)
             if (sim.Tick % ReinforceInterval == 0)
             {
                 foreach (var ai in _ais.Values.ToList())
@@ -49,67 +84,361 @@ namespace IronCurtain.Sim
 
             if (sim.Tick % DecisionInterval != 0) return;
             foreach (var ai in _ais.Values.ToList())
+                TickScripted(sim, ai);
+        }
+
+        // ---------- 主循环(两档共用骨架) ----------
+
+        static void TickScripted(SimCore sim, AiState ai)
+        {
+            FillProduction(sim, ai);
+            if (ai.UseHexes)
             {
-                if (ai.Tier == AiTier.Simple) TickSimple(sim, ai);
-                else TickNormal(sim, ai);
+                if (sim.EpOf(ai.Side) >= 2 && !sim.IsUpgraded(ai.Side, HeroId.ZhenYue))
+                    sim.BuyUpgrade(ai.Side, HeroId.ZhenYue, out _);
+                TryUseHeldHex(sim, ai);
+                if (sim.Tick >= 1800 && HexSystem.CanDraw(sim, ai.Side))
+                    TryDrawHex(sim, ai);
+            }
+
+            MaintainWaves(sim, ai);
+            UpdateLost(sim, ai);
+
+            switch (ai.Phase)
+            {
+                case AiPhase.Establish: StepEstablish(sim, ai); break;
+                case AiPhase.Offensive: StepOffensive(sim, ai); break;
+                case AiPhase.Reclaim: StepReclaim(sim, ai); break;
+            }
+
+            if (ai.DefendReflex)
+            {
+                ThreatRespond(sim, ai);
+                ActiveDefend(sim, ai);
+            }
+
+            Heartbeat(sim, ai);
+        }
+
+        // ---------- 阶段①:立足(占前线+驻防) ----------
+
+        static void StepEstablish(SimCore sim, AiState ai)
+        {
+            var posts = GuardPosts(sim, ai);
+            bool allGuarded = true;
+            foreach (var post in posts)
+            {
+                int want = WantGuards(ai, post);
+                int have = CountGuards(sim, ai, post, includeEnRoute: true);
+                while (have < want)
+                {
+                    var g = TakeFreeGeneral(sim, ai, post);
+                    if (g == null) { allGuarded = false; break; }
+                    var front = FrontCell(sim, post);
+                    if (front.HasValue) sim.SetMoveTarget(g.Id, front.Value);
+                    have++;   // 派出即计(含赶路),防同 tick 重复派
+                }
+                if (have < want) allGuarded = false;
+            }
+            if ((posts.Count == 0 || allGuarded) || sim.Tick - ai.PhaseSince > PhaseTimeoutTicks)
+            {
+                // 立足完成(或超时保险①)→记录地盘快照,进入攻势
+                ai.OwnedSet.Clear();
+                foreach (var b in sim.Entities.Values)
+                    if (b != null && b.Kind == EntityKind.Building && b.Side == ai.Side && !b.Rubbled)
+                        ai.OwnedSet.Add(b.Id);
+                ai.Phase = AiPhase.Offensive;
+                ai.PhaseSince = sim.Tick;
             }
         }
 
-        // ---------- 简单 AI ----------
-        static void TickSimple(SimCore sim, AiState ai)
+        /// <summary>驻防点:本方三路各最前(朝敌方向最远)的己方建筑;简单档附加本方草坪箭塔 2 座。
+        /// 前线城被拆/被占 → 该点自动消失(动态降级,else 出口)。</summary>
+        static List<Entity> GuardPosts(SimCore sim, AiState ai)
         {
-            FillProduction(sim, ai, simple: true);
-            PassiveDefend(sim, ai);
+            var posts = new List<Entity>();
+            var own = sim.Entities.Values
+                .Where(e => e != null && e.Kind == EntityKind.Building && e.Side == ai.Side
+                            && !e.Rubbled && e.Building != BuildingId.Base)
+                .ToList();
+            for (int lane = 0; lane < 3; lane++)
+            {
+                var inLane = own.Where(b => LaneIndexOf(SimVec2.FromGrid(b.Pos)) == lane).ToList();
+                if (inLane.Count == 0) continue;
+                // 朝敌最远 = 距基地最近敌方向 x 极值;用基地距离最远近似(三路几何下等价)
+                var home = Home(sim, ai.Side);
+                var front = inLane.OrderByDescending(b => home != null ? Dist(sim, b, home) : 0f).First();
+                posts.Add(front);
+            }
+            if (ai.Tier == AiTier.Simple)
+            {
+                // 本方草坪箭塔(不在任何路带的己方 Tower,每方 2 座)
+                foreach (var b in own)
+                    if (b.Building == BuildingId.Tower && IntentFor(b) == SiegeIntent.Capture)
+                        posts.Add(b);
+            }
+            return posts;
         }
 
-        static void PassiveDefend(SimCore sim, AiState ai)
+        static int WantGuards(AiState ai, Entity post)
         {
-            var myBuildings = sim.Entities.Values
-                .Where(e => e.Side == ai.Side && e.Kind == EntityKind.Building && !e.Rubbled)
-                .ToList();
-            foreach (var b in myBuildings)
+            if (ai.Tier == AiTier.Hard) return 2;                        // 困难:前线每城 2 兵团
+            bool lawn = post.Building == BuildingId.Tower && IntentFor(post) == SiegeIntent.Capture;
+            return 1;                                                    // 简单:前线/草坪塔各 1
+        }
+
+        /// <summary>城旁 GuardRadiusF 内的本方将数;includeEnRoute 把"移动目标指向该城"的赶路将也计入。</summary>
+        static int CountGuards(SimCore sim, AiState ai, Entity post, bool includeEnRoute)
+        {
+            int n = 0;
+            var front = FrontCell(sim, post);
+            foreach (var e in sim.Entities.Values)
             {
-                var threat = sim.Entities.Values
-                    .Where(e => e.Kind == EntityKind.Unit && e.Side != ai.Side && e.State != EntityState.Dead
-                                && VisionSystem.IsUnitVisible(sim, ai.Side, e.Id)
-                                && Dist(sim, e, b) <= 8f)
-                    .FirstOrDefault();
-                if (threat == null) continue;
-                var idle = sim.Entities.Values
-                    .Where(e => e.Kind == EntityKind.Unit && e.Side == ai.Side && !e.IsSoldier
-                                && e.State == EntityState.Idle && e.GarrisonBuildingId == 0)
-                    .OrderBy(e => Dist(sim, e, b))
-                    .Take(5).ToList();
-                foreach (var u in idle)
+                if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != ai.Side) continue;
+                if (e.State == EntityState.Dead || e.GarrisonBuildingId != 0) continue;
+                if (InAnyWave(ai, e.Id)) continue;
+                if (Dist(sim, e, post) <= GuardRadiusF) { n++; continue; }
+                if (includeEnRoute && front.HasValue && e.HasMoveTarget && e.MoveTarget == front.Value) n++;
+            }
+            return n;
+        }
+
+        /// <summary>挑一个可调动的将:非波次、非驻防留守(距任一驻防点超半径)、离目标最近。</summary>
+        static Entity TakeFreeGeneral(SimCore sim, AiState ai, Entity near)
+        {
+            var posts = GuardPosts(sim, ai);
+            Entity best = null; float bd = float.MaxValue;
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != ai.Side) continue;
+                if (e.State == EntityState.Dead || e.State == EntityState.Exchanging) continue;
+                if (e.GarrisonBuildingId != 0 || InAnyWave(ai, e.Id)) continue;
+                bool guardingOther = false;
+                foreach (var p in posts)
+                    if (p.Id != near.Id && Dist(sim, e, p) <= GuardRadiusF) { guardingOther = true; break; }
+                if (guardingOther) continue;
+                float d = Dist(sim, e, near);
+                if (d < bd) { bd = d; best = e; }
+            }
+            return best;
+        }
+
+        // ---------- 阶段②:攻势(集结推一路) ----------
+
+        static void StepOffensive(SimCore sim, AiState ai)
+        {
+            if (ai.LostIds.Count > 0)
+            {
+                ai.Phase = AiPhase.Reclaim;
+                ai.PhaseSince = sim.Tick;
+                return;
+            }
+            bool attackUnderway = ai.Waves.Any(w => !w.IsRetake);
+            if (attackUnderway) return;
+
+            var pool = FreeGenerals(sim, ai).ToList();
+            // 集结等待:人数不足且未超时 → 等;超时后强抽驻防将(保险②:驻防非死锁资源)
+            if (pool.Count < 2)
+            {
+                if (sim.Tick - ai.PhaseSince < PhaseTimeoutTicks) return;
+                pool = pool.Concat(PullFromGuards(sim, ai, 2 - pool.Count)).ToList();
+            }
+
+            var wave = PickComposition(pool, ai.WaveCap);
+            if (wave.Count == 0) return;
+
+            int lane = (int)(sim.Rng.NextUInt64() % 3);   // 制作人:随机选一路
+            var target = PickTargetInLane(sim, ai, lane);
+            if (target == null) target = PickAnyTarget(sim, ai);
+            if (target == null) return;
+
+            var order = SiegeSystem.TryIssueRegimentOrder(sim, wave.Select(e => e.Id).ToList(),
+                target.Id, ai.Side, IntentFor(target));
+            if (order.Success)
+            {
+                ai.Waves.Add(new Wave { TargetId = target.Id, StartCount = wave.Count,
+                    Units = wave.Select(e => e.Id).ToList(), IsRetake = false });
+                ai.PhaseSince = sim.Tick;
+            }
+        }
+
+        /// <summary>兵种结构(制作人:必含重装/战士/射手,哪类多一不管;缺类降级跳过)。</summary>
+        static List<Entity> PickComposition(List<Entity> pool, int cap)
+        {
+            var result = new List<Entity>();
+            Func<HeroId, bool> isTank = h => h == HeroId.PanShi || h == HeroId.ZhenYue;
+            Func<HeroId, bool> isWarrior = h => h == HeroId.DuanFeng || h == HeroId.ZhuFeng;
+            Func<HeroId, bool> isShooter = h => h == HeroId.ZhuiRi || h == HeroId.XingLuo;
+            foreach (var pred in new[] { isTank, isWarrior, isShooter })
+            {
+                var pick = pool.FirstOrDefault(e => e.Hero.HasValue && pred(e.Hero.Value));
+                if (pick != null) result.Add(pick);
+            }
+            foreach (var e in pool)
+            {
+                if (result.Count >= cap) break;
+                if (!result.Contains(e)) result.Add(e);
+            }
+            return result;
+        }
+
+        /// <summary>该路上最前的已知敌建筑(朝我方方向最近)。</summary>
+        static Entity PickTargetInLane(SimCore sim, AiState ai, int lane)
+        {
+            var home = Home(sim, ai.Side);
+            return sim.Entities.Values
+                .Where(e => e != null && e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral
+                            && !e.Rubbled && e.Building != BuildingId.Base
+                            && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id)
+                            && LaneIndexOf(SimVec2.FromGrid(e.Pos)) == lane)
+                .OrderBy(e => home != null ? Dist(sim, e, home) : 0f)
+                .FirstOrDefault();
+        }
+
+        static Entity PickAnyTarget(SimCore sim, AiState ai)
+        {
+            var home = Home(sim, ai.Side);
+            return sim.Entities.Values
+                .Where(e => e != null && e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral
+                            && !e.Rubbled && e.Building != BuildingId.Base
+                            && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id))
+                .OrderBy(e => home != null ? Dist(sim, e, home) : 0f)
+                .FirstOrDefault();
+        }
+
+        // ---------- 阶段③:收复(失地优先) ----------
+
+        static void StepReclaim(SimCore sim, AiState ai)
+        {
+            if (ai.LostIds.Count == 0)
+            {
+                ai.Phase = AiPhase.Offensive;   // 全部收复 → 恢复攻势
+                ai.PhaseSince = sim.Tick;
+                return;
+            }
+            foreach (var lostId in ai.LostIds.ToList())
+            {
+                if (ai.SkipRetake.Contains(lostId)) continue;
+                if (ai.Waves.Any(w => w.TargetId == lostId)) continue;   // 已有收复波在途
+                var pool = FreeGenerals(sim, ai).ToList();
+                if (pool.Count == 0) break;
+                var squad = PickComposition(pool, 2);   // 每处失地 1-2 将,分散同时夺回
+                if (squad.Count == 0) break;
+                var order = SiegeSystem.TryIssueRegimentOrder(sim, squad.Select(e => e.Id).ToList(),
+                    lostId, ai.Side, SiegeIntent.Capture);
+                if (order.Success)
+                    ai.Waves.Add(new Wave { TargetId = lostId, StartCount = squad.Count,
+                        Units = squad.Select(e => e.Id).ToList(), IsRetake = true });
+            }
+        }
+
+        // ---------- 失地/波次维护 ----------
+
+        static void UpdateLost(SimCore sim, AiState ai)
+        {
+            foreach (var id in ai.OwnedSet.ToList())
+            {
+                var b = sim.GetEntity(id);
+                if (b == null || b.Rubbled) { ai.LostIds.Remove(id); continue; }   // 没了(废墟)不再追
+                if (b.Side != ai.Side) ai.LostIds.Add(id);
+                else
                 {
-                    var t = FrontCell(sim, b);
-                    if (t.HasValue) sim.SetMoveTarget(u.Id, t.Value);
+                    if (ai.LostIds.Remove(id)) ai.RetakeFails.Remove(id);   // 收复了
                 }
             }
         }
 
-        // ---------- 普通 AI ----------
-        static void TickNormal(SimCore sim, AiState ai)
+        static void MaintainWaves(SimCore sim, AiState ai)
         {
-            // 1. 补产(配比)
-            FillProduction(sim, ai, simple: false);
-            // 2. 升级
-            if (sim.EpOf(ai.Side) >= 2 && !sim.IsUpgraded(ai.Side, HeroId.ZhenYue))
-                sim.BuyUpgrade(ai.Side, HeroId.ZhenYue, out _);
-            // 3. 规律抽卡
-            TryUseHeldHex(sim, ai);
-            if (sim.Tick >= 1800 && HexSystem.CanDraw(sim, ai.Side))
-                TryDrawHex(sim, ai);
-            // 5. 受挫撤退(先于新波次判断)
-            if (ai.WaveActive) CheckRetreat(sim, ai);
-            // 4. 集结进攻
-            if (!ai.WaveActive) TryLaunchWave(sim, ai);
-            // 6. 主动防守
-            ActiveDefend(sim, ai);
-            // 7. 威胁响应(2026-09-12 制作人"AI 智能化"第一步,纯规则不加权):
-            //    ①敌兵压境/城池被攻 → 就近士兵入城驻守;②调闲置主将回防(到位自动索敌)
-            ThreatRespond(sim, ai);
+            foreach (var w in ai.Waves.ToList())
+            {
+                w.Units = w.Units.Where(id => sim.Entities.TryGetValue(id, out var e)
+                    && e.State != EntityState.Dead && !e.IsSoldier).ToList();
+
+                var target = sim.GetEntity(w.TargetId);
+                bool done = target == null || target.Rubbled || target.Side == ai.Side;
+                if (w.Units.Count == 0 || done)
+                {
+                    if (w.IsRetake && !done)
+                    {
+                        ai.RetakeFails.TryGetValue(w.TargetId, out var f);
+                        ai.RetakeFails[w.TargetId] = f + 1;
+                        if (f + 1 > RetakeFailLimit) ai.SkipRetake.Add(w.TargetId);   // 保险③
+                    }
+                    if (done && w.IsRetake) { /* 收复成功 */ }
+                    ai.Waves.Remove(w);
+                    continue;
+                }
+                if (ai.Retreat && !w.IsRetake && w.Units.Count < w.StartCount * 0.4f)
+                {
+                    var home = Home(sim, ai.Side);
+                    var front = home != null ? FrontCell(sim, home) : (GridPos?)null;
+                    foreach (var id in w.Units)
+                        if (front.HasValue) sim.SetMoveTarget(id, front.Value);
+                    ai.Waves.Remove(w);
+                }
+            }
         }
+
+        static bool InAnyWave(AiState ai, int unitId) => ai.Waves.Any(w => w.Units.Contains(unitId));
+
+        /// <summary>保险②:强抽驻防将(超时后进攻兵源不足时)——驻防是偏好不是死锁。
+        /// 抽法:各驻防点只留 1 将,多出的可抽;全都单将时抽离目标最近的(城空了由威胁响应/后续产将回补)。</summary>
+        static List<Entity> PullFromGuards(SimCore sim, AiState ai, int need)
+        {
+            var pulled = new List<Entity>();
+            var posts = GuardPosts(sim, ai);
+            // 先抽"超编"的(点内 ≥2 将)
+            foreach (var p in posts)
+            {
+                var guards = sim.Entities.Values
+                    .Where(e => e != null && e.Kind == EntityKind.Unit && !e.IsSoldier && e.Side == ai.Side
+                                && e.State != EntityState.Dead && e.GarrisonBuildingId == 0
+                                && !InAnyWave(ai, e.Id) && Dist(sim, e, p) <= GuardRadiusF)
+                    .OrderByDescending(e => Dist(sim, e, p))
+                    .ToList();
+                for (int i = 1; i < guards.Count && pulled.Count < need; i++)   // 每点至少留 1
+                    pulled.Add(guards[i]);
+            }
+            if (pulled.Count >= need) return pulled;
+            // 仍不够:抽离"任一目标"最近的守将(全点单将的极端场景)
+            foreach (var e in sim.Entities.Values)
+            {
+                if (pulled.Count >= need) break;
+                if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != ai.Side) continue;
+                if (e.State == EntityState.Dead || e.State == EntityState.Exchanging) continue;
+                if (e.GarrisonBuildingId != 0 || InAnyWave(ai, e.Id) || pulled.Contains(e)) continue;
+                bool isGuard = false;
+                foreach (var p in posts)
+                    if (Dist(sim, e, p) <= GuardRadiusF) { isGuard = true; break; }
+                if (isGuard) pulled.Add(e);
+            }
+            return pulled;
+        }
+
+        static IEnumerable<Entity> FreeGenerals(SimCore sim, AiState ai)
+        {
+            var posts = GuardPosts(sim, ai);
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != ai.Side) continue;
+                if (e.State == EntityState.Dead || e.State == EntityState.Exchanging) continue;
+                if (e.GarrisonBuildingId != 0 || InAnyWave(ai, e.Id)) continue;
+                // 驻防留守将不抽(保险②的反面:驻防可抽的条件=该点超编;满编点保留)
+                bool guarding = false;
+                foreach (var p in posts)
+                {
+                    int want = WantGuards(ai, p);
+                    // 已达 want 的点:留守的将算驻防不抽;未达的点将本来就该去驻防
+                    if (CountGuards(sim, ai, p, includeEnRoute: true) >= want
+                        && Dist(sim, e, p) <= GuardRadiusF) { guarding = true; break; }
+                }
+                if (guarding) continue;
+                yield return e;
+            }
+        }
+
+        // ---------- 海克斯(Hard) ----------
 
         static void TryDrawHex(SimCore sim, AiState ai)
         {
@@ -137,105 +466,16 @@ namespace IronCurtain.Sim
                 if (!hand.Contains(c)) continue;
                 if (HexSystem.TryUseHeld(sim, ai.Side, c) == HexUseError.None) return true;
             }
-            return false; // 例如铁壁暂时无合法落点：保留手牌，下个决策 tick 重试。
+            return false;
         }
 
-        static void CheckRetreat(SimCore sim, AiState ai)
-        {
-            ai.WaveUnits = ai.WaveUnits
-                .Where(id => sim.Entities.TryGetValue(id, out var e) && e.State != EntityState.Dead && !e.IsSoldier)
-                .ToList();
-            if (ai.WaveUnits.Count < ai.WaveStartCount * 0.4f)
-            {
-                var home = sim.Entities.Values
-                    .FirstOrDefault(e => e.Side == ai.Side && e.Kind == EntityKind.Building && e.Building == BuildingId.Base);
-                var front = home != null ? FrontCell(sim, home) : (GridPos?)null;
-                foreach (var id in ai.WaveUnits)
-                    if (front.HasValue) sim.SetMoveTarget(id, front.Value);
-                ai.WaveActive = false;
-                ai.WaveUnits.Clear();
-            }
-        }
+        // ---------- 威胁响应(Hard;简单只攻不防) ----------
 
-        static void TryLaunchWave(SimCore sim, AiState ai)
-        {
-            var field = sim.Entities.Values
-                .Where(e => e.Kind == EntityKind.Unit && e.Side == ai.Side && !e.IsSoldier
-                            && e.State != EntityState.Dead && e.GarrisonBuildingId == 0
-                            && e.State != EntityState.Exchanging)
-                .ToList();
-            // 将兵制(M8.4b 名额上限 4):波次门槛按兵团计——8 只单兵的旧口径在 4 名额下永不满足,AI 永不推进
-            if (field.Count < 2) return;
-
-            var home = Home(sim, ai.Side);
-            // 目标选择(2026-09-11 三路分推):本波主攻路 = ai.NextLane 轮转(上/中/下),
-            // 优先打**该路上的**已知敌方建筑;该路暂无已知目标时回退全局最优(旧口径),不至于卡兵。
-            var neutral = sim.Entities.Values
-                .Where(e => e.Kind == EntityKind.Building && e.Building == BuildingId.ResourcePoint
-                            && e.Side == Side.Neutral && !e.Rubbled
-                            && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id))
-                .OrderBy(e => home != null ? Dist(sim, e, home) : 0f)
-                .FirstOrDefault();
-            int targetId; SiegeIntent intent;
-            if (neutral != null) { targetId = neutral.Id; intent = SiegeIntent.Capture; }
-            else
-            {
-                var candidates = sim.Entities.Values
-                    .Where(e => e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral
-                                && !e.Rubbled && e.Building != BuildingId.Base
-                                && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id))
-                    .Select(e => new { E = e, G = VisionSystem.LastKnownGarrison(sim, ai.Side, e.Id) ?? 999,
-                                       Lane = LaneIndexOf(SimVec2.FromGrid(e.Pos)) })
-                    .OrderBy(x => x.G).ThenBy(x => home != null ? Dist(sim, x.E, home) : 0f)
-                    .ToList();
-                if (candidates.Count == 0) return;
-                var pick = candidates.FirstOrDefault(x => x.Lane == ai.NextLane) ?? candidates[0];
-                targetId = pick.E.Id;
-                intent = IntentFor(pick.E);
-            }
-
-            var targetB = sim.GetEntity(targetId);
-            var wave = field.OrderBy(e => targetB != null ? Dist(sim, e, targetB) : 0f).Take(4).Select(e => e.Id).ToList(); // 名额 4,一波最多全员
-            var order = SiegeSystem.TryIssueRegimentOrder(sim, wave, targetId, ai.Side, intent);
-            if (order.Success)
-            {
-                ai.WaveActive = true;
-                ai.WaveUnits = wave;
-                ai.WaveStartCount = wave.Count;
-                ai.NextLane = (ai.NextLane + 1) % 3;   // 下一波换路,三路都有压力
-            }
-        }
-
-        /// <summary>进攻意图(2026-09-11):路上的箭塔=摧毁(旧口径);**草坪箭塔=占领**——
-        /// 无守军时贴上即被 InstantCapture 接管,保住箭塔为我所用,比拆掉划算。</summary>
-        static SiegeIntent IntentFor(Entity b)
-        {
-            if (b.Building != BuildingId.Tower) return SiegeIntent.Capture;
-            var p = SimVec2.FromGrid(b.Pos);
-            for (int l = 0; l < 3; l++)
-                if (Math.Abs(p.Y - TerrainMap.LaneY(p.X, l)) <= TerrainMap.LaneHalfWidth + 2f)
-                    return SiegeIntent.Destroy;     // 路上的防御塔
-            return SiegeIntent.Capture;             // 四块草坪的箭塔(不在任何路上)
-        }
-
-        /// <summary>点最贴近哪条路(0上/1中/2下)。</summary>
-        static int LaneIndexOf(SimVec2 p)
-        {
-            int best = 1; float bd = float.MaxValue;
-            for (int l = 0; l < 3; l++)
-            {
-                float d = (float)Math.Abs(p.Y - TerrainMap.LaneY(p.X, l));
-                if (d < bd) { bd = d; best = l; }
-            }
-            return best;
-        }
-
-        // ---- 威胁响应(2026-09-12) ----
-        const float ThreatRadius = 10f;     // 敌兵距城多远算压境
-        const int ThreatEnemies = 3;        // 压境敌兵数门槛
-        const int DefendCooldownTicks = 150; // 同城响应冷却(15s,防抖)
-        const float GarrisonSoldierRange = 22f; // 就近征兵半径
-        const int GarrisonBatch = 8;        // 单次最多征入城士兵
+        const float ThreatRadius = 10f;
+        const int ThreatEnemies = 3;
+        const int DefendCooldownTicks = 150;
+        const float GarrisonSoldierRange = 22f;
+        const int GarrisonBatch = 8;
 
         static void ThreatRespond(SimCore sim, AiState ai)
         {
@@ -245,10 +485,9 @@ namespace IronCurtain.Sim
                 if (b == null || b.Kind != EntityKind.Building || b.Side != ai.Side || b.Rubbled) continue;
                 float last;
                 hp.TryGetValue(b.Id, out last);
-                hp[b.Id] = b.Hp;                                   // 先记录,本轮判定用旧值
-                bool underAttack = b.Hp < last - 0.01f;            // 血在掉 = 正被攻
+                hp[b.Id] = b.Hp;
+                bool underAttack = b.Hp < last - 0.01f;
 
-                // 敌兵压境:可见敌兵在城 ThreatRadius 内
                 int enemiesNear = 0;
                 foreach (var e in sim.Entities.Values)
                 {
@@ -258,11 +497,9 @@ namespace IronCurtain.Sim
                 }
                 if (!underAttack && enemiesNear < ThreatEnemies) continue;
 
-                // 冷却(城级;缺省"从未响应"不得拦首次——TryGetValue 存在性判断)
                 if (ai.DefendCooldown.TryGetValue(b.Id, out long cdTick) && sim.Tick - cdTick < DefendCooldownTicks) continue;
                 ai.DefendCooldown[b.Id] = sim.Tick;
 
-                // ① 驻军反应:就近未出征士兵直接入城(临时驻军,守城战力)
                 if (b.GarrisonFormal.Count + b.GarrisonTemp.Count < 6)
                 {
                     var center = SimVec2.FromGrid(b.Pos);
@@ -271,7 +508,7 @@ namespace IronCurtain.Sim
                     {
                         if (e == null || e.Kind != EntityKind.Unit || !e.IsSoldier || e.Side != ai.Side) continue;
                         if (e.State == EntityState.Dead || e.GarrisonBuildingId != 0) continue;
-                        if (e.TargetBuildingId != 0) continue;      // 出征/攻城中的兵不征
+                        if (e.TargetBuildingId != 0) continue;
                         if (SimVec2.Distance(e.PosF, center) > GarrisonSoldierRange) continue;
                         candidates.Add(e.Id);
                         if (candidates.Count >= GarrisonBatch) break;
@@ -280,11 +517,10 @@ namespace IronCurtain.Sim
                         GarrisonSystem.EnterTemp(sim, candidates, b.Id, out _);
                 }
 
-                // ② 回防走位:最近的 2 个闲置主将拉到城门前(到位后既有索敌逻辑自动接战)
                 var defenders = sim.Entities.Values
                     .Where(e => e != null && e.Kind == EntityKind.Unit && e.Side == ai.Side && !e.IsSoldier
                                 && e.State == EntityState.Idle && e.GarrisonBuildingId == 0
-                                && !ai.WaveUnits.Contains(e.Id))
+                                && !InAnyWave(ai, e.Id))
                     .OrderBy(e => Dist(sim, e, b))
                     .Take(2).ToList();
                 foreach (var d in defenders)
@@ -308,10 +544,10 @@ namespace IronCurtain.Sim
                 if (near.Count < 6) continue;
                 var idle = sim.Entities.Values
                     .Where(e => e.Kind == EntityKind.Unit && e.Side == ai.Side && !e.IsSoldier
-                                && e.State == EntityState.Idle && e.GarrisonBuildingId == 0)
+                                && e.State == EntityState.Idle && e.GarrisonBuildingId == 0
+                                && !InAnyWave(ai, e.Id))
                     .OrderBy(e => Dist(sim, e, b))
                     .Take(6).ToList();
-                // 将兵制中间态:非士兵无法驻军(仅士兵可),防御=调到城门前排站位;士兵驻军防御在 M8.5 接上
                 foreach (var u in idle)
                 {
                     var t = FrontCell(sim, b);
@@ -321,30 +557,42 @@ namespace IronCurtain.Sim
             }
         }
 
-        // ---------- 公共 ----------
-        /// <summary>产将(M8.4b):向己方主基地入队;名额未满且队列空才入队。兵营无生产集,不再入队。</summary>
-        static void FillProduction(SimCore sim, AiState ai, bool simple)
-        {
-            if (sim.PopulationOf(ai.Side) >= sim.PopulationCapOf(ai.Side)) return; // 名额满,等待
+        // ---------- 心跳日志(保险⑤) ----------
 
+        static void Heartbeat(SimCore sim, AiState ai)
+        {
+            if (sim.Tick - ai.LastHeartbeat < 300) return;
+            ai.LastHeartbeat = sim.Tick;
+            if (LogHook == null) return;
+            int idleGenerals = 0;
+            foreach (var e in sim.Entities.Values)
+                if (e != null && e.Kind == EntityKind.Unit && !e.IsSoldier && e.Side == ai.Side
+                    && e.State == EntityState.Idle && !InAnyWave(ai, e.Id))
+                    idleGenerals++;
+            LogHook("[ai] side=" + ai.Side + " tier=" + ai.Tier + " phase=" + ai.Phase
+                + " waves=" + ai.Waves.Count + " idle=" + idleGenerals
+                + " lost=" + ai.LostIds.Count + " skip=" + ai.SkipRetake.Count
+                + " pop=" + sim.PopulationOf(ai.Side) + "/" + sim.PopulationCapOf(ai.Side));
+        }
+
+        // ---------- 公共 ----------
+
+        /// <summary>产将(M8.4b):向己方主基地入队;名额未满且队列空才入队。</summary>
+        static void FillProduction(SimCore sim, AiState ai)
+        {
+            if (sim.PopulationOf(ai.Side) >= sim.PopulationCapOf(ai.Side)) return;
             var b = Home(sim, ai.Side);
             if (b == null || b.Prod == null) return;
-
             for (int s = 0; s < b.Prod.Slots.Length; s++)
             {
                 var slot = b.Prod.Slots[s];
-                if (slot.Current != null || slot.Pending.Count > 0) return; // 队列非空,不重复入队
+                if (slot.Current != null || slot.Pending.Count > 0) return;
             }
-
-            // 2026-09-11 制作人拍板"AI 选将随机化,避免全屏磐石":替换旧的固定配比
-            // (Simple=恒磐石;Normal=磐石/断峰交替+每第 4 只镇岳)。
-            HeroId hero = PickProductionHero(sim, simple ? AiTier.Simple : AiTier.Normal);
+            HeroId hero = PickProductionHero(sim, ai.Tier);
             ProductionSystem.Enqueue(sim, b.Id, hero, out _);
         }
 
-        /// <summary>产将选择(2026-09-11):用 sim 的确定性 RNG(回放/测试可复现)。
-        /// Simple=三近战随机;Normal=六英雄加权(近战各×2、远程各×1)——前压为主、偶有远程混编。
-        /// 公开供测试断言分布。</summary>
+        /// <summary>产将选择:sim 确定性 RNG。简单=三近战随机;困难=六英雄加权(近战×2/远程×1)。</summary>
         public static HeroId PickProductionHero(SimCore sim, AiTier tier)
         {
             if (tier == AiTier.Simple)
@@ -365,7 +613,30 @@ namespace IronCurtain.Sim
                                                         && e.Building == BuildingId.Base && !e.Rubbled);
         }
 
-        /// <summary>城门站位格:建筑朝敌侧(碰撞半径+0.6 米),行序 15 优先、椭圆内、非水域。</summary>
+        /// <summary>进攻意图:路上的箭塔=摧毁;草坪箭塔(每方 2 座,不在任何路带)=占领。</summary>
+        static SiegeIntent IntentFor(Entity b)
+        {
+            if (b.Building != BuildingId.Tower) return SiegeIntent.Capture;
+            var p = SimVec2.FromGrid(b.Pos);
+            for (int l = 0; l < 3; l++)
+                if (Math.Abs(p.Y - TerrainMap.LaneY(p.X, l)) <= TerrainMap.LaneHalfWidth + 2f)
+                    return SiegeIntent.Destroy;
+            return SiegeIntent.Capture;
+        }
+
+        /// <summary>点最贴近哪条路(0上/1中/2下)。</summary>
+        static int LaneIndexOf(SimVec2 p)
+        {
+            int best = 1; float bd = float.MaxValue;
+            for (int l = 0; l < 3; l++)
+            {
+                float d = (float)Math.Abs(p.Y - TerrainMap.LaneY(p.X, l));
+                if (d < bd) { bd = d; best = l; }
+            }
+            return best;
+        }
+
+        /// <summary>城门站位格:建筑朝敌侧(碰撞半径+0.6 米),椭圆内、非水域。</summary>
         static GridPos? FrontCell(SimCore sim, Entity b)
         {
             int dx = b.Side == Side.Blue ? 1 : -1;

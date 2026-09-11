@@ -41,7 +41,7 @@ namespace IronCurtain.EditorTools
                 EditorApplication.Exit(1);
                 return;
             }
-            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 双方对打,画面有内容
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Hard); // 双方对打,画面有内容
 
             var cam = Camera.main;
             cam.aspect = 16f / 9f;

@@ -34,7 +34,7 @@ namespace IronCurtain.Tests
             var redG = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(78, 200)); // 兵团在城旁
             // 蓝方近战兵团压境(距城约 10m,塔视野 24 内可见;近战射程够不着,不会当场开打)
             RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(80, 193)); // 纵队在主将身后,摆近确保压境计数达标
-            AiSystem.Configure(sim, Side.Red, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Red, AiTier.Hard);
 
             Assert.AreEqual(0, barracks.GarrisonTemp.Count + barracks.GarrisonFormal.Count, "开局无人驻守");
             Run(25);   // 决策 tick=20 时触发
@@ -45,20 +45,24 @@ namespace IronCurtain.Tests
         }
 
         [Test]
-        public void 城池被攻_AI调闲置主将回防()
+        public void 二线城被攻_AI调闲置主将回防()
         {
-            var tower = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(80, 200));
-            var idleG = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(70, 205)); // 闲置主将
-            AiSystem.Configure(sim, Side.Red, AiTier.Normal);
+            // 用资源点(二线,非驻防点)验回防令:驻防点的将移动属立足行为,会干扰旧断言
+            // 塔在一线做驻防点(吸走立足期的移动令),res 在二线被攻 → 回防令=新目标可分辨
+            sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(80, 205));
+            var res = sim.SpawnBuilding(Side.Red, BuildingId.ResourcePoint, new GridPos(80, 215));
+            // g1 距塔最近 → 立足期被派驻一线(吃掉驻防令);g2 驻 res 旁保持真闲置 → 回防令的断言对象
+            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(70, 210));
+            var g2 = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(78, 220));
+            AiSystem.Configure(sim, Side.Red, AiTier.Hard);
 
-            Run(21);                       // 首个决策 tick:记录血快照(无威胁不触发)
-            Assert.IsFalse(idleG.HasMoveTarget, "未被威胁时主将不动");
+            Run(21);
+            res.Hp -= 20f;                 // 模拟被攻(血下降)
+            Run(20);                       // 下个决策 tick:underAttack → ThreatRespond 回防令
 
-            tower.Hp -= 20f;               // 模拟被攻击(血下降)
-            Run(20);                       // 下个决策 tick:underAttack 触发
-
-            Assert.IsTrue(idleG.HasMoveTarget || idleG.State == EntityState.Moving,
-                "城池掉血 → 最近的闲置主将应被调往城门回防");
+            bool gotDefendOrder = g2.HasMoveTarget;   // 立足期只派驻 g1,g2 的任何移动令都来自回防
+            Assert.IsTrue(gotDefendOrder,
+                "二线城掉血 → 闲置主将应收到回防移动令(g2 HasMoveTarget=" + g2.HasMoveTarget + ")");
         }
     }
 }

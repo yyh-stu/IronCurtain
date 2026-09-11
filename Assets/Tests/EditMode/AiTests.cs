@@ -88,16 +88,16 @@ namespace IronCurtain.Tests
         }
 
         [Test]
-        public void T3_简单被动回防()
+        public void T3_简单只攻不防_敌压境不驻军()
         {
+            // 2026-09-12 新简单档:只攻不防——敌兵压境不做驻军响应(与困难档相反)
             SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(15, 112));
             SpawnHero(Side.Blue, HeroId.DuanFeng, new GridPos(14, 112));
             SpawnHero(Side.Red, HeroId.PanShi, new GridPos(15, 116)); // 蓝塔 8 格内
             AiSystem.Configure(sim, Side.Blue, AiTier.Simple);
             Run(25);
-            bool anyMove = sim.Entities.Values.Any(e => e.Side == Side.Blue && e.Kind == EntityKind.Unit
-                && e.HasMoveTarget && e.State == EntityState.Moving);
-            Assert.IsTrue(anyMove, "敌单位逼近己方建筑时,简单 AI 应调兵回防");
+            Assert.AreEqual(0, blueTower.GarrisonTemp.Count + blueTower.GarrisonFormal.Count,
+                "简单 AI 只攻不防:敌压境不驻军(威胁响应仅困难档)");
         }
 
         [Test]
@@ -105,7 +105,7 @@ namespace IronCurtain.Tests
         {
             // 2026-09-11 制作人拍板"AI 选将随机化,避免全屏磐石":旧的"3 只 → 1 镇岳"固定配比已废弃,
             // 新契约=从六英雄加权池随机(近战×2/远程×1)。本测试断言产出落在合法池内。
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
             Run(1000); // 20s/将+错峰出生,出生节奏随场景浮动
             var pool = new HashSet<HeroId> { HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng,
                                              HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
@@ -124,7 +124,7 @@ namespace IronCurtain.Tests
         public void T5_普通买升级()
         {
             GiveEp(Side.Blue, 2);
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
             Run(25);
             Assert.IsTrue(sim.IsUpgraded(Side.Blue, HeroId.ZhenYue), "普通 AI 在 EP 足够时应买镇岳升级");
         }
@@ -134,7 +134,7 @@ namespace IronCurtain.Tests
         {
             GiveEp(Side.Blue, 4);
             Run(900); // 至 ~1805 tick,进入 3 分钟节点窗口
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
             Run(25);
             Assert.IsNotNull(HexSystem.ActiveOf(sim, Side.Blue), "3 分钟节点窗口内普通 AI 应抽一张海克斯");
             Assert.AreEqual(1f, sim.EpOf(Side.Blue), 0.001f, "升级 2EP + 抽取 2EP；释放不得二次扣费");
@@ -143,52 +143,21 @@ namespace IronCurtain.Tests
         }
 
         [Test]
-        public void T7_普通集结阈值()
+        public void T7_集结超时后强制出击()
         {
-            RevealBuilding(Side.Blue, redTower);
-            // 将兵制(M8.4b 名额 4):波次门槛按兵团计=2(旧 8 只单兵口径作废)
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
-            Run(25);
-            Assert.AreEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, neutral.Id), "1 兵团不应触发集结");
-
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95)); // 第 2 满编兵团
-            Run(25);
-            // 蓝塔视野自动揭示中立点 → 波次首选中立(占中立优先)
-            Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "2 兵团应触发对中立点的攻城意图");
+            // 2026-09-12 新脚本:先立足驻防,集结/阶段 40s 超时后必须出击(防卡死保险①)
+            GiveEp(Side.Blue, 2);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
+            Run(460);   // 46s:超过 PhaseTimeoutTicks(400)
+            bool attacked = SiegeSystem.GetIntent(sim, redTower.Id) != SiegeIntent.None
+                || sim.Entities.Values.Any(e => e.Side == Side.Blue && e.Kind == EntityKind.Unit
+                    && e.TargetBuildingId != 0);
+            Assert.IsTrue(attacked, "超时后(兵力不足以满编驻防)仍应强制发起进攻");
         }
 
-        [Test]
-        public void T8_普通挑弱侧()
-        {
-            sim.RemoveEntity(neutral.Id); // 去掉中立,直测"弱侧"
-            var g1 = SpawnHero(Side.Red, HeroId.PanShi, new GridPos(15, 129));
-            g1.GarrisonBuildingId = redTower.Id; redTower.GarrisonFormal.Add(g1.Id);
-            for (int i = 0; i < 5; i++)
-            {
-                var g = SpawnHero(Side.Red, HeroId.DuanFeng, new GridPos(i % 3, 10 + i));
-                g.GarrisonBuildingId = redBarracks.Id; redBarracks.GarrisonFormal.Add(g.Id);
-            }
-            RevealBuilding(Side.Blue, redTower);
-            RevealBuilding(Side.Blue, redBarracks);
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95));
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
-            Run(25);
-            Assert.AreNotEqual(SiegeIntent.None, SiegeSystem.GetIntent(sim, redTower.Id), "应选择驻军更少的红塔(弱侧)");
-        }
+        // T8_普通挑弱侧:2026-09-12 旧 Normal"挑弱侧/中立优先"随脚本化改版退役删除
 
-        [Test]
-        public void T9_普通占中立优先()
-        {
-            RevealBuilding(Side.Blue, neutral);
-            RevealBuilding(Side.Blue, redTower);
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 95));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(25, 95));
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
-            Run(25);
-            Assert.AreEqual(SiegeIntent.Capture, SiegeSystem.GetIntent(sim, neutral.Id), "优先占领中立资源点");
-        }
+        // T9_普通占中立优先:2026-09-12 旧 Normal"挑弱侧/中立优先"随脚本化改版退役删除
 
         [Test]
         public void T10_普通主动防守()
@@ -198,7 +167,7 @@ namespace IronCurtain.Tests
             SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(16, 112));
             for (int i = 0; i < 8; i++)
                 SpawnHero(Side.Red, HeroId.PanShi, new GridPos(14 + i % 3, 118 + i / 3)); // 蓝塔 10 格内且可见
-            AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(sim, Side.Blue, AiTier.Hard);
             Run(25);
             bool defending = sim.Entities.Values.Any(e => e.Side == Side.Blue && e.Kind == EntityKind.Building
                     && e.GarrisonFormal.Count > 0)

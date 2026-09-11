@@ -59,7 +59,7 @@ namespace IronCurtain.View
             }
             boot.Speed = 3f;
             // 验收模式:蓝方补一个简单 AI,保证截图里双方都有单位在对打
-            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 验收用普通 AI,兵种多样
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Hard); // 验收用普通 AI,兵种多样
 
             int i = 0;
             float guard = 0f;
@@ -107,7 +107,7 @@ namespace IronCurtain.View
             boot.Sim.Game.Match.DurationMinutes = 1;   // 运行时压缩时限(MatchClockSystem 读实时值)
             boot.Sim.Game.Match.OvertimeMinutes = 1;
             boot.Speed = 6f;
-            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 保证对打有伤亡与 EP 差,面板数据非全零
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Hard); // 保证对打有伤亡与 EP 差,面板数据非全零
 
             bool tookOvertime = false, tookResult = false;
             float guard = 0f;
@@ -153,7 +153,7 @@ namespace IronCurtain.View
                 yield break;
             }
             boot.Speed = 3f;
-            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal);
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Hard);
             var cam = Camera.main;
             var rig = cam != null ? cam.GetComponent<CameraRig>() : null;
             if (cam != null)

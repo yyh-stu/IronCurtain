@@ -29,7 +29,7 @@ namespace IronCurtain.Tests
             var sim = new SimCore(new SimConfig(), new SeededRng(7));
             sim.Game = _cfg;
             var seen = new HashSet<HeroId>();
-            for (int i = 0; i < 30; i++) seen.Add(AiSystem.PickProductionHero(sim, AiTier.Normal));
+            for (int i = 0; i < 30; i++) seen.Add(AiSystem.PickProductionHero(sim, AiTier.Hard));
             Assert.GreaterOrEqual(seen.Count, 4, "30 次加权抽取应出现至少 4 种英雄(混编,不再固定磐石/断峰)");
             Assert.IsTrue(seen.Contains(HeroId.ZhuiRi) || seen.Contains(HeroId.XingLuo) || seen.Contains(HeroId.ZhuFeng),
                 "应包含至少一种远程英雄(旧配比永不产远程)");
@@ -51,7 +51,7 @@ namespace IronCurtain.Tests
         [Test]
         public void 波次按路轮转_红方推进至少覆盖两路()
         {
-            var sim = MatchSetup.Build(_cfg, null, AiTier.Normal);   // 蓝方无人(玩家位),红方普通 AI
+            var sim = MatchSetup.Build(_cfg, null, AiTier.Hard);   // 蓝方无人(玩家位),红方普通 AI
             // 红方加 4 座资源点催 EP(加速补充兵源;都放在红方墙内广场,不扰战场)
             foreach (var p in new[] { new GridPos(75, 250), new GridPos(85, 250), new GridPos(75, 256), new GridPos(85, 256) })
                 sim.SpawnBuilding(Side.Red, BuildingId.ResourcePoint, p);

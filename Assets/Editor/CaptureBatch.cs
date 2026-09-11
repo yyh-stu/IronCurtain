@@ -67,7 +67,7 @@ namespace IronCurtain.EditorTools
                 return;
             }
 
-            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal); // 双方对打,画面有内容
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Hard); // 双方对打,画面有内容
             Directory.CreateDirectory("D:/DevTools/shots");
             var cam = Camera.main;
             var fogView = Object.FindFirstObjectByType<FogView>();
