@@ -28,8 +28,8 @@ namespace IronCurtain.View
             {
                 new Vector3(0f, 0.25f, 3f),
                 new Vector3(LaneGrid.Cols, 0.25f, 3f),
-                new Vector3(LaneGrid.Cols, 0.25f, -27f),
-                new Vector3(0f, 0.25f, -27f)
+                new Vector3(LaneGrid.Cols, 0.25f, 3f - LaneGrid.Rows),
+                new Vector3(0f, 0.25f, 3f - LaneGrid.Rows)
             };
             var uv = new[] { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
             var tris = new[] { 0, 1, 2, 0, 2, 3 };
@@ -51,7 +51,12 @@ namespace IronCurtain.View
             var fogGo = new GameObject("FogQuad");
             fogGo.transform.SetParent(parent, false);
             fogGo.AddComponent<MeshFilter>().sharedMesh = mesh;
-            fogGo.AddComponent<MeshRenderer>().sharedMaterial = m;
+            var fogMr = fogGo.AddComponent<MeshRenderer>();
+            fogMr.sharedMaterial = m;
+            // 2026-09-11 铺路时发现:迷雾平面在投影——地图上出现一大块台阶状暗影,
+            // 边缘与迷雾锯齿完全一致。迷雾是纯覆盖层,不投影也不收影。
+            fogMr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            fogMr.receiveShadows = false;
             RefreshNow();
         }
 

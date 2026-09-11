@@ -87,6 +87,45 @@ namespace IronCurtain.View
             Quad(v, t, c + new Vector3(-x, y, z), c + new Vector3(x, y, z), c + new Vector3(x, y, -z), c + new Vector3(-x, y, -z));
         }
 
+        /// <summary>
+        /// 单格顶面 + **显式 UV**(ART-P0 铺路用)。自动 UV 是按整块网格包围盒归一化的,
+        /// 一整片地面会只剩一张贴图被拉伸;地面必须逐格给 UV 才能按模块拼贴。
+        /// 绕序与 AddBox 的顶面一致(法线朝上),故 uv 的 v 轴对应世界 −z。
+        /// </summary>
+        public static void AddTopQuad(List<Vector3> v, List<int> t, List<Vector2> uv,
+            float cx, float cz, float y, float size, float u0, float v0, float u1, float v1)
+        {
+            float h = size * 0.5f;
+            int i0 = v.Count;
+            v.Add(new Vector3(cx - h, y, cz + h)); uv.Add(new Vector2(u0, v0));
+            v.Add(new Vector3(cx + h, y, cz + h)); uv.Add(new Vector2(u1, v0));
+            v.Add(new Vector3(cx + h, y, cz - h)); uv.Add(new Vector2(u1, v1));
+            v.Add(new Vector3(cx - h, y, cz - h)); uv.Add(new Vector2(u0, v1));
+            t.Add(i0); t.Add(i0 + 1); t.Add(i0 + 2);
+            t.Add(i0); t.Add(i0 + 2); t.Add(i0 + 3);
+        }
+
+        /// <summary>带显式 UV 的网格(逐 submesh 对齐顶点序)。</summary>
+        public static Mesh CreateMesh(List<Vector3>[] verts, List<int>[] tris, List<Vector2>[] uvs)
+        {
+            var m = CreateMesh(verts, tris);
+            var all = new List<Vector2>();
+            for (int s = 0; s < uvs.Length; s++) all.AddRange(uvs[s]);
+            if (all.Count == m.vertexCount) m.SetUVs(0, all);
+            return m;
+        }
+
+        /// <summary>贴图材质(URP/Lit);tex 为空时退化为纯色。</summary>
+        public static Material Textured(Texture2D tex, Color tint, float smoothness)
+        {
+            var m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            m.SetColor("_BaseColor", tint);
+            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Smoothness", smoothness);
+            if (tex != null) m.SetTexture("_BaseMap", tex);
+            return m;
+        }
+
         // 底面中心 c,向上 h;botHalf/topHalf 为 x/z 半宽;seg 边数;angOff 起始角偏移
         public static void AddPrism(List<Vector3> v, List<int> t, Vector3 c, Vector2 botHalf, Vector2 topHalf, float h, int seg, float angOff = 0f)
         {
@@ -134,6 +173,9 @@ namespace IronCurtain.View
         public static Mesh CreateMesh(List<Vector3>[] verts, List<int>[] tris)
         {
             var m = new Mesh();
+            // 2026-09-11 铺路:边界子格细分后单网格顶点数会突破 65535(16 位索引上限),
+            // 超限会静默截断 → 整片地面消失。必须开 32 位索引。
+            m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             var all = new List<Vector3>();
             for (int s = 0; s < verts.Length; s++) all.AddRange(verts[s]);
             m.SetVertices(all);
