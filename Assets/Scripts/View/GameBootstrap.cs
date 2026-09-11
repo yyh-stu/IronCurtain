@@ -42,6 +42,8 @@ namespace IronCurtain.View
             // 2026-09-11 屏障血条:五段各自独立,受击才显示(满血隐藏)
             _wallHp = gameObject.AddComponent<WallHealthView>();
             _wallHp.Init(transform);
+            // 2026-09-11 UI demo→成品迁移:UITK 根必须先于**所有**面板建立(含最早 Init 的兵营总览/建筑命令)
+            gameObject.AddComponent<UiRoot>();
             var overview = gameObject.AddComponent<BarracksOverviewPanel>();
             overview.Init(Sim, Side.Blue);
             gameObject.AddComponent<CaptureRunner>();
@@ -60,8 +62,6 @@ namespace IronCurtain.View
             inputAudit.Init(Sim);
 #endif
 
-            // 2026-09-11 UI demo→成品迁移:UITK 根先于面板建(面板 Init 时取 UiRoot.Current)
-            gameObject.AddComponent<UiRoot>();
             var topBar = gameObject.AddComponent<TopBarPanel>();
             topBar.Init(Sim, Side.Blue);
             var upgrades = gameObject.AddComponent<UpgradeCommandPanel>();

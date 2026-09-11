@@ -1,10 +1,19 @@
 using System.Collections.Generic;
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>M6.3-C1 紧凑建筑操作面板；动作与反馈全部由 BuildingCommandModel 提供。</summary>
+    /// <summary>M6.3-C1 紧凑建筑操作面板；动作与反馈全部由 BuildingCommandModel 提供。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit。三件套:
+    /// ①底部中央目标面板(标题/状态/占领/摧毁/重建/反馈/关闭);
+    /// ②常显偏好标签(已设偏好的敌方据点上方,世界锚点);
+    /// ③悬停选择器(悬停敌方/中立据点时其上方出现[占领][摧毁])。
+    /// 世界锚点 = 世界→屏幕点 → RuntimePanelUtils.ScreenToPanel(处理 ScaleWithScreenSize 的坐标差)。
+    /// 顺带修旧实现的隐患:OnGUI 的 ev.mousePosition(y 向下)被直接喂给 ScreenPointToRay(要 y 向上),
+    /// 悬停拾取竖直方向镜像;现改用 Input.mousePosition(y 向上,口径正确)。
+    /// 公开契约(HasTarget/TargetId/SetTarget/TryOrderPreferred/ClearTarget)与审计行原样保留。</summary>
     public sealed class BuildingCommandPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = Rect.zero;
@@ -16,6 +25,14 @@ namespace IronCurtain.View
         private bool _feedbackOk;
         private float _feedbackUntil;
 
+        private VisualElement _root, _hoverHost, _markerHost;
+        private Label _title, _status, _feedbackLabel;
+        private Button _btnCapture, _btnDestroy, _btnRebuild, _btnClose;
+        private VisualElement _hoverBox;
+        private Label _hoverPref;
+        private Button _hoverCapture, _hoverDestroy;
+        private int _hoverId;
+
         public bool HasTarget => _targetId != 0;
         public int TargetId => _targetId;
 
@@ -23,6 +40,7 @@ namespace IronCurtain.View
         {
             _model = new BuildingCommandModel(sim, player);
             _selectedIds = selectedIds;
+            if (UiRoot.Current != null && UiRoot.Current.Screen != null) Build(UiRoot.Current.Screen);
         }
 
         public void SetTarget(int buildingId)
@@ -35,7 +53,7 @@ namespace IronCurtain.View
 
         private bool MouseOverOtherUi(Vector2 m)
         {
-            Vector2 g = new Vector2(m.x, Screen.height - m.y);
+            Vector2 g = new Vector2(m.x, UnityEngine.Screen.height - m.y);
             return BarracksOverviewPanel.LastPanelRect.Contains(g) || TopBarPanel.LastPanelRect.Contains(g)
                 || MinimapPanel.LastPanelRect.Contains(g) || LastPanelRect.Contains(g);
         }
@@ -51,46 +69,146 @@ namespace IronCurtain.View
             return BuildingCommandModel.PickVisibleBuilding(_model.Sim, _model.Player, new SimVec2(wp.x, 3f - wp.z));
         }
 
-        /// <summary>悬停敌方/中立据点:据点上方出现偏好选择(占领/摧毁);点击=改偏好(有选中兵团即攻)。</summary>
-        private void DrawHoverSelector()
+        // ---- UITK 构建 ----
+
+        private void Build(VisualElement parent)
         {
-            var ev = Event.current;
-            if (ev == null || ev.type != EventType.Repaint) return;
-            int id = HoveredBuilding(ev.mousePosition);
-            if (id == 0) return;
-            var b = _model.Sim.GetEntity(id);
-            if (b == null) return;
-            // 2026-09-10 制作人目击修复:自家建筑不弹占领/摧毁偏好(偏好=对可进攻据点;与常显标签同过滤)
-            if (b.Side == _model.Player) return;
-            var sp = WorldToScreenAbove(b, 2.6f);
-            // 已设偏好小标签(第 5 条:未设不可见)
-            if (b.Intent != SiegeIntent.None && b.IntentIssuer == _model.Player)
+            _root = new VisualElement { name = "BuildingPanel" };
+            _root.AddToClassList("panel");
+            _root.style.position = Position.Absolute;
+            _root.style.bottom = 78;
+            _root.style.left = Length.Percent(50);
+            _root.style.translate = new Translate(Length.Percent(-50), Length.Percent(0));
+            _root.style.width = 352;
+
+            var head = new VisualElement();
+            head.style.flexDirection = FlexDirection.Row;
+            head.style.alignItems = Align.Center;
+            _title = UiKit.MakeLabel("", "label-title");
+            head.Add(_title);
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
+            _btnClose = UiKit.MakeButton("×", () => ClearTarget("cancel"));
+            _btnClose.style.width = 32;
+            head.Add(_btnClose);
+            _root.Add(head);
+
+            _status = UiKit.MakeLabel("");
+            _status.style.marginTop = 2;
+            _root.Add(_status);
+
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.marginTop = 6;
+            _btnCapture = UiKit.MakeButton("占领", () => Execute(BuildingCommandAction.Capture));
+            _btnDestroy = UiKit.MakeButton("摧毁", () => Execute(BuildingCommandAction.Destroy));
+            _btnRebuild = UiKit.MakeButton("重建", () => Execute(BuildingCommandAction.Rebuild));
+            foreach (var b in new[] { _btnCapture, _btnDestroy, _btnRebuild })
             {
-                var label = "偏好:" + (b.Intent == SiegeIntent.Capture ? "占领" : "摧毁");
-                GUI.Label(new Rect(sp.x - 60f, sp.y, 120f, 18f), label, SmallStyle());
+                b.style.height = 34; b.style.flexGrow = 1;
+                row.Add(b);
             }
-            var sel = new Rect(sp.x - 76f, sp.y - 30f, 152f, 26f);
-            if (GUI.Button(new Rect(sel.x, sel.y, 74f, 26f), "占领"))
-                ChoosePreference(id, BuildingCommandAction.Capture);
-            if (GUI.Button(new Rect(sel.x + 78f, sel.y, 74f, 26f), "摧毁"))
-                ChoosePreference(id, BuildingCommandAction.Destroy);
+            _root.Add(row);
+
+            _feedbackLabel = UiKit.MakeLabel("", "feedback-ok");
+            _feedbackLabel.style.marginTop = 4;
+            _root.Add(_feedbackLabel);
+            _root.style.display = DisplayStyle.None;
+            parent.Add(_root);
+
+            // 常显偏好标签容器(世界锚点)
+            _markerHost = new VisualElement { name = "PrefMarkers" };
+            _markerHost.style.position = Position.Absolute;
+            _markerHost.style.left = 0; _markerHost.style.top = 0; _markerHost.style.right = 0; _markerHost.style.bottom = 0;
+            _markerHost.pickingMode = PickingMode.Ignore;   // 纯标签,不吃指针
+            parent.Add(_markerHost);
+
+            // 悬停选择器(世界锚点):偏好小标签 + [占领][摧毁]
+            _hoverBox = new VisualElement { name = "HoverSelector" };
+            _hoverBox.style.position = Position.Absolute;
+            _hoverBox.style.display = DisplayStyle.None;
+            _hoverPref = UiKit.MakeLabel("", "marker");
+            _hoverPref.style.position = Position.Absolute;
+            _hoverPref.style.top = 30;                       // 标签在锚点处,选择按钮在其上方
+            _hoverPref.style.width = 120;
+            _hoverPref.style.translate = new Translate(Length.Percent(-50), Length.Percent(0));
+            var hoverRow = new VisualElement();
+            hoverRow.style.flexDirection = FlexDirection.Row;
+            hoverRow.style.position = Position.Absolute;
+            hoverRow.style.top = 0;                          // 锚点上方 30(盒子顶=锚点-30)
+            hoverRow.style.translate = new Translate(Length.Percent(-50), Length.Percent(0));
+            _hoverCapture = UiKit.MakeButton("占领", () => ChoosePreference(_hoverId, BuildingCommandAction.Capture));
+            _hoverDestroy = UiKit.MakeButton("摧毁", () => ChoosePreference(_hoverId, BuildingCommandAction.Destroy));
+            _hoverCapture.style.width = 76;
+            _hoverDestroy.style.width = 76;
+            _hoverDestroy.style.marginLeft = 6;
+            hoverRow.Add(_hoverCapture); hoverRow.Add(_hoverDestroy);
+            _hoverBox.Add(_hoverPref); _hoverBox.Add(hoverRow);
+            _hoverBox.pickingMode = PickingMode.Ignore;    // 容器不吃指针,按钮自己吃
+            parent.Add(_hoverBox);
         }
 
-        private void ChoosePreference(int id, BuildingCommandAction action)
+        private bool _demoDone;
+        private void Update()
         {
-            var r = _model.SetPreference(id, action, _selectedIds);
-            _feedbackOk = r.Success;
-            _feedback = r.Message;
-            _feedbackUntil = Time.unscaledTime + 2.5f;
-#if UNITY_EDITOR
-            InputAudit.Log("building_pref building=" + id + " action=" + action + " result=" + (r.Success ? "ok" : "deny")
-                + " message=" + r.Message + " selected_ids=" + InputAudit.FormatIds(_selectedIds));
-#endif
+            if (_model == null) return;
+            // 取证开关 IC_UI_BUILDING=1:对一个已知敌方据点设偏好(常显标签)+对另一个开目标面板
+            if (!_demoDone && System.Environment.GetEnvironmentVariable("IC_UI_BUILDING") == "1")
+            {
+                _demoDone = true;
+                var ids = new List<int>();
+                foreach (var kv in _model.Sim.Entities)
+                {
+                    var b = kv.Value;
+                    if (b == null || b.Kind != EntityKind.Building || b.Rubbled) continue;
+                    if (b.Side == _model.Player || b.Side == Side.Neutral) continue;
+                    if (b.Building == BuildingId.Base) continue;
+                    if (!VisionSystem.IsBuildingKnown(_model.Sim, _model.Player, b.Id)) continue;
+                    ids.Add(b.Id);
+                    if (ids.Count >= 2) break;
+                }
+                if (ids.Count >= 1) ChoosePreference(ids[0], BuildingCommandAction.Capture);   // 常显"占领"标签
+                if (ids.Count >= 2) SetTarget(ids[1]);                                          // 底部目标面板
+            }
+            UpdateTargetPanel();
+            UpdateMarkers();
+            UpdateHoverSelector();
         }
 
-        /// <summary>所有已设偏好的敌方/中立据点:据点上方常显偏好标签(制作人称:偏好看作据点属性)。</summary>
-        private void DrawPreferenceMarkers()
+        // ---- ① 目标面板 ----
+
+        private void UpdateTargetPanel()
         {
+            if (_targetId == 0)
+            {
+                _root.style.display = DisplayStyle.None;
+                LastPanelRect = Rect.zero;
+                return;
+            }
+            var info = _model.Describe(_targetId, _selectedIds);
+            if (!info.Exists) { ClearTarget("invalid"); return; }
+
+            _root.style.display = DisplayStyle.Flex;
+            _title.text = info.Title;
+            _status.text = info.Status;
+            _btnCapture.style.display = info.CanCapture ? DisplayStyle.Flex : DisplayStyle.None;
+            _btnDestroy.style.display = info.CanDestroy ? DisplayStyle.Flex : DisplayStyle.None;
+            _btnRebuild.style.display = info.CanRebuild ? DisplayStyle.Flex : DisplayStyle.None;
+            if (info.CanRebuild) _btnRebuild.text = "重建 " + info.RebuildCost + " EP";
+
+            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
+            {
+                _feedbackLabel.text = _feedback;
+                _feedbackLabel.EnableInClassList("feedback-ok", _feedbackOk);
+                _feedbackLabel.EnableInClassList("feedback-err", !_feedbackOk);
+            }
+            else _feedbackLabel.text = "";
+        }
+
+        // ---- ② 常显偏好标签(世界锚点) ----
+
+        private void UpdateMarkers()
+        {
+            _markerHost.Clear();
             var cam = Camera.main;
             if (cam == null) return;
             foreach (var kv in _model.Sim.Entities)
@@ -101,28 +219,72 @@ namespace IronCurtain.View
                 if (b.Intent == SiegeIntent.None || b.IntentIssuer != _model.Player) continue;
                 var sp = WorldToScreenAbove(b, 2.2f);
                 if (sp.z <= 0f) continue;
-                var label = (b.Intent == SiegeIntent.Capture ? "占领" : "摧毁");
-                GUI.Label(new Rect(sp.x - 40f, sp.y, 80f, 16f), label, SmallStyle());
+                var l = UiKit.MakeLabel(b.Intent == SiegeIntent.Capture ? "占领" : "摧毁", "marker");
+                PlaceAtPanel(l, sp, 80);
+                _markerHost.Add(l);
             }
         }
 
+        // ---- ③ 悬停选择器(世界锚点) ----
+
+        private void UpdateHoverSelector()
+        {
+            int id = HoveredBuilding(Input.mousePosition);
+            if (id != 0)
+            {
+                var b = _model.Sim.GetEntity(id);
+                // 自家建筑不弹偏好选择(2026-09-10 制作人目击修复的口径)
+                if (b != null && b.Side == _model.Player) id = 0;
+            }
+            if (id == 0)
+            {
+                _hoverBox.style.display = DisplayStyle.None;
+                _hoverId = 0;
+                return;
+            }
+            _hoverId = id;
+            var bb = _model.Sim.GetEntity(id);
+            var sp = WorldToScreenAbove(bb, 2.6f);
+            if (sp.z <= 0f) { _hoverBox.style.display = DisplayStyle.None; return; }
+
+            _hoverBox.style.display = DisplayStyle.Flex;
+            bool hasPref = bb.Intent != SiegeIntent.None && bb.IntentIssuer == _model.Player;
+            _hoverPref.text = hasPref
+                ? "偏好:" + (bb.Intent == SiegeIntent.Capture ? "占领" : "摧毁") : "";
+            _hoverPref.style.display = hasPref ? DisplayStyle.Flex : DisplayStyle.None;
+
+            // 标签在选择按钮上方
+            var panelPt = ScreenToPanel(sp);
+            _hoverBox.style.left = panelPt.x;
+            _hoverBox.style.top = panelPt.y - 30;
+        }
+
+        /// <summary>世界点(据点上方)→屏幕坐标(y 向下,已翻)。</summary>
         private Vector3 WorldToScreenAbove(Entity b, float y)
         {
             var cam = Camera.main;
             var wp = BoardView.WorldPos(b.Pos) + new Vector3(0f, y, 0f);
             var sp = cam.WorldToScreenPoint(wp);
-            return new Vector3(sp.x, Screen.height - sp.y, sp.z);
+            return new Vector3(sp.x, UnityEngine.Screen.height - sp.y, sp.z);
         }
 
-        private static GUIStyle _smallStyle;
-        private static GUIStyle SmallStyle()
+        /// <summary>屏幕像素 → UITK 面板坐标(ScaleWithScreenSize 下两者不同)。</summary>
+        private Vector2 ScreenToPanel(Vector3 sp)
         {
-            if (_smallStyle == null)
-            {
-                _smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, alignment = TextAnchor.MiddleCenter };
-                _smallStyle.normal.textColor = new Color(1f, 0.9f, 0.5f);
-            }
-            return _smallStyle;
+            if (_root.panel != null)
+                return RuntimePanelUtils.ScreenToPanel(_root.panel, new Vector2(sp.x, sp.y));
+            return new Vector2(sp.x, sp.y);
+        }
+
+        /// <summary>把标签元素摆到世界锚点(中心对齐)。</summary>
+        private void PlaceAtPanel(Label l, Vector3 sp, float width)
+        {
+            var p = ScreenToPanel(sp);
+            l.style.position = Position.Absolute;
+            l.style.left = p.x;
+            l.style.top = p.y;
+            l.style.width = width;
+            l.style.translate = new Translate(Length.Percent(-50), Length.Percent(0));
         }
 
         /// <summary>2026-09-09 制作人裁决:选中兵团点城=按现有偏好直接下令(兵随主将)。</summary>
@@ -151,45 +313,16 @@ namespace IronCurtain.View
 #endif
         }
 
-        private void OnDisable() => LastPanelRect = Rect.zero;
-        private void OnDestroy() => LastPanelRect = Rect.zero;
-
-        private void OnGUI()
+        private void ChoosePreference(int id, BuildingCommandAction action)
         {
-            if (_model == null) { LastPanelRect = Rect.zero; return; }
-            DrawPreferenceMarkers();   // 2026-09-10 制作人:已设偏好在据点上方常显小标签
-            DrawHoverSelector();       // 悬停据点:偏好选择 UI(有选中兵团则选完即攻)
-            if (_targetId == 0) { LastPanelRect = Rect.zero; return; }
-            var info = _model.Describe(_targetId, _selectedIds);
-            if (!info.Exists) { ClearTarget("invalid"); return; }
-
-            const float width = 340f;
-            const float height = 132f;
-            LastPanelRect = new Rect(Screen.width * 0.5f - width * 0.5f, Screen.height - 210f, width, height);
-            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
-            GUILayout.BeginArea(new Rect(LastPanelRect.x + 12f, LastPanelRect.y + 8f, width - 24f, height - 16f));
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(info.Title, TitleStyle());
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("×", GUILayout.Width(28f))) ClearTarget("cancel");
-            GUILayout.EndHorizontal();
-
-            GUILayout.Label(info.Status);
-            GUILayout.BeginHorizontal();
-            if (info.CanCapture && GUILayout.Button("占领", GUILayout.Height(32f))) Execute(BuildingCommandAction.Capture);
-            if (info.CanDestroy && GUILayout.Button("摧毁", GUILayout.Height(32f))) Execute(BuildingCommandAction.Destroy);
-            if (info.CanRebuild && GUILayout.Button("重建 " + info.RebuildCost + " EP", GUILayout.Height(32f)))
-                Execute(BuildingCommandAction.Rebuild);
-            GUILayout.EndHorizontal();
-
-            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
-            {
-                var previous = GUI.color;
-                GUI.color = _feedbackOk ? Color.green : new Color(1f, 0.35f, 0.3f);
-                GUILayout.Label(_feedback);
-                GUI.color = previous;
-            }
-            GUILayout.EndArea();
+            var r = _model.SetPreference(id, action, _selectedIds);
+            _feedbackOk = r.Success;
+            _feedback = r.Message;
+            _feedbackUntil = Time.unscaledTime + 2.5f;
+#if UNITY_EDITOR
+            InputAudit.Log("building_pref building=" + id + " action=" + action + " result=" + (r.Success ? "ok" : "deny")
+                + " message=" + r.Message + " selected_ids=" + InputAudit.FormatIds(_selectedIds));
+#endif
         }
 
         private void Execute(BuildingCommandAction action)
@@ -209,15 +342,13 @@ namespace IronCurtain.View
 #endif
         }
 
-        private static GUIStyle _title;
-        private static GUIStyle TitleStyle()
+        private void LateUpdate()
         {
-            if (_title == null)
-            {
-                _title = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold };
-                _title.normal.textColor = Color.white;
-            }
-            return _title;
+            // 只有目标面板算拦截区(与旧口径一致;悬停选择器/常显标签不拦)
+            if (_root != null && _targetId != 0) LastPanelRect = UiKit.WorldRect(_root);
         }
+
+        private void OnDisable() => LastPanelRect = Rect.zero;
+        private void OnDestroy() => LastPanelRect = Rect.zero;
     }
 }
