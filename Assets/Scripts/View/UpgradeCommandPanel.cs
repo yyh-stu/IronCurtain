@@ -29,7 +29,7 @@ namespace IronCurtain.View
         public void Init(SimCore sim, Side player)
         {
             _model = new UpgradeCommandModel(sim, player);
-            if (UiRoot.Current != null) Build(UiRoot.Current.Screen);
+            if (UiRoot.Current != null && UiRoot.Current.Right != null) Build(UiRoot.Current.Right);
             // 取证开关:IC_UI_EXPAND=1 展开面板拍按钮列表(成品观感证据)
             if (System.Environment.GetEnvironmentVariable("IC_UI_EXPAND") == "1")
                 SetExpanded(true);
@@ -58,10 +58,7 @@ namespace IronCurtain.View
         {
             _root = new VisualElement { name = "UpgradePanel" };
             _root.AddToClassList("panel");
-            _root.style.position = Position.Absolute;
-            _root.style.right = 12;
-            _root.style.top = 56;
-            _root.style.width = 324;
+            _root.style.marginBottom = 8;   // 右侧列内堆叠(列容器负责定位)
 
             var head = new VisualElement();
             head.style.flexDirection = FlexDirection.Row;

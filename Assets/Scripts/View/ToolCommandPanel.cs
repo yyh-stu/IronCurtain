@@ -1,12 +1,17 @@
 using System;
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
     public enum ToolTargetMode : byte { None, Ram, Fort }
 
-    /// <summary>M6.3 道具入口；只负责目标模式和反馈，结算由 ToolCommandModel 完成。</summary>
+    /// <summary>M6.3 道具入口；只负责目标模式和反馈，结算由 ToolCommandModel 完成。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit。逻辑方法(Arm/TryHandleWorldClick/
+    /// CancelTargeting/CanShowActions)与公开契约(PendingTarget/HasPendingTarget/Expanded/
+    /// SetExpanded/SetOpenedCallback/LastPanelRect)全部原样保留,仅绘制层更换。
+    /// 位置:左上、跟随兵营总览(暂仍为 IMGUI)底边,每帧对齐(LateUpdate)。</summary>
     public sealed class ToolCommandPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = Rect.zero;
@@ -24,11 +29,18 @@ namespace IronCurtain.View
         public bool HasPendingTarget => _pending != ToolTargetMode.None;
         public string LastFeedback => _feedback;
 
+        private VisualElement _root, _body;
+        private Button _header;
+        private Label _ep, _feedbackLabel;
+
         public void Init(SimCore sim, Side player)
         {
             _sim = sim;
             _model = new ToolCommandModel(sim, player);
             _player = player;
+            if (UiRoot.Current != null && UiRoot.Current.Screen != null) Build(UiRoot.Current.Screen);
+            if (System.Environment.GetEnvironmentVariable("IC_UI_EXPAND") == "1")
+                SetExpanded(true);   // 取证开关:展开拍按钮列表
         }
 
         public bool Arm(ToolTargetMode mode)
@@ -90,6 +102,7 @@ namespace IronCurtain.View
             return true;
         }
 
+        /// <summary>IMGUI 时代的布局参考;保留供兼容引用,实际布局改由 UITK 完成。</summary>
         public static Rect PanelRectFor(int screenWidth, int screenHeight, float reservedTop, bool expanded)
         {
             float width = Mathf.Max(0f, Mathf.Min(340f, screenWidth - 20f));
@@ -102,9 +115,6 @@ namespace IronCurtain.View
         /// <summary>无效配置不得把零成本按钮呈现成可执行操作。</summary>
         public static bool CanShowActions(ToolCommandState state) => state.Valid;
 
-        private void OnDisable() { LastPanelRect = Rect.zero; _pending = ToolTargetMode.None; }
-        private void OnDestroy() { LastPanelRect = Rect.zero; _pending = ToolTargetMode.None; }
-
         private bool _expanded;
         public bool Expanded => _expanded;
         public void SetOpenedCallback(Action callback) => _openedCallback = callback;
@@ -112,68 +122,116 @@ namespace IronCurtain.View
         {
             _expanded = expanded;
             if (expanded) _openedCallback?.Invoke();
+            ApplyExpanded();
         }
 
-        private void OnGUI()
+        private void Build(VisualElement parent)
         {
-            if (_model == null) { LastPanelRect = Rect.zero; return; }
-            GUI.skin.font = ViewAssets.UiFont(14);
-            LastPanelRect = PanelRectFor(Screen.width, Screen.height,
-                BarracksOverviewPanel.LastPanelRect.yMax + 8f, _expanded);
-            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
-            GUILayout.BeginArea(new Rect(LastPanelRect.x + 8f, LastPanelRect.y + 6f,
-                Mathf.Max(0f, LastPanelRect.width - 16f), Mathf.Max(0f, LastPanelRect.height - 12f)));
-            DrawHeader();
-            if (_expanded) DrawContents();
-            GUILayout.EndArea();
-        }
+            _root = new VisualElement { name = "ToolPanel" };
+            _root.AddToClassList("panel");
+            _root.style.position = Position.Absolute;
+            _root.style.left = 12;
+            _root.style.top = 60;
+            _root.style.width = 348;
 
-        private void DrawHeader()
-        {
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button(_expanded ? "道具 ▲" : "道具 ▼", GUILayout.Width(92f)))
+            var head = new VisualElement();
+            head.style.flexDirection = FlexDirection.Row;
+            head.style.alignItems = Align.Center;
+            _header = UiKit.MakeButton("道具 ▼", () =>
             {
                 SetExpanded(!_expanded);
 #if UNITY_EDITOR
                 InputAudit.Log("tool_panel expanded=" + _expanded);
 #endif
-            }
-            GUILayout.FlexibleSpace();
-            var state = _model.Describe();
-            GUILayout.Label(state.Valid ? "EP " + state.Ep.ToString("0.#") : "状态不可用");
-            GUILayout.EndHorizontal();
+            });
+            _header.style.width = 110;
+            head.Add(_header);
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
+            _ep = UiKit.MakeLabel("", "label-dim");
+            head.Add(_ep);
+            _root.Add(head);
+
+            _body = new VisualElement();
+            _body.style.marginTop = 6;
+            _root.Add(_body);
+
+            _feedbackLabel = UiKit.MakeLabel("", "feedback-ok");
+            _feedbackLabel.style.marginTop = 4;
+            _root.Add(_feedbackLabel);
+
+            parent.Add(_root);
+            ApplyExpanded();
         }
 
-        private void DrawContents()
+        private void ApplyExpanded()
         {
+            if (_header == null) return;
+            _header.text = _expanded ? "道具 ▲" : "道具 ▼";
+            if (_body != null) _body.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_feedbackLabel != null) _feedbackLabel.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void Update()
+        {
+            if (_model == null || _root == null) return;
             var state = _model.Describe();
+            _ep.text = state.Valid ? "EP " + state.Ep.ToString("0.#") : "状态不可用";
+            if (_expanded) RebuildContents(state);
+
+            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
+            {
+                _feedbackLabel.text = _feedback;
+                _feedbackLabel.EnableInClassList("feedback-ok", _feedbackOk);
+                _feedbackLabel.EnableInClassList("feedback-err", !_feedbackOk);
+            }
+            else if (_feedbackLabel != null) _feedbackLabel.text = "";
+        }
+
+        private void RebuildContents(ToolCommandState state)
+        {
+            _body.Clear();
             if (!CanShowActions(state))
             {
-                DrawFeedback("道具状态不可用", false);
+                _body.Add(UiKit.MakeLabel("道具状态不可用", "feedback-err"));
                 return;
             }
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("攻城锥 " + state.RamCost + "EP", GUILayout.Height(30f)))
-                Arm(ToolTargetMode.Ram);
-            if (GUILayout.Button("临时阵地 " + state.FortCost + "EP", GUILayout.Height(30f)))
-                Arm(ToolTargetMode.Fort);
-            GUILayout.EndHorizontal();
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            var ram = UiKit.MakeButton("攻城锥 " + state.RamCost + "EP", () => Arm(ToolTargetMode.Ram));
+            ram.style.height = 32; ram.style.flexGrow = 1;
+            var fort = UiKit.MakeButton("临时阵地 " + state.FortCost + "EP", () => Arm(ToolTargetMode.Fort));
+            fort.style.height = 32; fort.style.flexGrow = 1; fort.style.marginLeft = 8;
+            row.Add(ram); row.Add(fort);
+            _body.Add(row);
+
             if (_pending != ToolTargetMode.None)
             {
-                GUILayout.Label(_pending == ToolTargetMode.Ram ? "目标：可见敌方建筑" : "目标：地图内空格");
-                if (GUILayout.Button("取消当前目标", GUILayout.Height(26f))) CancelTargeting("button");
+                var targetRow = new VisualElement();
+                targetRow.style.flexDirection = FlexDirection.Row;
+                targetRow.style.alignItems = Align.Center;
+                targetRow.style.marginTop = 4;
+                targetRow.Add(UiKit.MakeLabel(
+                    _pending == ToolTargetMode.Ram ? "目标：可见敌方建筑" : "目标：地图内空格", "label-dim"));
+                var cancel = UiKit.MakeButton("取消当前目标", () => CancelTargeting("button"));
+                cancel.style.height = 26; cancel.style.marginLeft = 8;
+                targetRow.Add(cancel);
+                _body.Add(targetRow);
             }
-            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
-                DrawFeedback(_feedback, _feedbackOk);
         }
 
-        private static void DrawFeedback(string message, bool success)
+        private void LateUpdate()
         {
-            var previous = GUI.color;
-            GUI.color = success ? Color.green : new Color(1f, 0.35f, 0.3f);
-            GUILayout.Label(message);
-            GUI.color = previous;
+            if (_root == null) return;
+            // 跟随兵营总览(暂仍 IMGUI)底边;它迁完后此跟随逻辑自然失效可删
+            var b = BarracksOverviewPanel.LastPanelRect;
+            float top = b.height > 0f ? b.yMax + 8f : 60f;
+            _root.style.top = top;
+            LastPanelRect = UiKit.WorldRect(_root);   // 输入拦截桥
         }
+
+        private void OnDisable() { LastPanelRect = Rect.zero; _pending = ToolTargetMode.None; }
+        private void OnDestroy() { LastPanelRect = Rect.zero; _pending = ToolTargetMode.None; }
 
         private void Report(string action, ToolTargetMode mode, ToolCommandFeedback result)
         {

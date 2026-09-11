@@ -16,6 +16,8 @@ namespace IronCurtain.View
     {
         public static UiRoot Current { get; private set; }
         public VisualElement Screen { get; private set; }
+        /// <summary>右侧列(升级/海克斯等入口面板):自动堆叠,展开互不遮挡。</summary>
+        public VisualElement Right { get; private set; }
 
         private void Awake()
         {
@@ -41,6 +43,14 @@ namespace IronCurtain.View
             Screen.style.position = Position.Absolute;
             Screen.style.left = 0; Screen.style.right = 0; Screen.style.top = 0; Screen.style.bottom = 0;
             doc.rootVisualElement.Add(Screen);
+
+            Right = new VisualElement { name = "RightColumn" };
+            Right.style.position = Position.Absolute;
+            Right.style.right = 12;
+            Right.style.top = 56;
+            Right.style.width = 328;
+            Right.style.flexDirection = FlexDirection.Column;
+            Screen.Add(Right);
         }
 
         private void Start()
