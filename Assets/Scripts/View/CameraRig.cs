@@ -10,19 +10,25 @@ namespace IronCurtain.View
     {
         public float EdgeScrollSpeed = 28f;  // 键盘平移速度(米/秒),公开可配置
 
-        public const float MapWidthM = 286f;
+        public const float MapWidthM = 270f;
         public const float DefaultViewWidth = MapWidthM / 5f; // 57.2m
         public const float MinViewWidth = 22f;                // 近景上限(单位足够大)
         public const float MaxViewWidth = 150f;               // 半图纵览
 
         // 初始焦点单一来源(flash 审查:两处硬编码易再发 bug2)
         public const float InitFocusCol = 40f;
-        public const float InitFocusRow = 15f;
+        public const float InitFocusRow = 80f;   // 三路地图:中路居中(2026-09-11)
 
         private Camera _cam;
         private Vector3 _offset;             // 相机位置 - 焦点(保持既有构图)
+        private Vector3 _offsetDir;          // 视线偏移单位向量(缩放改距离时方向不变 → 焦点恒在屏幕中心)
+        private float _baseDist;             // Init 时的机位距离,透视 FOV 换算基准
         private float _focusCol, _focusRow;
         private float _viewWidth = DefaultViewWidth;
+
+        // 透视缩放时 FOV 允许区间:超出即改由拉远/拉近补偿,避免超广角畸变与超长焦压平
+        private const float MinFov = 22f;
+        private const float MaxFov = 50f;
 
         /// <summary>当前视野宽度(米,横向)。</summary>
         public float ViewWidth { get { return _viewWidth; } }
@@ -31,7 +37,16 @@ namespace IronCurtain.View
         {
             _cam = cam;
             _offset = cam.transform.position - WorldOf(focusColM, focusRowM);
+            _offsetDir = _offset.normalized;
+            _baseDist = _offset.magnitude;
             SetFocus(focusColM, focusRowM);
+            ApplyProjection();
+        }
+
+        /// <summary>重算投影。改过 Camera.aspect 或切换正交/透视后必须调用,否则取景范围与实际不符
+        /// (ART-P0 截图通道:批处理窗口 aspect 与实际不符,截图前先定死 16:9 再重算)。</summary>
+        public void RefreshProjection()
+        {
             ApplyProjection();
         }
 
@@ -84,10 +99,28 @@ namespace IronCurtain.View
             SetFocus(_focusCol + dx * step, _focusRow + dy * step);
         }
 
+        // ART-P0 2026-09-10 相机改透视后,缩放不能再只写 orthographicSize(原实现只在正交分支生效,
+        // 直接切透视会让滚轮静默失效)。统一语义仍是"焦点平面上的横向视野宽度 _viewWidth":
+        // 正交用 orthographicSize 表达,透视用 FOV 表达;FOV 越界时改由沿视线拉远/拉近补偿。
         private void ApplyProjection()
         {
-            if (_cam.orthographic && _cam.aspect > 0.01f)
-                _cam.orthographicSize = _viewWidth / (2f * _cam.aspect);
+            if (_cam == null || _cam.aspect <= 0.01f) return;
+            float halfV = _viewWidth / (2f * _cam.aspect);
+            if (_cam.orthographic)
+            {
+                _cam.orthographicSize = halfV;
+                return;
+            }
+            float fov = 2f * Mathf.Atan(halfV / _baseDist) * Mathf.Rad2Deg;
+            float dist = _baseDist;
+            if (fov < MinFov || fov > MaxFov)
+            {
+                fov = Mathf.Clamp(fov, MinFov, MaxFov);
+                dist = halfV / Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad);
+            }
+            _cam.fieldOfView = fov;
+            _offset = _offsetDir * dist;
+            _cam.transform.position = WorldOf(_focusCol, _focusRow) + _offset;
         }
     }
 }

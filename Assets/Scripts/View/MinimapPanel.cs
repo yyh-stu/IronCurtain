@@ -142,10 +142,12 @@ namespace IronCurtain.View
             }
             if (!ok)
             {
-                // 兜底:焦点 ± orthoSize
+                // 兜底:焦点 ± 半个视野宽度。ART-P0 相机改透视后 orthographicSize 已无意义
+                // (不再被写入,恒为 Unity 默认 5),改用 CameraRig 的视野宽度语义(正交/透视通用)。
+                float hw = _rig != null ? _rig.ViewWidth * 0.5f : _cam.orthographicSize;
                 Vector3 pos = _cam.transform.position;
-                minX = pos.x - _cam.orthographicSize; maxX = pos.x + _cam.orthographicSize;
-                minZ = pos.z - _cam.orthographicSize; maxZ = pos.z + _cam.orthographicSize;
+                minX = pos.x - hw; maxX = pos.x + hw;
+                minZ = pos.z - hw; maxZ = pos.z + hw;
             }
             float x0, y0, x1, y1;
             MinimapLayout.WorldToMini(minX, 3f - maxZ, w, h, out x0, out y0);
