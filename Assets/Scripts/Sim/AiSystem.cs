@@ -20,6 +20,10 @@ namespace IronCurtain.Sim
             public int WaveStartCount;
             public List<int> WaveUnits = new List<int>();
             public int NextLane;            // 2026-09-11 三路分推:波次目标路 0上/1中/2下,成功发波后轮转
+            public readonly System.Collections.Generic.Dictionary<int, float> BuildingHp
+                = new System.Collections.Generic.Dictionary<int, float>();          // 威胁判定:城血快照
+            public readonly System.Collections.Generic.Dictionary<int, long> DefendCooldown
+                = new System.Collections.Generic.Dictionary<int, long>();           // 威胁响应城级冷却
         }
 
         static readonly Dictionary<Side, AiState> _ais = new Dictionary<Side, AiState>();
@@ -102,6 +106,9 @@ namespace IronCurtain.Sim
             if (!ai.WaveActive) TryLaunchWave(sim, ai);
             // 6. 主动防守
             ActiveDefend(sim, ai);
+            // 7. 威胁响应(2026-09-12 制作人"AI 智能化"第一步,纯规则不加权):
+            //    ①敌兵压境/城池被攻 → 就近士兵入城驻守;②调闲置主将回防(到位自动索敌)
+            ThreatRespond(sim, ai);
         }
 
         static void TryDrawHex(SimCore sim, AiState ai)
@@ -221,6 +228,71 @@ namespace IronCurtain.Sim
                 if (d < bd) { bd = d; best = l; }
             }
             return best;
+        }
+
+        // ---- 威胁响应(2026-09-12) ----
+        const float ThreatRadius = 10f;     // 敌兵距城多远算压境
+        const int ThreatEnemies = 3;        // 压境敌兵数门槛
+        const int DefendCooldownTicks = 150; // 同城响应冷却(15s,防抖)
+        const float GarrisonSoldierRange = 22f; // 就近征兵半径
+        const int GarrisonBatch = 8;        // 单次最多征入城士兵
+
+        static void ThreatRespond(SimCore sim, AiState ai)
+        {
+            var hp = ai.BuildingHp;
+            foreach (var b in sim.Entities.Values)
+            {
+                if (b == null || b.Kind != EntityKind.Building || b.Side != ai.Side || b.Rubbled) continue;
+                float last;
+                hp.TryGetValue(b.Id, out last);
+                hp[b.Id] = b.Hp;                                   // 先记录,本轮判定用旧值
+                bool underAttack = b.Hp < last - 0.01f;            // 血在掉 = 正被攻
+
+                // 敌兵压境:可见敌兵在城 ThreatRadius 内
+                int enemiesNear = 0;
+                foreach (var e in sim.Entities.Values)
+                {
+                    if (e == null || e.Kind != EntityKind.Unit || e.Side == ai.Side || e.State == EntityState.Dead) continue;
+                    if (!VisionSystem.IsUnitVisible(sim, ai.Side, e.Id)) continue;
+                    if (Dist(sim, e, b) <= ThreatRadius) enemiesNear++;
+                }
+                if (!underAttack && enemiesNear < ThreatEnemies) continue;
+
+                // 冷却(城级;缺省"从未响应"不得拦首次——TryGetValue 存在性判断)
+                if (ai.DefendCooldown.TryGetValue(b.Id, out long cdTick) && sim.Tick - cdTick < DefendCooldownTicks) continue;
+                ai.DefendCooldown[b.Id] = sim.Tick;
+
+                // ① 驻军反应:就近未出征士兵直接入城(临时驻军,守城战力)
+                if (b.GarrisonFormal.Count + b.GarrisonTemp.Count < 6)
+                {
+                    var center = SimVec2.FromGrid(b.Pos);
+                    var candidates = new List<int>();
+                    foreach (var e in sim.Entities.Values)
+                    {
+                        if (e == null || e.Kind != EntityKind.Unit || !e.IsSoldier || e.Side != ai.Side) continue;
+                        if (e.State == EntityState.Dead || e.GarrisonBuildingId != 0) continue;
+                        if (e.TargetBuildingId != 0) continue;      // 出征/攻城中的兵不征
+                        if (SimVec2.Distance(e.PosF, center) > GarrisonSoldierRange) continue;
+                        candidates.Add(e.Id);
+                        if (candidates.Count >= GarrisonBatch) break;
+                    }
+                    if (candidates.Count > 0)
+                        GarrisonSystem.EnterTemp(sim, candidates, b.Id, out _);
+                }
+
+                // ② 回防走位:最近的 2 个闲置主将拉到城门前(到位后既有索敌逻辑自动接战)
+                var defenders = sim.Entities.Values
+                    .Where(e => e != null && e.Kind == EntityKind.Unit && e.Side == ai.Side && !e.IsSoldier
+                                && e.State == EntityState.Idle && e.GarrisonBuildingId == 0
+                                && !ai.WaveUnits.Contains(e.Id))
+                    .OrderBy(e => Dist(sim, e, b))
+                    .Take(2).ToList();
+                foreach (var d in defenders)
+                {
+                    var front = FrontCell(sim, b);
+                    if (front.HasValue) sim.SetMoveTarget(d.Id, front.Value);
+                }
+            }
         }
 
         static void ActiveDefend(SimCore sim, AiState ai)
