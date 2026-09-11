@@ -45,6 +45,38 @@ namespace IronCurtain.Tests
         }
 
         [Test]
+        public void 简单档前线失守_草坪塔驻军参战回防()
+        {
+            // 制作人补例(2026-09-12):简单档只攻不防,但前线失守时草坪箭塔驻军要回防(收复)
+            var towerA = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(80, 205));   // 中路前线点
+            var lawn = sim.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(45, 60));     // 草坪塔(不在路带)
+            var g1 = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(78, 205));
+            var g2 = RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(45, 58));
+            AiSystem.Configure(sim, Side.Red, AiTier.Simple);
+
+            Run(80);   // 立足:g1 驻前线塔、g2 驻草坪塔;OwnedSet 快照记录
+
+            // 真实失守:撤走塔旁全部红军(否则贴身即时占领会立刻翻回,掩盖行为),蓝兵进城驻守
+            foreach (var e in sim.Entities.Values.ToList())
+                if (e != null && e.Side == Side.Red && e.Kind == EntityKind.Unit
+                    && SimVec2.Distance(e.PosF, new SimVec2(205f, 80f)) < 14f)
+                    sim.RemoveEntity(e.Id);
+            var defender = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(79, 204));
+            defender.IsSoldier = true; defender.Hp = defender.MaxHp = 100f; defender.GeneralId = 0;
+            defender.GarrisonBuildingId = towerA.Id;
+            towerA.GarrisonFormal.Add(defender.Id);   // 有守军 → 红方无法即时翻回
+            towerA.Side = Side.Blue;
+            Run(40);   // 决策 tick:失地 → Reclaim → 草坪塔驻将 g2 参战
+
+            var moving = sim.Entities.Values.Count(e => e != null && e.Side == Side.Red
+                && e.Kind == EntityKind.Unit && (e.HasMoveTarget || e.TargetBuildingId != 0));
+            Assert.IsTrue(g2.HasMoveTarget || g2.State == EntityState.Moving || g2.TargetBuildingId != 0,
+                "前线失守 → 草坪塔驻军(g2)应参与收复回防(g2: HasMoveTarget=" + g2.HasMoveTarget
+                + " Target=" + g2.TargetBuildingId + " State=" + g2.State + " Pos=" + g2.PosF
+                + "; 全红方动员数=" + moving + "; " + AiSystem.DebugStateOf(Side.Red) + ")");
+        }
+
+        [Test]
         public void 二线城被攻_AI调闲置主将回防()
         {
             // 用资源点(二线,非驻防点)验回防令:驻防点的将移动属立足行为,会干扰旧断言

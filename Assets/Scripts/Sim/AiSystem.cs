@@ -54,6 +54,7 @@ namespace IronCurtain.Sim
             public readonly HashSet<int> OwnedSet = new HashSet<int>();      // 立足完成时的地盘快照
             public readonly Dictionary<int, float> BuildingHp = new Dictionary<int, float>();
             public readonly Dictionary<int, long> DefendCooldown = new Dictionary<int, long>();
+            public long LastSeenTick = -1;      // 弱侧攻击:首个敌方建筑变已知的 tick(延迟2s基准)
             public long LastHeartbeat;
 
             public bool UseHexes => Tier == AiTier.Hard;          // 简单:不抽卡不升级
@@ -70,6 +71,15 @@ namespace IronCurtain.Sim
         }
 
         public static void Reset() => _ais.Clear();
+
+        /// <summary>调试快照(测试/排障用):指定方 AI 的阶段/失地/地盘/波次。 </summary>
+        public static string DebugStateOf(Side side)
+        {
+            if (!_ais.TryGetValue(side, out var ai) || ai == null) return "no-ai";
+            return "phase=" + ai.Phase + " lost=" + ai.LostIds.Count + " owned=" + ai.OwnedSet.Count
+                + " waves=" + ai.Waves.Count + " tier=" + ai.Tier
+                + " since=" + ai.PhaseSince;
+        }
 
         public static void Tick(SimCore sim, float dt)
         {
@@ -103,6 +113,7 @@ namespace IronCurtain.Sim
 
             MaintainWaves(sim, ai);
             UpdateLost(sim, ai);
+            GuardTopUp(sim, ai);   // 2026-09-12 制作人:简单档箭塔始终保持有军队(驻防点未满即补)
 
             switch (ai.Phase)
             {
@@ -177,6 +188,12 @@ namespace IronCurtain.Sim
                     if (b.Building == BuildingId.Tower && IntentFor(b) == SiegeIntent.Capture)
                         posts.Add(b);
             }
+            if (posts.Count == 0)
+            {
+                // 2026-09-12 制作人:前线/二线全失守 → 完全收缩到第三线与大本营(Home 兜底为驻防点)
+                var home = Home(sim, ai.Side);
+                if (home != null) posts.Add(home);
+            }
             return posts;
         }
 
@@ -247,7 +264,9 @@ namespace IronCurtain.Sim
             var wave = PickComposition(pool, ai.WaveCap);
             if (wave.Count == 0) return;
 
-            int lane = (int)(sim.Rng.NextUInt64() % 3);   // 制作人:随机选一路
+            // 2026-09-12 制作人:两档偏好**弱侧**——视野之灵开视野后延迟 2s,对兵力最弱侧发动攻击
+            int lane = WeakestLane(sim, ai);
+            if (lane < 0) return;   // 无任何已知敌情(视野未开)
             var target = PickTargetInLane(sim, ai, lane);
             if (target == null) target = PickAnyTarget(sim, ai);
             if (target == null) return;
@@ -280,6 +299,41 @@ namespace IronCurtain.Sim
                 if (!result.Contains(e)) result.Add(e);
             }
             return result;
+        }
+
+        /// <summary>弱侧(制作人 2026-09-12):三路中敌方兵力最弱者=该路可见敌单位数+已知驻军总和最少;
+        /// 无数据的路不参与比较。首次出现已知敌情后延迟 20 ticks(2s)才放行;全无数据返回 -1。</summary>
+        static int WeakestLane(SimCore sim, AiState ai)
+        {
+            bool anyKnown = false;
+            foreach (var e in sim.Entities.Values)
+                if (e != null && e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral
+                    && !e.Rubbled && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id))
+                { anyKnown = true; break; }
+            if (!anyKnown) return -1;
+            if (ai.LastSeenTick < 0) ai.LastSeenTick = sim.Tick;    // 视野之灵首次开视野
+            if (sim.Tick - ai.LastSeenTick < 20) return -1;        // 延迟 2s
+
+            int best = -1; int bestPower = int.MaxValue;
+            for (int lane = 0; lane < 3; lane++)
+            {
+                int power = 0; bool hasData = false;
+                foreach (var e in sim.Entities.Values)
+                {
+                    if (e == null) continue;
+                    if (e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral && !e.Rubbled
+                        && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id)
+                        && LaneIndexOf(SimVec2.FromGrid(e.Pos)) == lane)
+                    { power += VisionSystem.LastKnownGarrison(sim, ai.Side, e.Id) ?? 0; hasData = true; }
+                    else if (e.Kind == EntityKind.Unit && e.Side != ai.Side && e.State != EntityState.Dead
+                             && VisionSystem.IsUnitVisible(sim, ai.Side, e.Id)
+                             && LaneIndexOf(e.PosF) == lane)
+                    { power += 1; hasData = true; }
+                }
+                if (hasData && power < bestPower) { bestPower = power; best = lane; }
+            }
+            if (best >= 0) return best;
+            return (int)(sim.Rng.NextUInt64() % 3);   // 全无侧向数据 → 随机
         }
 
         /// <summary>该路上最前的已知敌建筑(朝我方方向最近)。</summary>
@@ -320,7 +374,7 @@ namespace IronCurtain.Sim
             {
                 if (ai.SkipRetake.Contains(lostId)) continue;
                 if (ai.Waves.Any(w => w.TargetId == lostId)) continue;   // 已有收复波在途
-                var pool = FreeGenerals(sim, ai).ToList();
+                var pool = ReclaimPool(sim, ai);
                 if (pool.Count == 0) break;
                 var squad = PickComposition(pool, 2);   // 每处失地 1-2 将,分散同时夺回
                 if (squad.Count == 0) break;
@@ -329,6 +383,15 @@ namespace IronCurtain.Sim
                 if (order.Success)
                     ai.Waves.Add(new Wave { TargetId = lostId, StartCount = squad.Count,
                         Units = squad.Select(e => e.Id).ToList(), IsRetake = true });
+                else
+                {
+                    // 兜底(else 出口):正式攻城令被拒(如前排落点无解)→ 直接走位压过去,
+                    // 靠既有索敌自动接战+无守军贴身即占(InstantCapture),失地仍可夺回
+                    var lb = sim.GetEntity(lostId);
+                    var lf = lb != null ? FrontCell(sim, lb) : (GridPos?)null;
+                    if (lf.HasValue)
+                        foreach (var g in squad) sim.SetMoveTarget(g.Id, lf.Value);
+                }
             }
         }
 
@@ -414,6 +477,45 @@ namespace IronCurtain.Sim
                 if (isGuard) pulled.Add(e);
             }
             return pulled;
+        }
+
+        /// <summary>驻防补员(2026-09-12 制作人:简单档箭塔始终保持有军队;两档通用):
+        /// 驻防点人数未满 want → 派最近自由将去补(草坪塔参战抽空后自动回填)。</summary>
+        static void GuardTopUp(SimCore sim, AiState ai)
+        {
+            foreach (var post in GuardPosts(sim, ai))
+            {
+                int want = WantGuards(ai, post);
+                int have = CountGuards(sim, ai, post, includeEnRoute: true);
+                while (have < want)
+                {
+                    var g = TakeFreeGeneral(sim, ai, post);
+                    if (g == null) return;
+                    var front = FrontCell(sim, post);
+                    if (front.HasValue) sim.SetMoveTarget(g.Id, front.Value);
+                    have++;
+                }
+            }
+        }
+
+        /// <summary>收复兵源(2026-09-12 制作人补例:简单档前线失守时,**草坪箭塔驻军要回防**——
+        /// 纳入草坪塔驻将;前线城驻军不动)。困难档=常规自由将。</summary>
+        static List<Entity> ReclaimPool(SimCore sim, AiState ai)
+        {
+            var pool = FreeGenerals(sim, ai).ToList();
+            if (ai.Tier != AiTier.Simple) return pool;
+            var posts = GuardPosts(sim, ai);
+            foreach (var e in sim.Entities.Values)
+            {
+                if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != ai.Side) continue;
+                if (e.State == EntityState.Dead || e.State == EntityState.Exchanging) continue;
+                if (e.GarrisonBuildingId != 0 || InAnyWave(ai, e.Id) || pool.Contains(e)) continue;
+                foreach (var p in posts)
+                    if (Dist(sim, e, p) <= GuardRadiusF
+                        && p.Building == BuildingId.Tower && IntentFor(p) == SiegeIntent.Capture)
+                    { pool.Add(e); break; }   // 草坪塔驻将参战
+            }
+            return pool;
         }
 
         static IEnumerable<Entity> FreeGenerals(SimCore sim, AiState ai)
