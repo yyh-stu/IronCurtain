@@ -466,6 +466,7 @@ namespace IronCurtain.Sim
                                 int ws = (int)wallHit.Value.Owner;
                                 bool broke = WallSystem.Damage(wallHit.Value.Owner, wallHit.Value.Panel, wallDmg);
                                 Emit(new SimEvent(Tick, SimEventType.WallDamaged, wallHit.Value.Panel, wallDmg, e.Id, ws, e.PosF));
+                                AddBuildingDamage(e, wallDmg);   // 墙计入对建筑伤害(2026-09-11 结算口径)
                                 if (broke)
                                     Emit(new SimEvent(Tick, SimEventType.WallBroken, wallHit.Value.Panel, 0f, e.Id, ws));
                             }
@@ -599,6 +600,7 @@ namespace IronCurtain.Sim
                     remaining -= absorbed;
                 }
                 o.Hp -= remaining;
+                AddCombatDamage(attacker, o, dmg);
                 Emit(new SimEvent(Tick, SimEventType.DamageDealt, o.Id, dmg, attacker.Id));
                 if (o.Hp <= 0f) { o.State = EntityState.Dead; dead.Add(o.Id); }
             }
@@ -609,6 +611,29 @@ namespace IronCurtain.Sim
             foreach (var h in Game.Heroes)
                 if (h.Id == id) return h.ChargeSpeed;
             return 0;
+        }
+
+        /// <summary>战绩归因(2026-09-11):伤害/承伤归到出手方与受击方主将名下——
+        /// 士兵实体自带主将 Hero(变装口径),士兵与主将统一用自身 Hero 归因;
+        /// 受击为建筑计"对建筑伤害"(墙在攻墙处另行计入)。</summary>
+        static void AddCombatDamage(Entity attacker, Entity victim, float dmg)
+        {
+            if (attacker == null || victim == null || dmg <= 0f) return;
+            if (attacker.Side == Side.Neutral) return;
+            HeroId aHero = attacker.Hero ?? HeroId.PanShi;
+            if (victim.Kind == EntityKind.Building)
+                MatchStats.AddBuildingDamage(attacker.Side, aHero, dmg);
+            else
+                MatchStats.AddHeroDamage(attacker.Side, aHero, dmg);
+            if (victim.Kind == EntityKind.Unit && victim.Side != Side.Neutral)
+                MatchStats.AddDamageTaken(victim.Side, victim.Hero ?? HeroId.PanShi, dmg);
+        }
+
+        /// <summary>墙伤害归因(攻墙处调用)。</summary>
+        static void AddBuildingDamage(Entity attacker, float dmg)
+        {
+            if (attacker == null || attacker.Side == Side.Neutral) return;
+            MatchStats.AddBuildingDamage(attacker.Side, attacker.Hero ?? HeroId.PanShi, dmg);
         }
 
         public void Emit(SimEvent ev)

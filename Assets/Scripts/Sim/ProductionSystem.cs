@@ -116,7 +116,7 @@ namespace IronCurtain.Sim
                 // 2026-09-10:改用 SlotOffset 统一(12 兵双态:出生时主将 Idle→圆阵)
                 bool formationClear = true;
                 var probeG = new Entity(0, b.Side, EntityKind.Unit, cand, 1f) { PosF = center };
-                for (int s2 = 0; s2 < RegimentSystem.SoldiersPerGeneral && formationClear; s2++)
+                for (int s2 = 0; s2 < RegimentSystem.CompanySize(probeG) && formationClear; s2++)
                 {
                     var sp = center + RegimentSystem.SlotOffset(probeG, s2);
                     var scell = sp.ToGrid();

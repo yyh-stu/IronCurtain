@@ -116,19 +116,19 @@ public class SiegeTests
     }
 
     [Test]
-    public void T3_封城锁意图()
+    public void T3_意图随时可切_封城已废除()
     {
+        // 2026-09-11 制作人:废除封城——交换进行中也可切换意图
         Garrison(redTowerId, 3, Side.Red);
         SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Capture, out _);
         var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
         var atk = SoldiersOf(g).Take(2).ToList();
         AttackAndArrive(redTowerId, atk.ToArray());
-        Assert.IsTrue(RunUntil(() => sim.Entities[redTowerId].Sealed, 50), "超时未进入封城");
-        Assert.IsTrue(sim.Entities[redTowerId].Sealed, "攻方入城后建筑应封城");
-        Assert.IsFalse(SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Destroy, out var err), "封城期间切换意图应被拒绝");
-        Assert.IsNotNull(err, "应返回错误信息");
-        StringAssert.Contains("封城", err, "错误信息应包含『封城』");
+        RunUntil(() => SiegeSystemSealedNever(), 5); // 推进若干 tick(交换可能进行中)
+        Assert.IsTrue(SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Destroy, out var err), "交换期间切换意图应放行(2026-09-11 废封城)");
     }
+
+    private static bool SiegeSystemSealedNever() => false;
 
     [Test]
     public void T4_交换1比1_守军与攻方士兵同归于尽()
@@ -217,8 +217,7 @@ public class SiegeTests
         var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
         var ss = SoldiersOf(g).ToList();
         AttackAndArrive(redTowerId, ss[0]);
-        Assert.IsTrue(RunUntil(() => sim.Entities[redTowerId].Sealed, 50), "超时未封城");
-        AttackAndArrive(redTowerId, ss[1], ss[2]); // 封城期间增援
+        AttackAndArrive(redTowerId, ss[1], ss[2]); // 交换期间增援照常进城(2026-09-11 废封城)
         Assert.IsTrue(RunUntil(() => sim.Entities[redTowerId].Side == Side.Blue), "超时未完成占领");
         var b = sim.Entities[redTowerId];
         Assert.AreEqual(Side.Blue, b.Side, "最终建筑应归属蓝方");

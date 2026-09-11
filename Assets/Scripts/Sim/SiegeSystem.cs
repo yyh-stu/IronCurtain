@@ -59,7 +59,6 @@ namespace IronCurtain.Sim
             if (sim == null || !TryGetBuilding(sim, buildingId, out b)) { error = "目标不是建筑"; return false; }
             if (issuer == Side.Neutral) { error = "发令阵营无效"; return false; }
             if (b.Rubbled) { error = "废墟需先重建"; return false; }
-            if (b.Sealed) { error = "封城中不可切换意图"; return false; }
             if (intent != SiegeIntent.None && b.Side != Side.Neutral && b.Side == issuer)
             { error = "不可对己方建筑下达占领或摧毁命令"; return false; }
             if (b.Side == Side.Neutral && intent == SiegeIntent.Destroy) { error = "中立建筑不可摧毁"; return false; }
@@ -279,7 +278,7 @@ namespace IronCurtain.Sim
             list.Add(u.Id);
             sim.FreeCell(u.Pos);           // 离格:释放格占用,不堵后续部队
             u.State = EntityState.Exchanging;
-            b.Sealed = true;
+            // 2026-09-11 制作人:废除封城(Sealed 不再置位,字段保留恒 false;相关分支一并拆除)
         }
 
         static void Capture(SimCore sim, Entity b, List<int> survivors)
@@ -309,14 +308,30 @@ namespace IronCurtain.Sim
             }
         }
 
-        static void KillDefenders(SimCore sim, Entity b, int n)
+        /// <summary>士兵交换力:镇岳军团士兵=2(1:2),普通=1。士兵 Hero=主将英雄(变装口径)。</summary>
+        static int SoldierWorth(Entity u)
+        {
+            return u != null && u.IsSoldier && u.Hero == HeroId.ZhenYue ? 2 : 1;
+        }
+
+        static void KillDefenders(SimCore sim, Entity b, int power, Entity killer)
         {
             // 交换只消耗正式驻军,临时驻军受保护(用户拍板,覆盖 GDD 2.4.1)
-            for (int i = 0; i < n && b.GarrisonFormal.Count > 0; i++)
+            // 2026-09-11:按交换力扣——普通守兵 1 力/镇岳守兵 2 力,攻方一轮 power 点
+            int killed = 0;
+            while (power > 0 && b.GarrisonFormal.Count > 0)
             {
                 var id = b.GarrisonFormal[0];
                 b.GarrisonFormal.RemoveAt(0);
+                var victim = sim.GetEntity(id);   // 先取后删:镇岳守兵(2 力)才扣得对
                 sim.RemoveEntity(id);
+                killed++;
+                power -= SoldierWorth(victim);
+            }
+            if (killed > 0 && killer != null)
+            {
+                var hero = killer.Hero ?? HeroId.PanShi;
+                MatchStats.AddAlleyKill(killer.Side, hero, killed);   // 巷战杀敌归进城方主将
             }
         }
 
@@ -375,11 +390,6 @@ namespace IronCurtain.Sim
             foreach (var u in arrived)
             {
                 if (!TryGetBuilding(sim, u.TargetBuildingId, out var b)) { u.TargetBuildingId = 0; continue; }
-                if (b.Sealed)
-                {
-                    if (u.Side == b.IntentIssuer) EnterCity(sim, b, u); // 封城期间攻方增援进城
-                    continue;
-                }
                 if (b.Intent == SiegeIntent.Capture)
                 {
                     if (b.GarrisonFormal.Count + b.GarrisonTemp.Count > 0) EnterCity(sim, b, u);
@@ -391,20 +401,33 @@ namespace IronCurtain.Sim
                 }
             }
 
-            // 2) 交换结算:每 10 tick 一轮;1:1 兵/次,主将免疫
+            // 2) 交换结算:每 10 tick 一轮。2026-09-11 制作人新口径——按**交换力**:
+            //    进城将领=10(镇岳 12,自己不死,一轮换掉等值守军);镇岳军团士兵=2(1:2),普通士兵=1。
+            //    封城已废:有攻方城内单位即结算(原以 Sealed 触发)。
             if (sim.Tick % 10 != 0) return;
-            var sealedBuildings = new List<Entity>();
+            var battleBuildings = new List<Entity>();
             foreach (var e in sim.Entities.Values)
-                if (e.Kind == EntityKind.Building && e.Sealed) sealedBuildings.Add(e);
-            foreach (var b in sealedBuildings)
+                if (e.Kind == EntityKind.Building && AttackersOf(e.Id).Count > 0 && e.GarrisonFormal.Count > 0)
+                    battleBuildings.Add(e);
+            foreach (var b in battleBuildings)
             {
                 var atk = AttackersOf(b.Id);
                 while (atk.Count > 0 && b.GarrisonFormal.Count > 0)
                 {
                     var aid = atk[0];
                     atk.RemoveAt(0); // 该单位结束城内待命(无论生死都离开交换队列)
-                    KillDefenders(sim, b, 1); // 1:1 兵/次(制作人拍板)
-                    KillAttacker(sim, atk, aid); // 攻方只耗士兵,主将免疫
+                    var a = sim.GetEntity(aid);
+                    if (a != null && !a.IsSoldier)
+                    {
+                        // 将领进城:一轮换掉 10(镇岳 12)兵等值守军,将领本体不死
+                        int gp = a.Hero == HeroId.ZhenYue ? 12 : 10;
+                        KillDefenders(sim, b, gp, a);
+                    }
+                    else
+                    {
+                        KillDefenders(sim, b, SoldierWorth(a), a); // 镇岳兵 1:2
+                        KillAttacker(sim, atk, aid); // 攻方只耗士兵,主将免疫(存量语义)
+                    }
                 }
                 if (b.GarrisonFormal.Count == 0)
                 {

@@ -185,7 +185,7 @@ namespace IronCurtain.Tests
             var blueSoldiers = SoldiersOf(sim).FindAll(s => s.Side == Side.Blue);
             var redSoldiers = SoldiersOf(sim).FindAll(s => s.Side == Side.Red);
             Assert.AreEqual(12, blueSoldiers.Count);
-            Assert.AreEqual(12, redSoldiers.Count);
+            Assert.AreEqual(8, redSoldiers.Count);   // 2026-09-11 制作人:镇岳军团 8 兵(士兵 1:2)
 
             var ps = blueSoldiers[0]; // 磐石士兵
             var zy = redSoldiers[0];  // 镇岳士兵
@@ -335,5 +335,37 @@ namespace IronCurtain.Tests
             for (int i = 0; i < 100; i++) sim.Step();
             Assert.Greater(g2.Shield, 10f, "磐石主将脱战应回盾(对照)");
         }
+
+        /// <summary>2026-09-11 制作人:镇岳军团 8 兵,平时两路 2×4(仅两个横向离散位,4 行);
+        /// 警戒圆圈 8 均分(半径一致,围主将)。</summary>
+        [Test]
+        public void 镇岳军团八兵_平时两路2x4_警戒围圈()
+        {
+            var sim = NewSim();
+            var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhenYue, new GridPos(15, 100));
+            Assert.AreEqual(8, RegimentSystem.CompanySize(g), "镇岳军团 8 兵");
+            Assert.AreEqual(2, RegimentSystem.FormationColsOf(g), "平时两路(2 列)");
+
+            // 平时(Idle)阵型:横向(perp)离散值恰 2 个、纵向 4 行
+            var perp = new HashSet<float>();
+            var depth = new HashSet<float>();
+            var f = RegimentSystemFacing(g);
+            var perpDir = new IronCurtain.Sim.SimVec2(f.y, -f.x);
+            for (int slot = 0; slot < 8; slot++)
+            {
+                var off = RegimentSystem.SlotOffset(g, slot);
+                perp.Add(Mathf.Round(Vector2.Dot(new Vector2(off.X, off.Y), new Vector2(perpDir.X, perpDir.Y)) * 10f) / 10f);
+                depth.Add(Mathf.Round(Vector2.Dot(new Vector2(off.X, off.Y), new Vector2(f.x, f.y)) * 10f) / 10f);
+            }
+            Assert.AreEqual(2, perp.Count, "横向恰 2 路");
+            Assert.AreEqual(4, depth.Count, "纵向 4 行");
+        }
+
+        private static Vector2 RegimentSystemFacing(IronCurtain.Sim.Entity g)
+        {
+            // Idle 朝敌:蓝向 +X/红向 −X(与 FacingOf 同口径的测试内复算,防同源假绿)
+            return g.Side == IronCurtain.Sim.Side.Blue ? Vector2.right : Vector2.left;
+        }
+
     }
 }

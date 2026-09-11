@@ -62,7 +62,7 @@ namespace IronCurtain.Tests
 
             var after = SoldiersOf(sim, a.Id);
             Assert.AreEqual(12, after.Count, "A 团应补满 12");
-            Assert.AreEqual(12, SoldiersOf(sim, b.Id).Count, "B 团满编不补");
+            Assert.AreEqual(8, SoldiersOf(sim, b.Id).Count, "B 团(镇岳)满编 8 不补");
             Assert.AreEqual(23, ReinforceSystem.PoolOf(sim, Side.Blue), "池剩 30-7=23(12 兵制:补 7)");
 
             var slots = new HashSet<int>();

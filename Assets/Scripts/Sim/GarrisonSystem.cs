@@ -28,15 +28,7 @@ namespace IronCurtain.Sim
                 var u = sim.GetEntity(id);
                 if (!u.IsSoldier) { error = "仅士兵可驻军"; continue; } // 主将永不进城
                 if (u.Side != b.Side) { error = "建筑须为己方"; Rollback(sim, accepted, buildingId); return false; }
-                if (b.GarrisonFormal.Count >= cfg.GarrisonFormal)
-                {   // 驻军全满:路过或城门站定(仅士兵)
-                    if (!u.HasMoveTarget && u.GarrisonBuildingId == 0)
-                    {
-                        var g = FindGateCell(sim, b);
-                        if (g != null) sim.SetMoveTarget(id, g.Value);
-                    }
-                    continue;
-                }
+                // 2026-09-11 制作人:单城**不限量**驻守(废除容量判定,原满员改走城门的分支删除)
                 DoEnterFormal(sim, u, buildingId, b.GarrisonFormal);
                 accepted.Add(id);
             }
@@ -58,15 +50,7 @@ namespace IronCurtain.Sim
                 var u = sim.GetEntity(id);
                 if (!u.IsSoldier) { error = "仅士兵可驻军"; continue; } // 主将城外等候
                 if (u.Side != b.Side) { error = "建筑须为己方"; RollbackTemp(sim, accepted, buildingId); return false; }
-                if (b.GarrisonTemp.Count >= cap)
-                {   // 临时驻军全满:路过或城门站定(仅士兵)
-                    if (!u.HasMoveTarget && u.GarrisonBuildingId == 0)
-                    {
-                        var g = FindGateCell(sim, b);
-                        if (g != null) sim.SetMoveTarget(id, g.Value);
-                    }
-                    continue;
-                }
+                // 2026-09-11 制作人:临时驻军同样不限量
                 DoEnterTemp(u, buildingId, b.GarrisonTemp);
                 accepted.Add(id);
             }
@@ -237,7 +221,7 @@ namespace IronCurtain.Sim
             // 1) 临时驻军:正式有空缺且未封城 → 自动转正式(城守住补入正式)
             foreach (var b in sim.Entities.Values.Where(e => e.Kind == EntityKind.Building).ToList())
             {
-                if (b.Sealed) continue; // 封城期间不转
+                // 2026-09-11 制作人:废除封城,随时可转正(原 Sealed 拦截删除)
                 // 敌方攻城意图存续期间不转:临时驻军受保护,防止"转正后被交换杀死"
                 if (b.Intent != SiegeIntent.None && b.IntentIssuer != b.Side) continue;
                 if (b.IsFort) continue; // 堡垒不可驻军(2026-09-11),无转正一说

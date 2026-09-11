@@ -63,7 +63,7 @@ public class GarrisonTests
     }
 
     [Test]
-    public void 正式满员_第31只站定不入城()
+    public void 正式驻军不限量_第31只照常入城()
     {
         var g1 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 140));
         var g2 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 165));
@@ -73,17 +73,16 @@ public class GarrisonTests
         string err;
         bool ok30 = GarrisonSystem.EnterFormal(sim, all.Take(30).Select(x => x.Id).ToList(), blueBarracks.Id, out err);
         Assert.IsTrue(ok30, "前 30 名应成功入城");
-        Assert.AreEqual(30, blueBarracks.GarrisonFormal.Count, "驻军容量 30");
+        Assert.AreEqual(30, blueBarracks.GarrisonFormal.Count, "前 30 名入城");
         var s31 = all[30];
         bool ok31 = GarrisonSystem.EnterFormal(sim, new List<int> { s31.Id }, blueBarracks.Id, out err);
-        Assert.IsTrue(ok31, "已满时不再报错(用户新规)");
-        Assert.AreEqual(30, blueBarracks.GarrisonFormal.Count, "仍为 30 人");
-        Assert.AreEqual(0, s31.GarrisonBuildingId, "第 31 名未入城");
-        Assert.IsTrue(s31.HasMoveTarget, "第 31 名应在城门站定");
+        Assert.IsTrue(ok31, "第 31 名入城成功");
+        Assert.AreEqual(31, blueBarracks.GarrisonFormal.Count, "2026-09-11 制作人:单城不限量驻守,第 31 名也登记");
+        Assert.AreNotEqual(0, s31.GarrisonBuildingId, "第 31 名已入城(不限量)");
     }
 
     [Test]
-    public void 临时满员_新来者城门站定()
+    public void 临时驻军不限量_第31只照常登记()
     {
         var g1 = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 140));
         var g2 = Gen(Side.Blue, HeroId.DuanFeng, new GridPos(10, 140));
@@ -91,13 +90,11 @@ public class GarrisonTests
         var all = SoldiersOf(g1).Concat(SoldiersOf(g2)).Concat(SoldiersOf(g3)).ToList();
         string err;
         Assert.IsTrue(GarrisonSystem.EnterTemp(sim, all.Take(30).Select(x => x.Id).ToList(), blueBarracks.Id, out err), "30 名临时登记应成功");
-        Assert.AreEqual(30, blueBarracks.GarrisonTemp.Count, "临时容量 30");
+        Assert.AreEqual(30, blueBarracks.GarrisonTemp.Count, "前 30 名临时登记");
         var extra = all[30];
-        Assert.IsTrue(GarrisonSystem.EnterTemp(sim, new List<int> { extra.Id }, blueBarracks.Id, out err), "满员不报错");
-        Assert.AreEqual(0, extra.TempGarrisonId, "第 31 名不登记");
-        Assert.IsFalse(blueBarracks.GarrisonTemp.Contains(extra.Id), "不在临时列表");
-        Assert.AreEqual(0, extra.GarrisonBuildingId, "未入城");
-        Assert.AreEqual(g3.Id, extra.GeneralId, "第 31 名留在兵团跟随主将(12 兵制下属第三团)");
+        Assert.IsTrue(GarrisonSystem.EnterTemp(sim, new List<int> { extra.Id }, blueBarracks.Id, out err), "第 31 名登记成功");
+        Assert.AreEqual(31, blueBarracks.GarrisonTemp.Count, "2026-09-11 制作人:临时驻军同样不限量");
+        Assert.AreNotEqual(0, extra.TempGarrisonId, "第 31 名已登记临时驻军");
     }
 
     [Test]
@@ -118,18 +115,15 @@ public class GarrisonTests
     }
 
     [Test]
-    public void 封城期间临时不转正_解封后转正()
+    public void 临时驻军随时转正_无封城概念()
     {
+        // 2026-09-11 制作人:废除封城——临时驻军随时转正(不再有 Sealed 窗口)
         var g = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 122));
         var ss = SoldiersOf(g).Take(2).ToList();
         string err;
         GarrisonSystem.EnterTemp(sim, ss.Select(x => x.Id).ToList(), blueBarracks.Id, out err);
-        blueBarracks.Sealed = true;
         TickN(5);
-        Assert.AreEqual(2, blueBarracks.GarrisonTemp.Count, "封城期间不转正");
-        blueBarracks.Sealed = false;
-        TickN(1);
-        Assert.AreEqual(2, blueBarracks.GarrisonFormal.Count, "解封后转正");
+        Assert.AreEqual(2, blueBarracks.GarrisonFormal.Count, "无封城,直接转正");
         Assert.AreEqual(0, blueBarracks.GarrisonTemp.Count, "临时表清空");
     }
 

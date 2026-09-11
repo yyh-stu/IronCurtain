@@ -59,7 +59,7 @@ namespace IronCurtain.Sim
                 }
                 if (inCombat) continue;
                 anyEligible = true;
-                if (cnt < RegimentSystem.SoldiersPerGeneral)
+                if (cnt < RegimentSystem.CompanySize(g))   // 2026-09-11:镇岳 8/其余 12
                     regiments.Add(System.Tuple.Create(cnt, g));
             }
             if (!anyEligible) { error = "全部兵团交战中,不可补兵"; return false; }
@@ -75,9 +75,10 @@ namespace IronCurtain.Sim
                 foreach (var e in sim.Entities.Values)
                     if (e.IsSoldier && e.GeneralId == g.Id && e.State != EntityState.Dead)
                         used.Add(e.FormationSlot);
-                int need = RegimentSystem.SoldiersPerGeneral - reg.Item1;
+                int company = RegimentSystem.CompanySize(g);
+                int need = company - reg.Item1;
                 int give = System.Math.Min(need, sim.ReinforcePool[side]);
-                for (int slot = 0; slot < RegimentSystem.SoldiersPerGeneral && give > 0; slot++)
+                for (int slot = 0; slot < company && give > 0; slot++)
                 {
                     if (used.Contains(slot)) continue;
                     // 防崩:槽位落格若被建筑占地/单位占据,沿槽向再推 1m(至多 3 次);仍堵则跳过该槽不耗池

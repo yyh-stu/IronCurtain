@@ -28,8 +28,8 @@ namespace IronCurtain.View
         private VisualElement _root, _hoverHost, _markerHost;
         private Label _title, _status, _feedbackLabel;
         private Button _btnCapture, _btnDestroy, _btnRebuild, _btnClose;
-        private VisualElement _hoverBox;
-        private Label _hoverPref;
+        private VisualElement _hoverBox, _garrisonTip;
+        private Label _hoverPref, _tipPower, _tipGenerals, _tipSoldiers, _tipEnemy;
         private Button _hoverCapture, _hoverDestroy;
         private int _hoverId;
 
@@ -145,6 +145,20 @@ namespace IronCurtain.View
             _hoverBox.Add(_hoverPref); _hoverBox.Add(hoverRow);
             _hoverBox.pickingMode = PickingMode.Ignore;    // 容器不吃指针,按钮自己吃
             parent.Add(_hoverBox);
+
+            // 悬停驻军 tooltip(2026-09-11 制作人:鼠标放建筑上无需按下)
+            _garrisonTip = new VisualElement { name = "GarrisonTip" };
+            _garrisonTip.AddToClassList("tooltip-bg");
+            _garrisonTip.style.position = Position.Absolute;
+            _garrisonTip.style.display = DisplayStyle.None;
+            _garrisonTip.pickingMode = PickingMode.Ignore;
+            _tipPower = UiKit.MakeLabel("", "label");
+            _tipGenerals = UiKit.MakeLabel("", "label-dim");
+            _tipSoldiers = UiKit.MakeLabel("", "label-dim");
+            _tipEnemy = UiKit.MakeLabel("", "label");
+            _garrisonTip.Add(_tipPower); _garrisonTip.Add(_tipGenerals);
+            _garrisonTip.Add(_tipSoldiers); _garrisonTip.Add(_tipEnemy);
+            parent.Add(_garrisonTip);
         }
 
         private bool _demoDone;
@@ -236,6 +250,7 @@ namespace IronCurtain.View
                 // 自家建筑不弹偏好选择(2026-09-10 制作人目击修复的口径)
                 if (b != null && b.Side == _model.Player) id = 0;
             }
+            UpdateGarrisonTip(id != 0 ? _model.Sim.GetEntity(id) : null);
             if (id == 0)
             {
                 _hoverBox.style.display = DisplayStyle.None;
@@ -257,6 +272,80 @@ namespace IronCurtain.View
             var panelPt = ScreenToPanel(sp);
             _hoverBox.style.left = panelPt.x;
             _hoverBox.style.top = panelPt.y - 30;
+        }
+
+        /// <summary>悬停驻军信息(2026-09-11 制作人):无需按下。
+        /// 己方=实时三行;敌方=侦察快照一行(快照只有总数,无将/兵拆分)。
+        /// 兵力 = Σ(将交换值:镇岳12/其余10) + Σ(兵交换力:镇岳兵2/其余1)——制作人公式"将总数*将兵交换比+兵总数"。</summary>
+        private bool _tipDemoDone;
+        private void UpdateGarrisonTip(Entity b)
+        {
+            // 取证开关 IC_UI_TIP=1:无鼠标时对第一个己方建筑常显 tooltip
+            if (b == null && !_tipDemoDone && System.Environment.GetEnvironmentVariable("IC_UI_TIP") == "1")
+            {
+                _tipDemoDone = true;
+                foreach (var kv in _model.Sim.Entities)
+                {
+                    var cand = kv.Value;
+                    if (cand == null || cand.Kind != EntityKind.Building || cand.Rubbled) continue;
+                    if (cand.Side != _model.Player) continue;
+                    b = cand;
+                    break;
+                }
+            }
+            if (b == null || b.Kind != EntityKind.Building || b.Rubbled)
+            {
+                _garrisonTip.style.display = DisplayStyle.None;
+                return;
+            }
+            var sp = WorldToScreenAbove(b, 5.2f);
+            if (sp.z <= 0f) { _garrisonTip.style.display = DisplayStyle.None; return; }
+
+            if (b.Side == _model.Player)
+            {
+                int soldierPower = 0, soldierCount = 0;
+                var gens = new HashSet<int>();
+                foreach (var listName in new[] { 0, 1 })
+                {
+                    var list = listName == 0 ? b.GarrisonFormal : b.GarrisonTemp;
+                    foreach (var sid in list)
+                    {
+                        var u = _model.Sim.GetEntity(sid);
+                        if (u == null) continue;
+                        soldierCount++;
+                        soldierPower += u.Hero == HeroId.ZhenYue ? 2 : 1;
+                        if (u.GeneralId != 0) gens.Add(u.GeneralId);
+                    }
+                }
+                int genPower = 0;
+                foreach (var gid in gens)
+                {
+                    var g = _model.Sim.GetEntity(gid);
+                    if (g != null) genPower += g.Hero == HeroId.ZhenYue ? 12 : 10;
+                }
+                _tipPower.text = "兵力：" + (genPower + soldierPower);
+                _tipGenerals.text = "将：" + gens.Count;
+                _tipSoldiers.text = "兵：" + soldierCount;
+                _tipEnemy.style.display = DisplayStyle.None;
+                _tipPower.style.display = DisplayStyle.Flex;
+                _tipGenerals.style.display = DisplayStyle.Flex;
+                _tipSoldiers.style.display = DisplayStyle.Flex;
+            }
+            else
+            {
+                var snap = VisionSystem.LastKnownBuilding(_model.Sim, _model.Player, b.Id);
+                if (snap == null) { _garrisonTip.style.display = DisplayStyle.None; return; }
+                _tipEnemy.text = "驻军(侦察)：" + snap.GarrisonCount;
+                _tipEnemy.style.display = DisplayStyle.Flex;
+                _tipPower.style.display = DisplayStyle.None;
+                _tipGenerals.style.display = DisplayStyle.None;
+                _tipSoldiers.style.display = DisplayStyle.None;
+            }
+            var p = ScreenToPanel(sp);
+            _garrisonTip.style.left = p.x;
+            _garrisonTip.style.top = p.y;
+            _garrisonTip.style.translate = new Translate(Length.Percent(-50), Length.Percent(0));
+            _garrisonTip.style.display = DisplayStyle.Flex;
         }
 
         /// <summary>世界点(据点上方)→屏幕坐标(y 向下,已翻)。</summary>

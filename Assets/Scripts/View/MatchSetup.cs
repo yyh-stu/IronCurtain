@@ -81,6 +81,7 @@ namespace IronCurtain.View
 
         public static void Reset()
         {
+            MatchStats.Reset();   // 2026-09-11 结算战绩表随局清空
             AiSystem.Reset();
             VisionSystem.Reset();
             HexSystem.Reset();

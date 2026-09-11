@@ -9,6 +9,19 @@ namespace IronCurtain.Sim
     public static class RegimentSystem
     {
         public const int SoldiersPerGeneral = 12; // 2026-09-10 制作人拍板:20→12(画面过乱)
+        public const int ZhenYueSoldiers = 8;     // 2026-09-11 制作人:镇岳军团 8 兵(士兵 1:2,等效 16)
+
+        /// <summary>该主将的军团士兵数(镇岳 8,其余 12)。</summary>
+        public static int CompanySize(Entity g)
+        {
+            return g != null && g.Hero == HeroId.ZhenYue ? ZhenYueSoldiers : SoldiersPerGeneral;
+        }
+
+        /// <summary>该主将的平时纵队列数(镇岳两路 2 列,其余 3 列)。</summary>
+        public static int FormationColsOf(Entity g)
+        {
+            return g != null && g.Hero == HeroId.ZhenYue ? 2 : FormationCols;
+        }
         public const int FormationRows = 4;   // 4 行 × 5 列,行列距 1.0 米
         public const int FormationCols = 3; // 行军纵队 3×4(2026-09-10 制作人拍板)
 
@@ -28,20 +41,23 @@ namespace IronCurtain.Sim
 
         public static SimVec2 SlotOffset(Entity g, int slot)
         {
-            // 2026-09-10 制作人定稿:平时(行军/跟随/驻立)一律 3×4 纵队跟在主将后方,美观;
-            // 警戒/交火(索敌接战中)改圆圈包围主将,主将为圆心
+            // 2026-09-10 制作人定稿:平时(行军/跟随/驻立)纵队跟在主将后方,美观;
+            // 警戒/交火(索敌接战中)改圆圈包围主将,主将为圆心。
+            // 2026-09-11 制作人:镇岳军团 8 兵——平时两路 2×4,警戒圆圈围主将(逻辑不变)。
+            int n = CompanySize(g);
             bool combat = g.State == EntityState.Attacking || g.AutoKind != 0;
             var facing = FacingOf(g);
             if (combat)
             {
-                float angle = slot * (System.MathF.PI * 2f / SoldiersPerGeneral);
+                float angle = slot * (System.MathF.PI * 2f / n);
                 var dir = new SimVec2(System.MathF.Cos(angle), System.MathF.Sin(angle));
                 return new SimVec2(dir.X * facing.X - dir.Y * facing.Y, dir.X * facing.Y + dir.Y * facing.X) * 2.6f; // 圆圈随朝向整体旋转,主将为圆心
             }
+            int cols = FormationColsOf(g);
             var perpC = new SimVec2(facing.Y, -facing.X);
-            int row = slot / FormationCols;
-            int col = slot % FormationCols;
-            return facing * -(row + 1.2f) + perpC * (col - (FormationCols - 1) * 0.5f);
+            int row = slot / cols;
+            int col = slot % cols;
+            return facing * -(row + 1.2f) + perpC * (col - (cols - 1) * 0.5f);
         }
 
         public static void Tick(SimCore sim, float dt)
@@ -202,7 +218,7 @@ namespace IronCurtain.Sim
             g.MoveSpeed = (float)c.MoveSpeed;
             if (c.Shield > 0) { g.Shield = c.Shield; g.ShieldMax = c.Shield; }
 
-            for (int slot = 0; slot < SoldiersPerGeneral; slot++)
+            for (int slot = 0; slot < CompanySize(g); slot++)
                 SpawnSoldier(sim, g, slot);
             return g;
         }
