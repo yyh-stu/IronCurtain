@@ -61,6 +61,11 @@ namespace IronCurtain.View
                     var dv2 = GetView(ev.SubjectId);
                     if (dv2 != null) dv2.SetDead();
                     break;
+                // 2026-09-11 屏障特效:受击涟漪/击碎动画(纯表现,自生自灭)
+                case SimEventType.WallDamaged:
+                case SimEventType.WallBroken:
+                    WallFx.OnEvent(transform, ev);
+                    break;
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using IronCurtain.Sim;
 using UnityEngine;
 #if UNITY_EDITOR
@@ -18,6 +19,11 @@ namespace IronCurtain.View
         private void Start()
         {
 #if UNITY_EDITOR
+            if (SessionState.GetBool("ic.playcap", false))
+            {
+                StartCoroutine(RunArtCapture());
+                return;
+            }
             if (!SessionState.GetBool("ic.capture", false))
             {
                 if (SessionState.GetBool("ic.fastresult", false))
@@ -131,5 +137,101 @@ namespace IronCurtain.View
             EditorApplication.ExitPlaymode();
 #endif
         }
+
+#if UNITY_EDITOR
+        // ART-P0 美术验收通道(Play 模式,SessionState ic.playcap):
+        // 为什么必须走 Play——URP Volume 后处理在 edit 模式 Camera.Render() 下架构性不生效
+        // (实测 saturation=100/postExposure+3 零变化),批处理截图只能验光照/材质层。
+        // 口径与 CaptureBatch 的 art 模式逐项一致(16:9 定幅 + CameraRig 规范机位 + 同 mark 同焦点算法),
+        // 所以「edit 无后处理」与「Play 有后处理」两张同机位图只差后处理一项,可直接 A/B 与量化比对。
+        private IEnumerator RunArtCapture()
+        {
+            var boot = GetComponent<GameBootstrap>();
+            if (boot == null || boot.Sim == null)
+            {
+                Debug.LogError("[artcap] GameBootstrap missing");
+                yield break;
+            }
+            boot.Speed = 3f;
+            AiSystem.Configure(boot.Sim, Side.Blue, AiTier.Normal);
+            var cam = Camera.main;
+            var rig = cam != null ? cam.GetComponent<CameraRig>() : null;
+            if (cam != null)
+            {
+                cam.aspect = 16f / 9f; // 与 edit 通道同幅,避免窗口 aspect 影响取景与指标
+                if (rig != null) rig.RefreshProjection();
+                Debug.Log("[artcap] aspect=" + cam.aspect + " ortho=" + cam.orthographic + " fov=" + cam.fieldOfView);
+            }
+            string tag = System.Environment.GetEnvironmentVariable("IC_ART_ROUND") ?? "pre";
+            Directory.CreateDirectory("D:/DevTools/shots");
+
+            int i = 0;
+            float guard = 0f;
+            while (i < Marks.Length)
+            {
+                yield return null;
+                double simSec = boot.Sim.Tick / (double)boot.Sim.Config.TickRate;
+                if (simSec >= Marks[i])
+                {
+                    FocusCamera(cam, rig, i, boot.Sim);
+                    string p = string.Format("D:/DevTools/shots/art_{0}_play_{1}_t{2}s.png", tag, i + 1, (int)Marks[i]);
+                    SaveRender(cam, p);
+                    // 同帧再存一张含 UI 的玩家实见图(顶栏/小地图/面板入图),供审美判断
+                    ScreenCapture.CaptureScreenshot(string.Format("D:/DevTools/shots/art_{0}_playui_{1}_t{2}s.png", tag, i + 1, (int)Marks[i]));
+                    Debug.Log("[artcap] " + p + " simSec=" + simSec.ToString("F1"));
+                    i++;
+                }
+                guard += Time.unscaledDeltaTime;
+                if (guard > 200f) { Debug.Log("[artcap] timeout"); break; }
+            }
+            yield return new WaitForSecondsRealtime(1.5f);
+            SessionState.SetBool("ic.playcap", false);
+            EditorApplication.ExitPlaymode();
+        }
+
+        // 与 CaptureBatch.FindBattleFocus/机位算法同源:优先对准交战单位,无交战走固定机位
+        private static void FocusCamera(Camera cam, CameraRig rig, int i, SimCore sim)
+        {
+            SimVec2? focus = FindBattleFocus(sim);
+            float camX = focus.HasValue ? focus.Value.X : CamX[i];
+            float camRow = focus.HasValue ? focus.Value.Y : 15f;
+            if (rig != null)
+                rig.SetFocus(camX, camRow);
+            else if (cam != null)
+            {
+                cam.transform.position = new Vector3(camX, 55f, 3f - camRow - 38f);
+                cam.transform.LookAt(new Vector3(camX, 0f, 3f - camRow));
+            }
+        }
+
+        private static SimVec2? FindBattleFocus(SimCore sim)
+        {
+            SimVec2? soldier = null;
+            foreach (var kv in sim.Entities)
+            {
+                var e = kv.Value;
+                if (e == null || e.Kind != EntityKind.Unit || e.State != EntityState.Attacking) continue;
+                if (!e.IsSoldier) return e.PosF;
+                if (soldier == null) soldier = e.PosF;
+            }
+            return soldier;
+        }
+
+        private static void SaveRender(Camera cam, string path)
+        {
+            var rt = new RenderTexture(1920, 1080, 24, RenderTextureFormat.ARGB32);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            tex.Apply();
+            File.WriteAllBytes(path, tex.EncodeToPNG());
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+            DestroyImmediate(tex);
+            DestroyImmediate(rt);
+        }
+#endif
     }
 }

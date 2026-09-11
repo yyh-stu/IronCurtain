@@ -16,6 +16,7 @@ namespace IronCurtain.View
         private double _accumulator;
         private CameraRig _rig;
         private FogView _fog;
+        private WallHealthView _wallHp;
 
         private void Awake()
         {
@@ -25,7 +26,7 @@ namespace IronCurtain.View
 
             CreateCamera();
             _rig = Cam.gameObject.AddComponent<CameraRig>();
-            _rig.Init(Cam, 40f, 15f); // 开局聚焦蓝基地前方 col40/row15
+            _rig.Init(Cam, 40f, 80f); // 三路地图:开局聚焦蓝主城前方(中路 col40/row80)
             CreateLighting();
             CreatePostProcess();
 
@@ -35,6 +36,12 @@ namespace IronCurtain.View
             Board.Init(Sim, transform);
             Board.PlayerSide = Side.Blue;
             Sim.AddEventListener(Board.OnSimEvent);
+            // 2026-09-11 屏障氛围粒子(每方一个系统,单 draw call;edit 模式由 CaptureBatch 手动推进)
+            WallFx.SpawnAmbient(boardGo.transform, Side.Blue);
+            WallFx.SpawnAmbient(boardGo.transform, Side.Red);
+            // 2026-09-11 屏障血条:五段各自独立,受击才显示(满血隐藏)
+            _wallHp = gameObject.AddComponent<WallHealthView>();
+            _wallHp.Init(transform);
             var overview = gameObject.AddComponent<BarracksOverviewPanel>();
             overview.Init(Sim, Side.Blue);
             gameObject.AddComponent<CaptureRunner>();
@@ -92,6 +99,7 @@ namespace IronCurtain.View
                 Sim.Step();
             }
             Board.TickViews();
+            if (_wallHp != null) _wallHp.Tick(Cam);   // 屏障血条:受击才显示
         }
 
         private void OnDestroy()
@@ -109,13 +117,16 @@ namespace IronCurtain.View
             Cam.backgroundColor = new Color32(0x79, 0xb5, 0xea, 0xff); // 明亮天空蓝(部落冲突式明快)
             Cam.nearClipPlane = 0.3f;
             Cam.farClipPlane = 300f;
-            Cam.orthographic = true;
-            Cam.orthographicSize = 27f;
+            // ART-P0 2026-09-10:正交 → 透视(FOV 30°,落在规格 30-40° 下沿)。
+            // 机位距离由 66.85(=√(55²+38²))收到 60,方向不变(按 55:38 比例缩放为 49.4:34.1),
+            // 这样焦点平面上的横向视野仍≈57.2m(=1/5 地图宽),取景范围感与原正交一致,只多了透视纵深。
+            Cam.orthographic = false;
+            Cam.fieldOfView = 30f;
             // 2026-09-09 bug2 真因修复:相机必须摆在初始焦点正上方同构偏移,
             // 原摆在 col143 → CameraRig._offset 恒带 +103 米横向偏差,小地图/键盘怎么挪都错位,
             // 两边基地被推出视野。用户拍板:鼠标点哪里,视图中心就在哪里。焦点常量见 CameraRig。
             float fx = CameraRig.InitFocusCol, fz = 3f - CameraRig.InitFocusRow;
-            go.transform.position = new Vector3(fx, 55f, fz - 38f);
+            go.transform.position = new Vector3(fx, 49.4f, fz - 34.1f);
             go.transform.LookAt(new Vector3(fx, 0f, fz));
             var data = go.AddComponent<UniversalAdditionalCameraData>();
             data.renderPostProcessing = true;
@@ -130,6 +141,11 @@ namespace IronCurtain.View
             light.type = LightType.Directional;
             light.color = new Color(1f, 0.98f, 0.93f);
             light.intensity = 1.05f;
+            // ART-P0 2026-09-10:此前全工程零阴影。除 URP 资产未开软阴影外,主光也从未显式设置
+            // shadows;另 m_ShadowDistance 原为 50,而相机距地面焦点约 60-67m,焦点区整体落在
+            // 阴影距离之外 → 即使开了也不会显示,故一并调到 120。
+            light.shadows = LightShadows.Soft;
+            light.shadowStrength = 0.7f;
             go.transform.rotation = Quaternion.Euler(55f, -35f, 0f);
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.62f, 0.78f, 0.98f);
@@ -141,16 +157,21 @@ namespace IronCurtain.View
         private void CreatePostProcess()
         {
             var profile = ScriptableObject.CreateInstance<VolumeProfile>();
+            // ART-P0 2026-09-10:后处理此前从未生效——根因是 UniversalRenderer.asset 的
+            // postProcessData 为空引用,URP 后处理通道拿不到 shader(修好后 edit/Play 均生效,
+            // 故"必须走 Play 才能看后处理"的旧结论作废)。以下数值是首次可见后才调的:
+            // 原 postExposure +0.35 配 ACES 整屏泛白(实测亮部 21.6%→52.4%、饱和 0.26→0.16、
+            // 边缘 5.1→1.9),按厚实高饱和卡通锚回调。
             var bloom = profile.Add<Bloom>(true);
-            bloom.threshold.Override(0.55f);
-            bloom.intensity.Override(1.7f);
-            bloom.scatter.Override(0.7f);
+            bloom.threshold.Override(1.0f);   // 原 0.55:压曝光后阈值过松会全屏起雾
+            bloom.intensity.Override(0.5f);   // 原 1.7:泛光吃掉边缘能量(5.1→1.9 主因之一)
+            bloom.scatter.Override(0.6f);
             var colorAdjustments = profile.Add<ColorAdjustments>(true);
             colorAdjustments.saturation.Override(32f);
-            colorAdjustments.contrast.Override(22f);
-            colorAdjustments.postExposure.Override(0.35f);
+            colorAdjustments.contrast.Override(32f);
+            colorAdjustments.postExposure.Override(0f); // 原 +0.35:ACES+泛光下过曝
             var tone = profile.Add<Tonemapping>(true);
-            tone.mode.Override(TonemappingMode.ACES);
+            tone.mode.Override(TonemappingMode.Neutral); // 原 ACES:电影感压饱和,与卡通锚相冲
             var go = new GameObject("PostProcess");
             go.transform.SetParent(transform, false);
             var vol = go.AddComponent<Volume>();
