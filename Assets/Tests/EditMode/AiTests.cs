@@ -101,15 +101,23 @@ namespace IronCurtain.Tests
         }
 
         [Test]
-        public void T4_普通补产镇岳()
+        public void T4_普通补产随机混编()
         {
+            // 2026-09-11 制作人拍板"AI 选将随机化,避免全屏磐石":旧的"3 只 → 1 镇岳"固定配比已废弃,
+            // 新契约=从六英雄加权池随机(近战×2/远程×1)。本测试断言产出落在合法池内。
             AiSystem.Configure(sim, Side.Blue, AiTier.Normal);
-            Run(1000); // 配比"3 只 → 1 镇岳";20s/将+错峰出生,出生节奏随场景浮动,放宽并兜底查场上
-            bool hasZhenYue = sim.Entities.Values.Any(e => e.Side == Side.Blue && e.Kind == EntityKind.Unit
-                && !e.IsSoldier && e.Hero == HeroId.ZhenYue)
-                || blueHQ.Prod.Slots.Any(s =>
-                s.Current == HeroId.ZhenYue || s.Pending.Contains(HeroId.ZhenYue));
-            Assert.IsTrue(hasZhenYue, "普通 AI 兵种配比应含镇岳");
+            Run(1000); // 20s/将+错峰出生,出生节奏随场景浮动
+            var pool = new HashSet<HeroId> { HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng,
+                                             HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
+            var produced = sim.Entities.Values
+                .Where(e => e.Side == Side.Blue && e.Kind == EntityKind.Unit && !e.IsSoldier && e.Hero.HasValue)
+                .Select(e => e.Hero.Value)
+                .Concat(blueHQ.Prod.Slots.Where(s => s.Current != null).Select(s => s.Current.Value)
+                    .Concat(blueHQ.Prod.Slots.SelectMany(s => s.Pending)))
+                .ToList();
+            Assert.IsNotEmpty(produced, "普通 AI 应有产出");
+            foreach (var h in produced)
+                Assert.IsTrue(pool.Contains(h), "产出必须在六英雄池内:" + h);
         }
 
         [Test]

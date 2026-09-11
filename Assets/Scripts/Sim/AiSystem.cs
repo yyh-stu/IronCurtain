@@ -16,11 +16,10 @@ namespace IronCurtain.Sim
         {
             public Side Side;
             public AiTier Tier;
-            public int ProducedSinceZhenYue; // 已产英雄计数(配比)
-            public bool ZhenYueQueued;       // 下一只为镇岳
             public bool WaveActive;
             public int WaveStartCount;
             public List<int> WaveUnits = new List<int>();
+            public int NextLane;            // 2026-09-11 三路分推:波次目标路 0上/1中/2下,成功发波后轮转
         }
 
         static readonly Dictionary<Side, AiState> _ais = new Dictionary<Side, AiState>();
@@ -162,7 +161,8 @@ namespace IronCurtain.Sim
             if (field.Count < 2) return;
 
             var home = Home(sim, ai.Side);
-            // 目标选择
+            // 目标选择(2026-09-11 三路分推):本波主攻路 = ai.NextLane 轮转(上/中/下),
+            // 优先打**该路上的**已知敌方建筑;该路暂无已知目标时回退全局最优(旧口径),不至于卡兵。
             var neutral = sim.Entities.Values
                 .Where(e => e.Kind == EntityKind.Building && e.Building == BuildingId.ResourcePoint
                             && e.Side == Side.Neutral && !e.Rubbled
@@ -173,16 +173,18 @@ namespace IronCurtain.Sim
             if (neutral != null) { targetId = neutral.Id; intent = SiegeIntent.Capture; }
             else
             {
-                var enemyBuildings = sim.Entities.Values
+                var candidates = sim.Entities.Values
                     .Where(e => e.Kind == EntityKind.Building && e.Side != ai.Side && e.Side != Side.Neutral
                                 && !e.Rubbled && e.Building != BuildingId.Base
                                 && VisionSystem.IsBuildingKnown(sim, ai.Side, e.Id))
-                    .Select(e => new { E = e, G = VisionSystem.LastKnownGarrison(sim, ai.Side, e.Id) ?? 999 })
+                    .Select(e => new { E = e, G = VisionSystem.LastKnownGarrison(sim, ai.Side, e.Id) ?? 999,
+                                       Lane = LaneIndexOf(SimVec2.FromGrid(e.Pos)) })
                     .OrderBy(x => x.G).ThenBy(x => home != null ? Dist(sim, x.E, home) : 0f)
-                    .FirstOrDefault();
-                if (enemyBuildings == null) return;
-                targetId = enemyBuildings.E.Id;
-                intent = enemyBuildings.E.Building == BuildingId.Tower ? SiegeIntent.Destroy : SiegeIntent.Capture;
+                    .ToList();
+                if (candidates.Count == 0) return;
+                var pick = candidates.FirstOrDefault(x => x.Lane == ai.NextLane) ?? candidates[0];
+                targetId = pick.E.Id;
+                intent = IntentFor(pick.E);
             }
 
             var targetB = sim.GetEntity(targetId);
@@ -193,7 +195,32 @@ namespace IronCurtain.Sim
                 ai.WaveActive = true;
                 ai.WaveUnits = wave;
                 ai.WaveStartCount = wave.Count;
+                ai.NextLane = (ai.NextLane + 1) % 3;   // 下一波换路,三路都有压力
             }
+        }
+
+        /// <summary>进攻意图(2026-09-11):路上的箭塔=摧毁(旧口径);**草坪箭塔=占领**——
+        /// 无守军时贴上即被 InstantCapture 接管,保住箭塔为我所用,比拆掉划算。</summary>
+        static SiegeIntent IntentFor(Entity b)
+        {
+            if (b.Building != BuildingId.Tower) return SiegeIntent.Capture;
+            var p = SimVec2.FromGrid(b.Pos);
+            for (int l = 0; l < 3; l++)
+                if (Math.Abs(p.Y - TerrainMap.LaneY(p.X, l)) <= TerrainMap.LaneHalfWidth + 2f)
+                    return SiegeIntent.Destroy;     // 路上的防御塔
+            return SiegeIntent.Capture;             // 四块草坪的箭塔(不在任何路上)
+        }
+
+        /// <summary>点最贴近哪条路(0上/1中/2下)。</summary>
+        static int LaneIndexOf(SimVec2 p)
+        {
+            int best = 1; float bd = float.MaxValue;
+            for (int l = 0; l < 3; l++)
+            {
+                float d = (float)Math.Abs(p.Y - TerrainMap.LaneY(p.X, l));
+                if (d < bd) { bd = d; best = l; }
+            }
+            return best;
         }
 
         static void ActiveDefend(SimCore sim, AiState ai)
@@ -237,20 +264,27 @@ namespace IronCurtain.Sim
                 if (slot.Current != null || slot.Pending.Count > 0) return; // 队列非空,不重复入队
             }
 
-            HeroId hero;
-            if (simple) hero = HeroId.PanShi;
-            else if (ai.ZhenYueQueued) hero = HeroId.ZhenYue;
-            else hero = ai.ProducedSinceZhenYue % 2 == 0 ? HeroId.PanShi : HeroId.DuanFeng;
-
+            // 2026-09-11 制作人拍板"AI 选将随机化,避免全屏磐石":替换旧的固定配比
+            // (Simple=恒磐石;Normal=磐石/断峰交替+每第 4 只镇岳)。
+            HeroId hero = PickProductionHero(sim, simple ? AiTier.Simple : AiTier.Normal);
             ProductionSystem.Enqueue(sim, b.Id, hero, out _);
+        }
 
-            if (simple) return;
-            if (hero == HeroId.ZhenYue) { ai.ZhenYueQueued = false; ai.ProducedSinceZhenYue = 0; }
-            else
+        /// <summary>产将选择(2026-09-11):用 sim 的确定性 RNG(回放/测试可复现)。
+        /// Simple=三近战随机;Normal=六英雄加权(近战各×2、远程各×1)——前压为主、偶有远程混编。
+        /// 公开供测试断言分布。</summary>
+        public static HeroId PickProductionHero(SimCore sim, AiTier tier)
+        {
+            if (tier == AiTier.Simple)
             {
-                ai.ProducedSinceZhenYue++;
-                if (ai.ProducedSinceZhenYue >= 3) ai.ZhenYueQueued = true;
+                var pool = new[] { HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng };
+                return pool[sim.Rng.NextUInt64() % (ulong)pool.Length];
             }
+            var weighted = new[] {
+                HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng,
+                HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng,
+                HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
+            return weighted[sim.Rng.NextUInt64() % (ulong)weighted.Length];
         }
 
         static Entity Home(SimCore sim, Side side)
