@@ -1,0 +1,73 @@
+/* 铁幕:前线 · UI 主题 v1(2026-09-11 demo→成品迁移第 0 步)
+ * 纯 USS 代码主题,先成形后换肤;集中在此,换皮=换这份文件。
+ * 色板:深石板底 + 冰蓝阵营强调(与蓝方屏障色系一致)。 */
+
+:root {
+    --accent: rgb(88, 166, 255);
+    --panel-bg: rgba(16, 20, 28, 0.92);
+    --panel-border: rgba(120, 140, 170, 0.55);
+    --text: rgb(232, 238, 246);
+    --text-dim: rgba(232, 238, 246, 0.62);
+}
+
+.panel {
+    background-color: var(--panel-bg);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+    padding: 8px;
+}
+
+.topbar {
+    background-color: rgba(8, 10, 14, 0.66);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(120, 140, 170, 0.35);
+}
+
+.label { color: var(--text); }
+.label-dim { color: var(--text-dim); }
+.label-title { font-size: 18px; color: rgb(255, 255, 255); }
+.label-clock { font-size: 21px; color: rgb(255, 255, 255); -unity-text-align: middle-center; }
+.label-clock-overtime { font-size: 21px; color: rgb(255, 140, 51); -unity-text-align: middle-center; }
+.label-phase { font-size: 12px; color: rgba(232, 238, 246, 0.7); -unity-text-align: middle-center; }
+.feedback-ok { color: rgb(126, 224, 138); }
+.feedback-err { color: rgb(255, 122, 110); }
+
+.btn {
+    background-color: rgb(43, 51, 64);
+    color: var(--text);
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: rgb(70, 83, 102);
+    padding: 4px 10px;
+    transition-property: background-color, border-color, scale;
+    transition-duration: 0.08s;
+}
+.btn:hover {
+    background-color: rgb(58, 70, 90);
+    border-color: rgb(107, 124, 148);
+}
+.btn:active {
+    background-color: rgb(47, 111, 174);
+    border-color: var(--accent);
+    scale: 0.97;
+}
+.btn:disabled { opacity: 0.4; }
+.btn-accent {
+    background-color: rgb(35, 80, 130);
+    border-color: rgb(88, 166, 255);
+}
+
+.hpbar-shell {
+    height: 14px;
+    border-radius: 3px;
+    background-color: rgba(0, 0, 0, 0.85);
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.18);
+    overflow: hidden;
+}
+.hpbar-fill { height: 100%; border-radius: 2px; }
+
+.row { flex-direction: row; align-items: center; }
+.gap { margin-left: 8px; }
+.grow { flex-grow: 1; }

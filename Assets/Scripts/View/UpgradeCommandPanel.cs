@@ -1,10 +1,14 @@
 using System;
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>M6.3 英雄升级入口；状态与购买结果全部来自 UpgradeCommandModel。</summary>
+    /// <summary>M6.3 英雄升级入口；状态与购买结果全部来自 UpgradeCommandModel。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit(theme.uss 三态按钮/面板皮肤);
+    /// 公开契约(Expanded/SetExpanded/SetOpenedCallback/LastPanelRect)与 InputAudit 审计行全部保留,
+    /// CommandPanelCoordinator 互斥链与 SelectionInteractionCoordinator 拦截链零改动。</summary>
     public sealed class UpgradeCommandPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = Rect.zero;
@@ -16,11 +20,19 @@ namespace IronCurtain.View
         private float _feedbackUntil;
         private Action _openedCallback;
 
+        private VisualElement _root, _body;
+        private Button _header;
+        private Label _ep, _feedbackLabel;
+
         public bool Expanded => _expanded;
 
         public void Init(SimCore sim, Side player)
         {
             _model = new UpgradeCommandModel(sim, player);
+            if (UiRoot.Current != null) Build(UiRoot.Current.Screen);
+            // 取证开关:IC_UI_EXPAND=1 展开面板拍按钮列表(成品观感证据)
+            if (System.Environment.GetEnvironmentVariable("IC_UI_EXPAND") == "1")
+                SetExpanded(true);
         }
 
         public void SetOpenedCallback(Action callback) => _openedCallback = callback;
@@ -29,8 +41,10 @@ namespace IronCurtain.View
         {
             _expanded = expanded;
             if (expanded) _openedCallback?.Invoke();
+            ApplyExpanded();
         }
 
+        /// <summary>IMGUI 时代的布局参考(屏幕右上);保留供兼容引用,实际布局改由 UITK 弹性完成。</summary>
         public static Rect PanelRectFor(int screenWidth, int screenHeight, bool expanded)
         {
             float width = Mathf.Max(0f, Mathf.Min(320f, screenWidth - 20f));
@@ -40,57 +54,95 @@ namespace IronCurtain.View
             return new Rect(Mathf.Max(0f, screenWidth - width - 10f), top, width, height);
         }
 
-        private void OnDisable() => LastPanelRect = Rect.zero;
-        private void OnDestroy() => LastPanelRect = Rect.zero;
-
-        private void OnGUI()
+        private void Build(VisualElement parent)
         {
-            if (_model == null) { LastPanelRect = Rect.zero; return; }
-            GUI.skin.font = ViewAssets.UiFont(14);
-            LastPanelRect = PanelRectFor(Screen.width, Screen.height, _expanded);
-            GUI.Box(LastPanelRect, "", UiSkin.Panel); // 2026-09-10 木框白底皮肤
-            GUILayout.BeginArea(new Rect(LastPanelRect.x + 8f, LastPanelRect.y + 6f,
-                Mathf.Max(0f, LastPanelRect.width - 16f), Mathf.Max(0f, LastPanelRect.height - 12f)));
-            DrawHeader();
-            if (_expanded) DrawEntries();
-            GUILayout.EndArea();
-        }
+            _root = new VisualElement { name = "UpgradePanel" };
+            _root.AddToClassList("panel");
+            _root.style.position = Position.Absolute;
+            _root.style.right = 12;
+            _root.style.top = 56;
+            _root.style.width = 324;
 
-        private void DrawHeader()
-        {
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button(_expanded ? "英雄升级 ▲" : "英雄升级 ▼", GUILayout.Width(112f)))
+            var head = new VisualElement();
+            head.style.flexDirection = FlexDirection.Row;
+            head.style.alignItems = Align.Center;
+            _header = UiKit.MakeButton("英雄升级 ▼", () =>
             {
                 SetExpanded(!_expanded);
 #if UNITY_EDITOR
                 InputAudit.Log("upgrade_panel expanded=" + _expanded);
 #endif
-            }
-            GUILayout.FlexibleSpace();
-            var state = _model.Describe();
-            GUILayout.Label(state.Entries.Count > 0 ? "EP " + state.Ep.ToString("0.#") : "状态不可用");
-            GUILayout.EndHorizontal();
+            });
+            _header.style.width = 132;
+            head.Add(_header);
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
+            _ep = UiKit.MakeLabel("", "label-dim");
+            head.Add(_ep);
+            _root.Add(head);
+
+            _body = new VisualElement();
+            _body.style.marginTop = 6;
+            _root.Add(_body);
+
+            _feedbackLabel = UiKit.MakeLabel("", "feedback-ok");
+            _feedbackLabel.style.marginTop = 4;
+            _root.Add(_feedbackLabel);
+
+            parent.Add(_root);
+            ApplyExpanded();
         }
 
-        private void DrawEntries()
+        private void ApplyExpanded()
         {
+            if (_header == null) return;
+            _header.text = _expanded ? "英雄升级 ▲" : "英雄升级 ▼";
+            if (_body != null) _body.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_feedbackLabel != null) _feedbackLabel.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        private void Update()
+        {
+            if (_model == null || _root == null) return;
             var state = _model.Describe();
+            _ep.text = state.Entries.Count > 0 ? "EP " + state.Ep.ToString("0.#") : "状态不可用";
+
+            if (_expanded) RebuildEntries(state);
+
+            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
+            {
+                _feedbackLabel.text = _feedback;
+                _feedbackLabel.EnableInClassList("feedback-ok", _feedbackOk);
+                _feedbackLabel.EnableInClassList("feedback-err", !_feedbackOk);
+            }
+            else if (_feedbackLabel != null) _feedbackLabel.text = "";
+        }
+
+        private void RebuildEntries(UpgradeCommandState state)
+        {
+            _body.Clear();
             if (state.Entries.Count == 0)
             {
-                DrawFeedback("升级状态不可用", false);
+                var l = UiKit.MakeLabel("升级状态不可用", "feedback-err");
+                _body.Add(l);
                 return;
             }
             foreach (var entry in state.Entries)
             {
-                GUILayout.BeginHorizontal();
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginTop = 3;
                 string action = entry.Upgraded ? "已升级" : entry.Cost + "EP";
-                if (GUILayout.Button(entry.Name + "  " + action, GUILayout.Width(132f), GUILayout.Height(25f)))
-                    Execute(entry.Hero);
-                GUILayout.Label(entry.Description, GUILayout.Height(25f));
-                GUILayout.EndHorizontal();
+                var btn = UiKit.MakeButton(entry.Name + "  " + action, () => Execute(entry.Hero), !entry.Upgraded);
+                btn.style.width = 168;
+                row.Add(btn);
+                var desc = UiKit.MakeLabel(entry.Description, "label-dim");
+                desc.style.marginLeft = 8;
+                desc.style.flexGrow = 1;
+                desc.style.whiteSpace = WhiteSpace.Normal;
+                row.Add(desc);
+                _body.Add(row);
             }
-            if (_feedback != null && Time.unscaledTime < _feedbackUntil)
-                DrawFeedback(_feedback, _feedbackOk);
         }
 
         private void Execute(HeroId hero)
@@ -109,12 +161,12 @@ namespace IronCurtain.View
 #endif
         }
 
-        private static void DrawFeedback(string message, bool success)
+        private void LateUpdate()
         {
-            var previous = GUI.color;
-            GUI.color = success ? Color.green : new Color(1f, 0.35f, 0.3f);
-            GUILayout.Label(message);
-            GUI.color = previous;
+            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 输入拦截桥
         }
+
+        private void OnDisable() => LastPanelRect = Rect.zero;
+        private void OnDestroy() => LastPanelRect = Rect.zero;
     }
 }

@@ -60,6 +60,8 @@ namespace IronCurtain.View
             inputAudit.Init(Sim);
 #endif
 
+            // 2026-09-11 UI demo→成品迁移:UITK 根先于面板建(面板 Init 时取 UiRoot.Current)
+            gameObject.AddComponent<UiRoot>();
             var topBar = gameObject.AddComponent<TopBarPanel>();
             topBar.Init(Sim, Side.Blue);
             var upgrades = gameObject.AddComponent<UpgradeCommandPanel>();

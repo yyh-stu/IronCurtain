@@ -1,9 +1,13 @@
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>M6.2 顶栏:左己方基地血量+人口 / 中对局时间 / 右敌方基地血量(迷雾口径,未侦察显示 ???)。</summary>
+    /// <summary>M6.2 顶栏:左己方基地血量+人口+EP / 中对局时间 / 右敌方基地血量(迷雾口径,未侦察显示 ???)。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit(弹性三段布局,多分辨率/安全区原生);
+    /// 数据口径全部不变(TopBarModel/VisionSystem.LastKnownBuilding)。
+    /// LastPanelRect 语义保留:每帧回填 worldBound,SelectionInteractionCoordinator 输入拦截链不变。</summary>
     public sealed class TopBarPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = Rect.zero;
@@ -13,81 +17,131 @@ namespace IronCurtain.View
         private Entity _myBase, _enemyBase;
         private float _nextQuery;
 
+        private VisualElement _root;
+        private VisualElement _myHpFill, _enemyHpFill;
+        private Label _myHpText, _popText, _epText, _clock, _phase, _enemyLabel, _enemyHpText;
+        private VisualElement _enemyHpShell;
+
         public void Init(SimCore sim, Side playerSide)
         {
             _sim = sim;
             _side = playerSide;
             _nextQuery = -1f;
+            if (UiRoot.Current == null) return;
+            Build(UiRoot.Current.Screen);
         }
 
-        private void OnGUI()
+        private void Build(VisualElement parent)
         {
-            if (_sim == null) return;
-            var rect = new Rect(0f, 0f, Screen.width, 40f);
-            LastPanelRect = rect;
-            var prev = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.55f);
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = prev;
+            _root = new VisualElement { name = "TopBar" };
+            _root.AddToClassList("topbar");
+            _root.style.position = Position.Absolute;
+            _root.style.left = 0; _root.style.right = 0; _root.style.top = 0;
+            _root.style.height = 44;
+            _root.style.flexDirection = FlexDirection.Row;
+            _root.style.alignItems = Align.Center;
+            _root.style.paddingLeft = 12; _root.style.paddingRight = 12;
 
-            if (Time.realtimeSinceStartup >= _nextQuery)
+            // 三段式:左(信息) — 中(时钟,flex 居中) — 右(敌方);窄屏自动挤压不再裁切
+            var left = MakeGroup(Justify.FlexStart);
+            left.Add(UiKit.MakeLabel("大本营"));
+            var shell = new VisualElement();
+            shell.AddToClassList("hpbar-shell");
+            shell.style.width = 150; shell.style.marginLeft = 8; shell.style.marginRight = 8;
+            _myHpFill = new VisualElement();
+            _myHpFill.AddToClassList("hpbar-fill");
+            shell.Add(_myHpFill);
+            left.Add(shell);
+            _myHpText = UiKit.MakeLabel("--"); _myHpText.style.marginRight = 14; left.Add(_myHpText);
+            _popText = UiKit.MakeLabel(""); _popText.style.marginRight = 14; left.Add(_popText);
+            _epText = UiKit.MakeLabel(""); left.Add(_epText);
+
+            var center = MakeGroup(Justify.Center);
+            center.style.flexGrow = 1;
+            var centerCol = new VisualElement();
+            _clock = UiKit.MakeLabel("--:--", "label-clock");
+            _phase = UiKit.MakeLabel("", "label-phase");
+            centerCol.Add(_clock); centerCol.Add(_phase);
+            center.Add(centerCol);
+
+            var right = MakeGroup(Justify.FlexEnd);
+            _enemyLabel = UiKit.MakeLabel("敌方大本营 ???");
+            _enemyHpShell = new VisualElement();
+            _enemyHpShell.AddToClassList("hpbar-shell");
+            _enemyHpShell.style.width = 150; _enemyHpShell.style.marginLeft = 8;
+            _enemyHpFill = new VisualElement();          // 修复:忘加填充子元素 → ElementAt(0) 越界(Play 日志实测)
+            _enemyHpFill.AddToClassList("hpbar-fill");
+            _enemyHpShell.Add(_enemyHpFill);
+            _enemyHpText = UiKit.MakeLabel(""); _enemyHpText.style.marginLeft = 8;
+            right.Add(_enemyLabel); right.Add(_enemyHpShell); right.Add(_enemyHpText);
+
+            _root.Add(left); _root.Add(center); _root.Add(right);
+            parent.Add(_root);
+        }
+
+        private static VisualElement MakeGroup(Justify j)
+        {
+            var g = new VisualElement();
+            g.style.flexDirection = FlexDirection.Row;
+            g.style.justifyContent = j;
+            g.style.alignItems = Align.Center;
+            return g;
+        }
+
+        private void Update()
+        {
+            if (_sim == null || _root == null) return;
+
+            // 时钟逐帧;数据 0.5s 一查(口径与旧版一致)
+            _clock.text = TopBarModel.FormatCountdown(_sim);
+            bool overtime = _sim.Phase == MatchPhase.Overtime;
+            _clock.EnableInClassList("label-clock-overtime", overtime);   // 加时橙红
+            _phase.text = TopBarModel.PhaseText(_sim);
+
+            if (Time.unscaledTime >= _nextQuery)
             {
-                _nextQuery = Time.realtimeSinceStartup + 0.5f;
+                _nextQuery = Time.unscaledTime + 0.5f;
                 _myBase = TopBarModel.FindBase(_sim, _side);
                 var other = _side == Side.Blue ? Side.Red : Side.Blue;
                 _enemyBase = TopBarModel.FindBase(_sim, other);
-            }
 
-            float y = 13f;
-            var label = new GUIStyle(GUI.skin.label) { fontSize = 16 };
-            label.normal.textColor = Color.white;
-            GUI.Label(new Rect(10f, y - 7f, 70f, 24f), "大本营", label);
-            if (_myBase != null)
-            {
-                DrawHpBar(new Rect(80f, y, 140f, 14f), _myBase.Hp, _myBase.MaxHp);
-                GUI.Label(new Rect(228f, y - 4f, 110f, 22f), TopBarModel.HpText(_myBase.Hp, _myBase.MaxHp), label);
-            }
-            GUI.Label(new Rect(344f, y - 7f, 110f, 24f), TopBarModel.PopText(_sim, _side), label);
-            GUI.Label(new Rect(458f, y - 7f, 180f, 24f), TopBarModel.EpText(_sim, _side), label);
-
-            var clockStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, alignment = TextAnchor.MiddleCenter };
-            clockStyle.normal.textColor = Color.white;
-            if (_sim.Phase == MatchPhase.Overtime) clockStyle.normal.textColor = new Color(1f, 0.55f, 0.2f); // 加时橙红
-            GUI.Label(new Rect(Screen.width * 0.5f - 90f, 4f, 180f, 26f),
-                TopBarModel.FormatCountdown(_sim), clockStyle);
-            var sub = new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
-            sub.normal.textColor = new Color(1f, 1f, 1f, 0.7f);
-            GUI.Label(new Rect(Screen.width * 0.5f - 90f, 28f, 180f, 14f), TopBarModel.PhaseText(_sim), sub);
-
-            var snap = _enemyBase != null
-                ? VisionSystem.LastKnownBuilding(_sim, _side, _enemyBase.Id) : null;
-            float right = Screen.width - 10f;
-            if (snap == null)
-            {
-                var q = new GUIStyle(GUI.skin.label) { fontSize = 16 };
-                q.normal.textColor = new Color(1f, 1f, 1f, 0.75f);
-                var qs = new Vector2(GUI.skin.label.CalcSize(new GUIContent("敌方大本营 ???")).x + 40f, 20f);
-                GUI.Label(new Rect(right - qs.x, y - 3f, qs.x, 22f), "敌方大本营 ???", q);
-            }
-            else
-            {
-                GUI.Label(new Rect(right - 330f, y - 7f, 110f, 24f), "敌方大本营", label);
-                DrawHpBar(new Rect(right - 210f, y, 140f, 14f), snap.Hp, snap.MaxHp);
-                var hp = TopBarModel.HpText(snap.Hp, snap.MaxHp);
-                var w = GUI.skin.label.CalcSize(new GUIContent(hp)).x + 6f;
-                GUI.Label(new Rect(right - w, y - 4f, w, 22f), hp, label);
+                if (_myBase != null)
+                {
+                    ApplyHp(_myHpFill, _myHpText, _myBase.Hp, _myBase.MaxHp);
+                    _popText.text = TopBarModel.PopText(_sim, _side);
+                    _epText.text = TopBarModel.EpText(_sim, _side);
+                }
+                var snap = _enemyBase != null ? VisionSystem.LastKnownBuilding(_sim, _side, _enemyBase.Id) : null;
+                if (snap == null)
+                {
+                    _enemyLabel.text = "敌方大本营 ???";
+                    _enemyHpShell.style.display = DisplayStyle.None;
+                    _enemyHpText.text = "";
+                }
+                else
+                {
+                    _enemyLabel.text = "敌方大本营";
+                    _enemyHpShell.style.display = DisplayStyle.Flex;
+                    ApplyHp(_enemyHpFill, _enemyHpText, snap.Hp, snap.MaxHp);
+                }
             }
         }
 
-        private static void DrawHpBar(Rect r, float hp, float maxHp)
+        private static void ApplyHp(VisualElement fill, Label text, float hp, float maxHp)
         {
-            var prev = GUI.color;
-            GUI.color = Color.black;
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
             float t = maxHp > 0f ? Mathf.Clamp01(hp / maxHp) : 0f;
-            GUI.color = t > 0.5f ? Color.green : (t > 0.25f ? new Color(1f, 0.85f, 0f) : Color.red);
-            GUI.DrawTexture(new Rect(r.x + 1f, r.y + 1f, (r.width - 2f) * t, r.height - 2f), Texture2D.whiteTexture);
-            GUI.color = prev;
+            fill.style.width = Length.Percent(t * 100f);
+            fill.style.backgroundColor = t > 0.5f ? new Color(0.30f, 0.85f, 0.40f)
+                : (t > 0.25f ? new Color(1f, 0.85f, 0f) : new Color(1f, 0.30f, 0.25f));
+            text.text = TopBarModel.HpText(hp, maxHp);
         }
+
+        private void LateUpdate()
+        {
+            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 输入拦截桥
+        }
+
+        private void OnDisable() => LastPanelRect = Rect.zero;
+        private void OnDestroy() => LastPanelRect = Rect.zero;
     }
 }

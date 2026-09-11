@@ -270,6 +270,13 @@
 > ⑤**视觉验证**:俯瞰全景三路带均有双方部队(像素计数 蓝 50/55/47、红 19/26/24,肉眼复核上/中/下三条线都有交战与推进)。
 > ⑥机制备注:AI 开局"已知建筑"来自**视野精灵**(首发 30s)揭图 → 波次自然在 30-60s 后启动,非开局即推。
 >
+> **2026-09-11 深夜·UI demo→成品迁移 第0步+第1批试点(制作人:"按你的想法做";技术选型=UI Toolkit+纯USS代码主题;321/321 全绿,随本块提交)**:
+> ①**骨架**:`UiRoot`(PanelSettings/主题从 Resources 加载)+`UiKit`(控件工厂)+`theme.uss`(集中样式:三态按钮/面板/血条,换肤=换这份文件)+`GenerateUiAssets` 编辑器工具。**两个实测坑**:(a)运行时 `CreateInstance<PanelSettings>` 因缺序列化初始化抛 ArgumentOutOfRange 并**连锁打断整个 GameBootstrap.Awake**——必须由编辑器生成资产(Resources/UI/PanelSettings.asset+UiTheme.tss);(b)`Screen` 属性遮蔽 `UnityEngine.Screen`,安全区代码须全限定。
+> ②**输入拦截桥(零改动关键)**:各 UITK 面板每帧把 `worldBound` 回填 `LastPanelRect` 静态字段,`SelectionInteractionCoordinator.IsPointerOverUi` 的矩形判定链原样生效;互斥协调器/审计行(InputAudit)契约全保留。
+> ③**已迁两块**:`TopBarPanel`(弹性三段式:左血条/人口/EP-中时钟加时橙红-右敌方迷雾口径;安全区;多分辨率原生)与 `UpgradeCommandPanel`(三态按钮列表/已升级禁用态/EP 反馈/互斥回调;取证开关 `IC_UI_EXPAND=1`)。**自查修一 bug**:敌方血条壳忘加填充子元素→`ElementAt(0)` 越界每帧刷异常(Play 日志插获)。
+> ④**验收**:Play 通道四帧零异常零编译错;自己眼睛确认顶栏成品观感+按钮展开态(六英雄行/禁用灰态/圆角深色面板);证据入桌面《待审核图片/11_UI成品化/》(两张)。**局限如实记**:悬停/按下三态与安全区为静态图不可验,待制作人实机;edit 通道 Camera.Render 不含 UITK(与 IMGUI 时代一致),UI 验收一律走 Play 通道。
+> ⑤**剩余迁移清单(后续批次)**:第1批余下=海克斯/道具两面板;第2批=兵营总览/建筑命令(世界坐标锚点)/小地图;第3批=结算/教学。旧 IMGUI 与新 UITK 迁移期并存。
+>
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):
