@@ -1,9 +1,14 @@
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>D19 全局小地图:右下角常驻,点击/拖动跳转镜头;雾叠加 + 敌方信息过滤 + 相机取景框。</summary>
+    /// <summary>D19 全局小地图:右下角常驻,点击/拖动跳转镜头;雾叠加 + 敌方信息过滤 + 相机取景框。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit。
+    /// 结构:静态地形底图 UITK Image 一张 + **动态合成 overlay 贴图**(270×160,每帧重画:
+    /// 雾/单位点/建筑点/取景框全部画进这一张,顺带消化 GUI 时代的 v 翻转与 texcoords 坑)。
+    /// LastPanelRect 语义保留(worldBound 回填);点击/拖动改 UITK 指针事件。</summary>
     public sealed class MinimapPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = new Rect(0f, 0f, 0f, 0f); // 无内容时 w/h=0
@@ -15,9 +20,15 @@ namespace IronCurtain.View
         private Camera _cam;
         private Texture2D _bg;
 
+        private VisualElement _root;
+        private Texture2D _overlay;
+        private Color32[] _ovPx;
+        private float _w, _h;
+
         public void Init(SimCore sim, Side player, CameraRig rig, FogView fog, Camera cam)
         {
             _sim = sim; _player = player; _rig = rig; _fog = fog; _cam = cam;
+            // 底图:行序直填(row0=北=UITK 顶部,无需 GUI 时代的行翻转)
             _bg = new Texture2D(LaneGrid.Cols, LaneGrid.Rows, TextureFormat.RGBA32, false)
             { filterMode = FilterMode.Point };
             var px = new Color32[LaneGrid.Rows * LaneGrid.Cols];
@@ -31,35 +42,74 @@ namespace IronCurtain.View
                     else if (TerrainMap.IsWater(c)) color = new Color32(63, 143, 214, 255);
                     else if (TerrainMap.IsIsland(c)) color = new Color32(95, 129, 73, 255);
                     else color = new Color32(120, 122, 126, 255);
-                    // GUI 纹理 v=0 画在 rect 底部=南方,而 row0=北 → 行序翻转
-                    px[(LaneGrid.Rows - 1 - row) * LaneGrid.Cols + col] = color;
+                    px[row * LaneGrid.Cols + col] = color;
                 }
             _bg.SetPixels32(px);
             _bg.Apply();
+
+            _overlay = new Texture2D(LaneGrid.Cols, LaneGrid.Rows, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Point };
+            _ovPx = new Color32[LaneGrid.Rows * LaneGrid.Cols];
+
+            if (UiRoot.Current != null && UiRoot.Current.Screen != null) Build(UiRoot.Current.Screen);
         }
 
-        private static void DrawDot(Rect rect, Color c)
+        private void Build(VisualElement parent)
         {
-            var prev = GUI.color;
-            GUI.color = c;
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
-            GUI.color = prev;
+            MinimapLayout.MiniSize(440f, 90f, out _w, out _h);
+            _root = new VisualElement { name = "Minimap" };
+            _root.style.position = Position.Absolute;
+            _root.style.right = 12;
+            _root.style.bottom = 12;
+            _root.style.width = Mathf.RoundToInt(_w);
+            _root.style.height = Mathf.RoundToInt(_h);
+            _root.AddToClassList("map-frame");
+
+            var bgEl = new VisualElement();
+            bgEl.style.position = Position.Absolute;
+            bgEl.style.left = 0; bgEl.style.right = 0; bgEl.style.top = 0; bgEl.style.bottom = 0;
+            bgEl.style.backgroundImage = Background.FromTexture2D(_bg);
+            _root.Add(bgEl);
+
+            var ovEl = new VisualElement();
+            ovEl.style.position = Position.Absolute;
+            ovEl.style.left = 0; ovEl.style.right = 0; ovEl.style.top = 0; ovEl.style.bottom = 0;
+            ovEl.style.backgroundImage = Background.FromTexture2D(_overlay);
+            _root.Add(ovEl);
+
+            // 点击/拖动跳转(旧 Event.current 语义 → UITK 指针)
+            _root.RegisterCallback<PointerDownEvent>(evt => Jump(evt.localPosition), TrickleDown.TrickleDown);
+            _root.RegisterCallback<PointerMoveEvent>(evt =>
+            {
+                if (evt.isPrimary && evt.pressure > 0f || (evt.pressedButtons & 1) != 0)
+                    Jump(evt.localPosition);
+            }, TrickleDown.TrickleDown);
+
+            parent.Add(_root);
         }
 
-        private void OnGUI()
+        private void Jump(Vector2 local)
         {
-            if (_sim == null || _bg == null) { LastPanelRect = new Rect(0f, 0f, 0f, 0f); return; }
-            float w, h;
-            MinimapLayout.MiniSize(440f, 90f, out w, out h);
-            var rect = new Rect(Screen.width - w - 12f, Screen.height - h - 12f, w, h);
-            LastPanelRect = rect;
+            float colM, rowM;
+            MinimapLayout.MiniToWorld(local.x, local.y, _w, _h, out colM, out rowM);
+            if (_rig != null) _rig.SetFocus(colM, rowM);
+        }
 
-            GUI.Box(rect, "");
-            GUI.DrawTexture(rect, _bg, ScaleMode.StretchToFill);
+        private void Update()
+        {
+            if (_sim == null || _root == null) return;
+            System.Array.Clear(_ovPx, 0, _ovPx.Length);
+
+            // ① 雾(FogView.Tex 行序=row0 北,与 overlay 对齐,直接搬)
             if (_fog != null && _fog.Tex != null)
-                // 纹理 row0(北)在 v=0=rect 底部 → 垂直翻转绘制(与背景行序翻转同理)
-                GUI.DrawTextureWithTexCoords(rect, _fog.Tex, new Rect(0f, 1f, 1f, -1f));
+            {
+                var fogPx = _fog.Tex.GetPixels32();
+                int n = Mathf.Min(fogPx.Length, _ovPx.Length);
+                for (int i = 0; i < n; i++)
+                    if (fogPx[i].a > 0) _ovPx[i] = fogPx[i];
+            }
 
+            // ② 建筑点(3×3 texel);敌方走迷雾口径(未知/无快照跳过)
             foreach (var kv in _sim.Entities)
             {
                 var e = kv.Value;
@@ -70,8 +120,7 @@ namespace IronCurtain.View
                     if (e.Side == _player)
                     {
                         if (e.Rubbled) c = new Color(0.235f, 0.235f, 0.235f);
-                        else c = e.Side == Side.Blue ? new Color(0.2f, 0.85f, 1f)
-                            : (e.Side == Side.Red ? new Color(1f, 0.3f, 0.3f) : new Color(0.5f, 0.75f, 0.5f));
+                        else c = SideColor(e.Side);
                     }
                     else
                     {
@@ -80,54 +129,54 @@ namespace IronCurtain.View
                         var snap = VisionSystem.LastKnownBuilding(_sim, _player, e.Id);
                         if (snap == null) continue;
                         if (snap.Rubbled) c = new Color(0.235f, 0.235f, 0.235f);
-                        else c = snap.Side == Side.Blue ? new Color(0.2f, 0.85f, 1f)
-                            : (snap.Side == Side.Red ? new Color(1f, 0.3f, 0.3f) : new Color(0.5f, 0.75f, 0.5f));
+                        else c = SideColor(snap.Side);
                     }
-                    DrawBuildingDot(rect, e, c);
+                    Dot(e.Pos.Col, e.Pos.Row, 1, c);
                 }
                 else if (e.Kind == EntityKind.Unit && e.State != EntityState.Dead)
                 {
                     if (e.GarrisonBuildingId != 0) continue; // 驻军中,已含在建筑点内
                     bool visible = e.Side == _player || VisionSystem.IsUnitVisible(_sim, _player, e.Id);
                     if (!visible) continue;
-                    float size = e.IsSoldier ? 2f : 4f;
-                    float mx, my;
-                    MinimapLayout.WorldToMini(e.PosF.X, e.PosF.Y, w, h, out mx, out my);
-                    DrawDot(new Rect(rect.x + mx - size * 0.5f, rect.y + my - size * 0.5f, size, size),
-                        e.Side == Side.Blue ? new Color(0.2f, 0.85f, 1f)
-                        : (e.Side == Side.Red ? new Color(1f, 0.3f, 0.3f) : new Color(0.5f, 0.75f, 0.5f)));
+                    Dot((int)e.PosF.X, (int)e.PosF.Y, e.IsSoldier ? 0 : 1, SideColor(e.Side));
                 }
             }
 
-            DrawViewRect(rect, w, h);
+            // ③ 相机取景框(白,1 texel 粗)
+            DrawViewRect();
 
-            // 点击/拖动跳转
-            var ev = Event.current;
-            if ((ev.type == EventType.MouseDown || ev.type == EventType.MouseDrag) && rect.Contains(ev.mousePosition))
-            {
-                float colM, rowM;
-                MinimapLayout.MiniToWorld(ev.mousePosition.x - rect.x, ev.mousePosition.y - rect.y, w, h, out colM, out rowM);
-                if (_rig != null) _rig.SetFocus(colM, rowM);
-                ev.Use();
-            }
+            _overlay.SetPixels32(_ovPx);
+            _overlay.Apply();
         }
 
-        private void DrawBuildingDot(Rect rect, Entity e, Color c)
+        private static Color SideColor(Side s)
         {
-            float mx, my;
-            MinimapLayout.WorldToMini(e.Pos.Col, e.Pos.Row, rect.width, rect.height, out mx, out my);
-            DrawDot(new Rect(rect.x + mx - 2.5f, rect.y + my - 2.5f, 5f, 5f), c);
+            return s == Side.Blue ? new Color(0.2f, 0.85f, 1f)
+                : (s == Side.Red ? new Color(1f, 0.3f, 0.3f) : new Color(0.5f, 0.75f, 0.5f));
         }
 
-        private void DrawViewRect(Rect rect, float w, float h)
+        /// <summary>在 overlay 上画一个点;radius=0 单像素(士兵),1 三像素(将/建筑)。</summary>
+        private void Dot(int col, int row, int radius, Color c)
+        {
+            var c32 = (Color32)c;
+            for (int dy = -radius; dy <= radius; dy++)
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    int y = row + dy, x = col + dx;
+                    if (y < 0 || y >= LaneGrid.Rows || x < 0 || x >= LaneGrid.Cols) continue;
+                    _ovPx[y * LaneGrid.Cols + x] = c32;
+                }
+        }
+
+        private void DrawViewRect()
         {
             if (_cam == null) return;
             float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
             bool ok = true;
             var corners = new[]
             {
-                new Vector3(0f, 0f), new Vector3(Screen.width - 1f, 0f),
-                new Vector3(Screen.width - 1f, Screen.height - 1f), new Vector3(0f, Screen.height - 1f)
+                new Vector3(0f, 0f), new Vector3(UnityEngine.Screen.width - 1f, 0f),
+                new Vector3(UnityEngine.Screen.width - 1f, UnityEngine.Screen.height - 1f), new Vector3(0f, UnityEngine.Screen.height - 1f)
             };
             foreach (var sp in corners)
             {
@@ -142,24 +191,39 @@ namespace IronCurtain.View
             }
             if (!ok)
             {
-                // 兜底:焦点 ± 半个视野宽度。ART-P0 相机改透视后 orthographicSize 已无意义
-                // (不再被写入,恒为 Unity 默认 5),改用 CameraRig 的视野宽度语义(正交/透视通用)。
+                // 兜底:焦点 ± 半个视野宽度(透视下 orthographicSize 无意义,用 CameraRig 视野宽度语义)
                 float hw = _rig != null ? _rig.ViewWidth * 0.5f : _cam.orthographicSize;
                 Vector3 pos = _cam.transform.position;
                 minX = pos.x - hw; maxX = pos.x + hw;
                 minZ = pos.z - hw; maxZ = pos.z + hw;
             }
             float x0, y0, x1, y1;
-            MinimapLayout.WorldToMini(minX, 3f - maxZ, w, h, out x0, out y0);
-            MinimapLayout.WorldToMini(maxX, 3f - minZ, w, h, out x1, out y1);
-            x0 += rect.x; y0 += rect.y; x1 += rect.x; y1 += rect.y;
-            float t0 = 1.5f;
-            var prev = GUI.color; GUI.color = Color.white;
-            GUI.DrawTexture(new Rect(x0, y0 - t0 * 0.5f, x1 - x0, t0), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(x0, y1 - t0 * 0.5f, x1 - x0, t0), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(x0 - t0 * 0.5f, y0, t0, y1 - y0), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(x1 - t0 * 0.5f, y0, t0, y1 - y0), Texture2D.whiteTexture);
-            GUI.color = prev;
+            MinimapLayout.WorldToMini(minX, 3f - maxZ, LaneGrid.Cols, LaneGrid.Rows, out x0, out y0);
+            MinimapLayout.WorldToMini(maxX, 3f - minZ, LaneGrid.Cols, LaneGrid.Rows, out x1, out y1);
+            var white = new Color32(255, 255, 255, 255);
+            int ix0 = Mathf.Clamp(Mathf.RoundToInt(x0), 0, LaneGrid.Cols - 1);
+            int iy0 = Mathf.Clamp(Mathf.RoundToInt(y0), 0, LaneGrid.Rows - 1);
+            int ix1 = Mathf.Clamp(Mathf.RoundToInt(x1), 0, LaneGrid.Cols - 1);
+            int iy1 = Mathf.Clamp(Mathf.RoundToInt(y1), 0, LaneGrid.Rows - 1);
+            for (int x = ix0; x <= ix1; x++)
+            {
+                _ovPx[iy0 * LaneGrid.Cols + x] = white;
+                _ovPx[iy1 * LaneGrid.Cols + x] = white;
+            }
+            for (int y = iy0; y <= iy1; y++)
+            {
+                _ovPx[y * LaneGrid.Cols + ix0] = white;
+                _ovPx[y * LaneGrid.Cols + ix1] = white;
+            }
         }
+
+        private void LateUpdate()
+        {
+            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 拦截桥
+            else LastPanelRect = new Rect(0f, 0f, 0f, 0f);
+        }
+
+        private void OnDisable() => LastPanelRect = Rect.zero;
+        private void OnDestroy() => LastPanelRect = Rect.zero;
     }
 }

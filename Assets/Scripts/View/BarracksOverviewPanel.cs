@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>M8.4c 总览面板:主基地将生产 + 补兵池显示与补兵按钮。IMGUI 渲染,多基地自动多区块。</summary>
+    /// <summary>M8.4c 总览面板:主基地将生产 + 补兵池显示与补兵按钮。多基地自动多区块。
+    /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit;数据/操作全部来自 BarracksOverviewModel。
+    /// LastPanelRect 语义保留(worldBound 回填):SelectionSystem 拦截 + 道具面板跟随底边都依赖它。</summary>
     public sealed class BarracksOverviewPanel : MonoBehaviour
     {
         private static readonly HeroId[] HeroOrder =
@@ -20,7 +23,7 @@ namespace IronCurtain.View
             new Color(0.90f, 0.60f, 0.25f), new Color(0.50f, 0.45f, 0.85f),
         };
 
-        /// <summary>M8.6 面板包围盒(GUI 坐标系,y 从顶起),供 SelectionSystem 判断点击是否落在面板上。</summary>
+        /// <summary>M8.6 面板包围盒(屏幕坐标),供 SelectionSystem 拦截与道具面板跟随。</summary>
         public static Rect LastPanelRect = new Rect(10f, 10f, 360f, 0f);
 
         private BarracksOverviewModel _model;
@@ -28,29 +31,37 @@ namespace IronCurtain.View
         private bool _lastFeedbackOk;
         private float _feedbackUntil;
 
+        private VisualElement _root, _blocksHost;
+        private Label _population, _pool, _feedback;
+
         public void Init(SimCore sim, Side player)
         {
             _model = new BarracksOverviewModel(sim, player);
+            if (UiRoot.Current != null && UiRoot.Current.Screen != null) Build(UiRoot.Current.Screen);
         }
 
-        private void OnGUI()
+        private void Build(VisualElement parent)
         {
-            if (_model == null) return;
-            GUI.skin.font = ViewAssets.UiFont(14);
+            _root = new VisualElement { name = "BarracksOverview" };
+            _root.AddToClassList("panel");
+            _root.style.position = Position.Absolute;
+            _root.style.left = 12;
+            _root.style.top = 12;
+            _root.style.width = 372;
 
-            var blocks = _model.DescribeBlocks();
-            // 2026-09-09 修底部裁切(制作人指出老毛病):块高余量不足,末行将按钮显示一半 → 158→174
-            float height = 84f + blocks.Count * 174f;
-            LastPanelRect = new Rect(10f, 10f, 360f, height);
-            GUI.Box(new Rect(10f, 10f, 360f, height), "", MakeBoxStyle());
-            GUILayout.BeginArea(new Rect(18f, 16f, 344f, height - 12f));
+            var title = UiKit.MakeLabel("总览", "label-title");
+            _root.Add(title);
+            _population = UiKit.MakeLabel("");
+            _root.Add(_population);
 
-            GUILayout.Label("总览", MakeTitleStyle());
-            GUILayout.Label("人口 将 " + _model.PopulationOf() + "/" + _model.PopulationCapOf());
-
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("补兵池 " + _model.ReinforcePoolOf() + "/" + _model.ReinforcePoolCap());
-            if (GUILayout.Button("补兵", GUILayout.Width(64f)))
+            var poolRow = new VisualElement();
+            poolRow.style.flexDirection = FlexDirection.Row;
+            poolRow.style.alignItems = Align.Center;
+            poolRow.style.marginTop = 4;
+            _pool = UiKit.MakeLabel("");
+            _pool.style.flexGrow = 1;
+            poolRow.Add(_pool);
+            var btn = UiKit.MakeButton("补兵", () =>
             {
                 int before = _model.ReinforcePoolOf();
                 string result = _model.RequestReinforce(out _);
@@ -59,76 +70,119 @@ namespace IronCurtain.View
                 InputAudit.Log("reinforce_click result=" + ResultForLog(result)
                     + " pool=" + before + "->" + _model.ReinforcePoolOf());
 #endif
-            }
-            GUILayout.EndHorizontal();
-            GUILayout.Space(4f);
+            });
+            btn.style.width = 76;
+            poolRow.Add(btn);
+            _root.Add(poolRow);
 
-            foreach (var block in blocks)
-                DrawBlock(block);
+            _blocksHost = new VisualElement();
+            _blocksHost.style.marginTop = 6;
+            _root.Add(_blocksHost);
+
+            _feedback = UiKit.MakeLabel("", "feedback-ok");
+            _feedback.style.marginTop = 4;
+            _root.Add(_feedback);
+
+            parent.Add(_root);
+        }
+
+        private void Update()
+        {
+            if (_model == null || _root == null) return;
+            _population.text = "人口 将 " + _model.PopulationOf() + "/" + _model.PopulationCapOf();
+            _pool.text = "补兵池 " + _model.ReinforcePoolOf() + "/" + _model.ReinforcePoolCap();
+            RebuildBlocks(_model.DescribeBlocks());
 
             if (_lastFeedback != null && Time.unscaledTime < _feedbackUntil)
             {
-                var prev = GUI.color;
-                GUI.color = _lastFeedbackOk ? Color.green : Color.red;
-                GUILayout.Label(_lastFeedback);
-                GUI.color = prev;
+                _feedback.text = _lastFeedback;
+                _feedback.EnableInClassList("feedback-ok", _lastFeedbackOk);
+                _feedback.EnableInClassList("feedback-err", !_lastFeedbackOk);
             }
-
-            GUILayout.EndArea();
+            else _feedback.text = "";
         }
 
-        private void DrawBlock(BarracksOverviewModel.BlockInfo block)
+        private void RebuildBlocks(List<BarracksOverviewModel.BlockInfo> blocks)
+        {
+            _blocksHost.Clear();
+            foreach (var block in blocks)
+                _blocksHost.Add(BuildBlock(block));
+        }
+
+        private VisualElement BuildBlock(BarracksOverviewModel.BlockInfo block)
         {
             bool destroyed = block.State == BarracksOverviewModel.BlockState.Destroyed;
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("主基地 #" + block.BarracksId, MakeBoldLabel());
+            var host = new VisualElement();
+            host.style.marginTop = 6;
+            host.style.paddingTop = 6;
+            host.style.borderTopWidth = 1;
+            host.style.borderTopColor = new Color(1f, 1f, 1f, 0.12f);
+
+            var head = new VisualElement();
+            head.style.flexDirection = FlexDirection.Row;
+            head.style.alignItems = Align.Center;
+            var idLabel = UiKit.MakeLabel("主基地 #" + block.BarracksId, "label-title");
+            head.Add(idLabel);
             if (destroyed)
             {
-                var prev = GUI.color;
-                GUI.color = new Color(1f, 0.35f, 0.3f);
-                GUILayout.Label("已摧毁 · 不可生产");
-                GUI.color = prev;
+                var d = UiKit.MakeLabel("已摧毁 · 不可生产", "feedback-err");
+                d.style.marginLeft = 8;
+                head.Add(d);
             }
-            GUILayout.EndHorizontal();
+            host.Add(head);
 
             for (int i = 0; i < block.Slots.Length; i++)
-                DrawSlot(block, i, destroyed);
+                host.Add(BuildSlot(block, i, destroyed));
 
             if (!destroyed)
-                DrawHeroButtons(block.BarracksId);
-
-            GUILayout.Space(6f);
+                host.Add(BuildHeroButtons(block.BarracksId));
+            return host;
         }
 
-        private void DrawSlot(BarracksOverviewModel.BlockInfo block, int index, bool destroyed)
+        private VisualElement BuildSlot(BarracksOverviewModel.BlockInfo block, int index, bool destroyed)
         {
             var slot = block.Slots[index];
-            GUILayout.BeginHorizontal();
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 3;
+
             string heroText;
             if (destroyed) heroText = "—";
             else if (slot.WaitingForSpawn) heroText = HeroNameOf(slot.Current) + "(等位)";
             else heroText = slot.Current.HasValue ? HeroNameOf(slot.Current) : "空闲";
-            GUILayout.Label("槽" + index + ":" + heroText, GUILayout.Width(88f));
+            var slotLabel = UiKit.MakeLabel("槽" + index + ":" + heroText);
+            slotLabel.style.width = 104;
+            row.Add(slotLabel);
 
-            var barRect = GUILayoutUtility.GetRect(150f, 16f);
+            // 生产进度条(绿);空闲/摧毁=空槽底
+            var shell = new VisualElement();
+            shell.AddToClassList("hpbar-shell");
+            shell.style.width = 150;
+            shell.style.marginRight = 6;
+            var fill = new VisualElement();
+            fill.AddToClassList("hpbar-fill");
             if (!destroyed && slot.Current.HasValue && slot.TotalSeconds > 0f)
             {
                 float frac = Mathf.Clamp01(slot.Progress / ProductionSystem.GeneralProductionSeconds);
-                var prev = GUI.color;
-                GUI.color = new Color(0.2f, 0.2f, 0.2f);
-                GUI.DrawTexture(barRect, Texture2D.whiteTexture);
-                GUI.color = Color.green;
-                GUI.DrawTexture(new Rect(barRect.x, barRect.y, barRect.width * frac, barRect.height), Texture2D.whiteTexture);
-                GUI.color = prev;
+                fill.style.width = Length.Percent(frac * 100f);
+                fill.style.backgroundColor = new Color(0.30f, 0.85f, 0.40f);
             }
+            else fill.style.width = 0;
+            shell.Add(fill);
+            row.Add(shell);
 
             if (!destroyed && slot.PendingCount > 0)
-                GUILayout.Label("×" + slot.PendingCount, GUILayout.Width(32f));
+            {
+                var p = UiKit.MakeLabel("×" + slot.PendingCount, "label-dim");
+                p.style.width = 30;
+                row.Add(p);
+            }
 
-            GUILayout.FlexibleSpace();
+            var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
             if (!destroyed && (slot.Current.HasValue || slot.PendingCount > 0))
             {
-                if (GUILayout.Button("取消", GUILayout.Width(48f)))
+                var cancel = UiKit.MakeButton("取消", () =>
                 {
                     string result = _model.Cancel(block.BarracksId, index);
                     Report(result, "已取消");
@@ -136,29 +190,32 @@ namespace IronCurtain.View
                     InputAudit.Log("production_cancel building=" + block.BarracksId + " slot=" + index
                         + " result=" + ResultForLog(result));
 #endif
-                }
+                });
+                cancel.style.width = 56;
+                row.Add(cancel);
             }
-            else
-            {
-                GUILayout.Space(52f);
-            }
-            GUILayout.EndHorizontal();
+            return row;
         }
 
-        private void DrawHeroButtons(int buildingId)
+        private VisualElement BuildHeroButtons(int buildingId)
         {
+            var host = new VisualElement();
             for (int row = 0; row < 2; row++)
             {
-                GUILayout.BeginHorizontal();
+                var r = new VisualElement();
+                r.style.flexDirection = FlexDirection.Row;
+                r.style.alignItems = Align.Center;
+                r.style.marginTop = 3;
                 for (int col = 0; col < 3; col++)
                 {
                     int idx = row * 3 + col;
                     var hero = HeroOrder[idx];
-                    var prev = GUI.color;
-                    GUI.color = HeroColors[idx];
-                    GUILayout.Box("", GUILayout.Width(14f), GUILayout.Height(20f));
-                    GUI.color = prev;
-                    if (GUILayout.Button("将:" + HeroNames[idx], GUILayout.Width(84f)))
+                    var chip = new VisualElement();
+                    chip.style.width = 8; chip.style.height = 18;
+                    chip.style.marginRight = 4;
+                    chip.style.backgroundColor = HeroColors[idx];
+                    r.Add(chip);
+                    var b = UiKit.MakeButton("将:" + HeroNames[idx], () =>
                     {
                         string result = _model.StartProduction(buildingId, hero);
                         Report(result, "已加入生产");
@@ -166,10 +223,14 @@ namespace IronCurtain.View
                         InputAudit.Log("production_click building=" + buildingId + " hero=" + hero
                             + " result=" + ResultForLog(result));
 #endif
-                    }
+                    });
+                    b.style.width = 96;
+                    b.style.flexShrink = 0;
+                    r.Add(b);
                 }
-                GUILayout.EndHorizontal();
+                host.Add(r);
             }
+            return host;
         }
 
         private void Report(string error, string success)
@@ -193,40 +254,12 @@ namespace IronCurtain.View
             return idx >= 0 ? HeroNames[idx] : hero.Value.ToString();
         }
 
-        private static GUIStyle _boxStyle;
-        private static GUIStyle MakeBoxStyle()
+        private void LateUpdate()
         {
-            if (_boxStyle == null)
-            {
-                _boxStyle = new GUIStyle(GUI.skin.box);
-                var tex = new Texture2D(1, 1);
-                tex.SetPixel(0, 0, new Color(0.06f, 0.08f, 0.10f, 0.82f));
-                tex.Apply();
-                _boxStyle.normal.background = tex;
-            }
-            return _boxStyle;
+            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 拦截桥 + 道具面板跟随
         }
 
-        private static GUIStyle _titleStyle;
-        private static GUIStyle MakeTitleStyle()
-        {
-            if (_titleStyle == null)
-            {
-                _titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 16 };
-                _titleStyle.normal.textColor = Color.white;
-            }
-            return _titleStyle;
-        }
-
-        private static GUIStyle _boldStyle;
-        private static GUIStyle MakeBoldLabel()
-        {
-            if (_boldStyle == null)
-            {
-                _boldStyle = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold };
-                _boldStyle.normal.textColor = new Color(0.9f, 0.92f, 0.95f);
-            }
-            return _boldStyle;
-        }
+        private void OnDisable() => LastPanelRect = Rect.zero;
+        private void OnDestroy() => LastPanelRect = Rect.zero;
     }
 }
