@@ -21,6 +21,8 @@ namespace IronCurtain.View
 
         private VisualElement _rve;
         private bool _heightPatched;
+        private bool _screenSized;
+        private float _lastW = -1f, _lastH = -1f;
 
         private void Awake()
         {
@@ -96,20 +98,36 @@ namespace IronCurtain.View
             // 但 resolvedStyle.height==0 —— 所有依赖父容器高度的面板(结算全屏遮罩/百分比布局)全部塌陷。
             // 旧面板全用显式 top+height,overflow 可见,故从未暴露。按宽度缩放比显式补高度,命中一次即可。
             // 注意布局未就绪时 resolvedStyle 为 NaN,NaN 与任何数比较均为 false,必须显式排除。
-            if (_rve == null || _heightPatched) return;
-            float h = _rve.resolvedStyle.height;
-            if (float.IsNaN(h)) return;               // 布局未就绪,下帧再看
-            if (h >= 1f) { _heightPatched = true; return; }
+            if (_rve == null) return;
             float w = _rve.resolvedStyle.width;
-            if (float.IsNaN(w) || w <= 1f) return;
-            if (UnityEngine.Screen.width <= 0) return;
-            float scale = w / UnityEngine.Screen.width;
-            if (float.IsNaN(scale) || scale < 0.01f || scale > 100f) return;
-            float target = UnityEngine.Screen.height * scale;
-            if (float.IsNaN(target) || target < 1f) return;
-            _rve.style.height = target;
-            _heightPatched = true;
-            Debug.Log("[UiRoot] panel height patched to " + target.ToString("F0") + " (was 0, scale=" + scale.ToString("F3") + ")");
+            if (float.IsNaN(w) || w <= 1f) return;              // 布局未就绪
+            float h = _rve.resolvedStyle.height;
+            if (float.IsNaN(h) || h < 1f)
+            {
+                // 高度补丁:父容器高度恒 0/NaN(idle 探针实测),按"宽度×当前缩放比"补出来
+                if (UnityEngine.Screen.width <= 0) return;
+                float scale = w / UnityEngine.Screen.width;
+                if (float.IsNaN(scale) || scale < 0.01f || scale > 100f) return;
+                float target = UnityEngine.Screen.height * scale;
+                if (float.IsNaN(target) || target < 1f) return;
+                _rve.style.height = target;
+                h = target;
+                if (!_heightPatched)
+                {
+                    _heightPatched = true;
+                    Debug.Log("[UiRoot] panel height patched to " + target.ToString("F0") + " (scale=" + scale.ToString("F3") + ")");
+                }
+            }
+            // 2026-09-12 ★关键:Screen 尺寸**持续跟随**父容器,不再一次性定死。
+            // 一次性定死的版本在视口尺寸/面板缩放变化后与新的缩放不匹配 —— 表现就是制作人报的
+            // "UI 一个屏放不下、左右都超出"(旧的 2194 宽画布被按新的大缩放渲染 → 两边各切一截)。
+            if (Screen != null && (_lastW != w || _lastH != h))
+            {
+                _lastW = w; _lastH = h;
+                if (!_screenSized) { Screen.style.right = StyleKeyword.Auto; Screen.style.bottom = StyleKeyword.Auto; _screenSized = true; }
+                Screen.style.width = w;
+                Screen.style.height = h;
+            }
         }
 
         private void OnDestroy()

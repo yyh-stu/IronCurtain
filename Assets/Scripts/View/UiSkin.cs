@@ -74,7 +74,7 @@ namespace IronCurtain.View
             if (tex == null) return null;
             var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
             m.SetTexture("_BaseMap", tex);
-            m.SetColor("_BaseColor", new Color(0.42f, 0.40f, 0.38f)); // 暗暖灰 tint
+            m.SetColor("_BaseColor", new Color(0.52f, 0.50f, 0.47f)); // 暖灰 tint(2026-09-13 提亮:0.42 在远景观感近黑)
             _hpSlate = m;
             return _hpSlate;
         }

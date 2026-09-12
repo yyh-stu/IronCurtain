@@ -42,15 +42,20 @@ namespace IronCurtain.View
             // 开局 3 将:中路大本营前一字排开(GridPos(row,col),row=Y=80±2、col=X 26-30),
             // 在主城广场内、城墙门洞后;三路地图的出生语义后续由城墙玩法接管再调整
             // 三将站在主城石路上(基地前 14 米),蓝在基地右侧、红在左侧
+            // 2026-09-13 BP:走过 BP 选将时用选将结果(双方可用同一英雄);否则默认 磐石/断峰/坠日
             int blueCol = (int)TerrainMap.BaseCenterX(Side.Blue) + 14;
             int redCol = (int)TerrainMap.BaseCenterX(Side.Red) - 14;
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(78, blueCol));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.DuanFeng, new GridPos(80, blueCol));
-            RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.ZhuiRi, new GridPos(82, blueCol));
+            var blueHeroes = AppFlow.BpBluePicks != null && AppFlow.BpBluePicks.Count == 3
+                ? AppFlow.BpBluePicks : new System.Collections.Generic.List<HeroId> { HeroId.PanShi, HeroId.DuanFeng, HeroId.ZhuiRi };
+            var redHeroes = AppFlow.BpRedPicks != null && AppFlow.BpRedPicks.Count == 3
+                ? AppFlow.BpRedPicks : blueHeroes;
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, blueHeroes[0], new GridPos(78, blueCol));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, blueHeroes[1], new GridPos(80, blueCol));
+            RegimentSystem.SpawnGeneral(sim, Side.Blue, blueHeroes[2], new GridPos(82, blueCol));
 
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(78, redCol));
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.DuanFeng, new GridPos(80, redCol));
-            RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.ZhuiRi, new GridPos(82, redCol));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, redHeroes[0], new GridPos(78, redCol));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, redHeroes[1], new GridPos(80, redCol));
+            RegimentSystem.SpawnGeneral(sim, Side.Red, redHeroes[2], new GridPos(82, redCol));
 
             if (blueTier.HasValue) AiSystem.Configure(sim, Side.Blue, blueTier.Value);
             if (redTier.HasValue) AiSystem.Configure(sim, Side.Red, redTier.Value);

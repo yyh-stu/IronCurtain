@@ -15,20 +15,32 @@ namespace IronCurtain.View
             terrainGo.transform.SetParent(parent, false);
             Transform t = terrainGo.transform;
 
-            BuildVoid(t);
+            BuildSea(t);
             BuildGroundChunks(t);
             BuildPlazaDiscs(t);   // 主城广场=真圆网格(2026-09-11:圆角/干净弧线)
             WallView.Build(t);    // 城墙表现层(箭塔拼段+改色+折角烽火台)   // 石路/草地/沙地/河水/石桥一体成网(2026-09-11)
             BuildEnvironment(t);
         }
 
-        private static void BuildVoid(Transform t)
+        /// <summary>地图外的海(2026-09-12 制作人:地图外全部变成有轻微海浪的海)。
+        /// 旧实现在可玩区外铺 #0a0c12 黑底板 —— 对局里相机贴边或拉远时,屏幕两侧会出现上下贯穿的黑带
+        /// (制作人目击的"透明黑框"),现改为两层水片错速滚动:远海深、近海浅,底下一层兜底防穿帮。</summary>
+        private static void BuildSea(Transform t)
         {
-            Material voidMat = ViewAssets.Flat(new Color32(0x0a, 0x0c, 0x12, 0xff), 0.05f);
-            // 2026-09-11 三路地图:底板覆盖全图(x 0..270, z 3..-157)+ 外扩 20 米收边
+            var seaGo = new GameObject("Sea");
+            seaGo.transform.SetParent(t, false);
             float cx = LaneGrid.Cols * 0.5f, cz = (3f + (3f - LaneGrid.Rows)) * 0.5f;
-            ViewAssets.DecoBox(voidMat, new Vector3(cx, -0.5f, cz),
-                new Vector3(LaneGrid.Cols + 40f, 0.4f, LaneGrid.Rows + 40f), t, "Void");
+            var far = GroundTiles.Mat(GroundTiles.KindWaterDeep);
+            var near = GroundTiles.Mat(GroundTiles.KindWaterShallow);
+            Material mFar = far != null ? new Material(far) : ViewAssets.Flat(new Color(0.20f, 0.44f, 0.66f));
+            Material mNear = near != null ? new Material(near) : ViewAssets.Flat(new Color(0.30f, 0.58f, 0.78f));
+            mFar.color = new Color(0.30f, 0.55f, 0.78f, 1f);    // 压青,别读成冰面(同河水口径)
+            mNear.color = new Color(0.44f, 0.68f, 0.88f, 1f);
+            // 1600×1600 足够大:任何拉远/平移都看不到边
+            ViewAssets.DecoQuad(mFar, new Vector3(cx, -0.42f, cz), new Vector2(1600f, 1600f), seaGo.transform, "SeaFar");
+            ViewAssets.DecoQuad(mNear, new Vector3(cx, -0.30f, cz), new Vector2(1600f, 1600f), seaGo.transform, "SeaNear");
+            var fx = seaGo.AddComponent<SeaWaveFx>();
+            fx.Far = mFar; fx.Near = mNear;
         }
 
         private static void BuildGroundChunks(Transform t)

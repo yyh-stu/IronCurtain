@@ -5,31 +5,23 @@ using UnityEngine.UIElements;
 
 namespace IronCurtain.View
 {
-    /// <summary>主界面 UI(2026-09-12 制作人定稿):左上头像占位、左列英雄选择(6 英雄自选切换,
-    /// 纯展示)、右列入口(商城/活动占位 + AI 对战简单/困难 + 练习场)。UITK 纯代码构建,复用 UiKit/theme。</summary>
+    /// <summary>主界面 UI(2026-09-12 制作人简化:大厅不再展示英雄,只留大本营场景)。
+    /// 现在只剩:顶部标题 + 左上头像占位 + 右列入口(商城/活动占位 + AI 两档 + 练习场)。
+    /// 英雄图鉴与展示台已按制作人指令移除(连带去掉了一批布局/挂点问题)。</summary>
     public sealed class MenuPanel : MonoBehaviour
     {
-        private static readonly HeroId[] Heroes =
-            { HeroId.PanShi, HeroId.ZhenYue, HeroId.DuanFeng, HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
-        private static readonly string[] HeroNames = { "磐石", "镇岳", "断峰", "逐风", "坠日", "星落" };
-        private static readonly string[] HeroTitles =
-            { "重装·磐石之壁", "重装·镇岳铁军", "战士·断峰之矛", "骑兵·逐风长枪", "射手·坠日之弓", "法师·星落之杖" };
-
-        private Label _heroName;
-        private Label _heroTitle;
-        private VisualElement _heroRow;
-        private readonly Color _pickOn = new Color(1f, 0.85f, 0.35f);
-
-        /// <summary>英雄切换回调(由 MenuBootstrap 注入,驱动 MenuStage.Show)。</summary>
-        public void Init(Action<HeroId> onHeroPick, HeroId initial)
+        /// <summary>构建 UI(不再需要英雄切换回调)。</summary>
+        public void Init()
         {
             if (UiRoot.Current == null || UiRoot.Current.Screen == null) return;
             var root = UiRoot.Current.Screen;
 
-            // 顶部中央:游戏标题
+            // 顶部中央:游戏标题(绝对定位 + 显式高度:零高盒子会把文字顶出画面)
             var title = UiKit.MakeLabel("铁 幕 :前 线", "victory-title");
             title.style.position = Position.Absolute;
-            title.style.top = 26; title.style.left = 0; title.style.right = 0;
+            title.style.top = 46; title.style.left = 0; title.style.right = 0;
+            title.style.height = 108f;
+            title.style.fontSize = 64f;
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
             root.Add(title);
 
@@ -79,75 +71,14 @@ namespace IronCurtain.View
             panel.Add(MakeEntry("练 习 场(无 AI · 可换边)", () => AppFlow.StartPractice()));
             right.Add(panel);
             root.Add(right);
-
-            // 左下:英雄选择列(点击切换展示台英雄)
-            var left = new VisualElement();
-            left.style.position = Position.Absolute;
-            left.style.left = 24;
-            left.style.bottom = 24;
-            left.style.width = 250;
-            left.style.flexDirection = FlexDirection.Column;
-            var heroPanel = new VisualElement();
-            heroPanel.AddToClassList("panel");
-            heroPanel.style.paddingTop = 12; heroPanel.style.paddingBottom = 12;
-            heroPanel.style.paddingLeft = 12; heroPanel.style.paddingRight = 12;
-            var tag = UiKit.MakeLabel("英 雄 图 鉴(点击切换展示)", "label-dim");
-            heroPanel.Add(tag);
-            _heroName = UiKit.MakeLabel("", "label-title");
-            _heroName.style.fontSize = 22;
-            _heroName.style.marginTop = 4;
-            heroPanel.Add(_heroName);
-            _heroTitle = UiKit.MakeLabel("", "label-dim");
-            _heroTitle.style.marginTop = 2; _heroTitle.style.marginBottom = 8;
-            heroPanel.Add(_heroTitle);
-            _heroRow = new VisualElement();
-            _heroRow.style.flexDirection = FlexDirection.Row;
-            _heroRow.style.flexWrap = Wrap.Wrap;
-            heroPanel.Add(_heroRow);
-            for (int i = 0; i < Heroes.Length; i++)
-            {
-                int idx = i;
-                var b = UiKit.MakeButton(HeroNames[i], () =>
-                {
-                    MarkPicked(idx);
-                    if (onHeroPick != null) onHeroPick(Heroes[idx]);
-                });
-                b.style.width = 68; b.style.height = 34;
-                b.style.marginRight = 6; b.style.marginTop = 6;
-                _heroRow.Add(b);
-            }
-            left.Add(heroPanel);
-            root.Add(left);
-
-            MarkPicked(Array.IndexOf(Heroes, initial) < 0 ? 1 : Array.IndexOf(Heroes, initial));
-        }
-
-        private void MarkPicked(int idx)
-        {
-            for (int i = 0; i < _heroRow.childCount; i++)
-            {
-                var b = _heroRow[i] as Button;
-                if (b == null) continue;
-                bool on = i == idx;
-                b.style.borderTopColor = on ? _pickOn : new Color(1f, 1f, 1f, 0f);
-                b.style.borderBottomColor = on ? _pickOn : new Color(1f, 1f, 1f, 0f);
-                b.style.borderLeftColor = on ? _pickOn : new Color(1f, 1f, 1f, 0f);
-                b.style.borderRightColor = on ? _pickOn : new Color(1f, 1f, 1f, 0f);
-                b.style.borderTopWidth = on ? 2 : 0;
-                b.style.borderBottomWidth = on ? 2 : 0;
-                b.style.borderLeftWidth = on ? 2 : 0;
-                b.style.borderRightWidth = on ? 2 : 0;
-            }
-            _heroName.text = HeroNames[idx];
-            _heroTitle.text = HeroTitles[idx];
         }
 
         private static Button MakeEntry(string text, Action onClick)
         {
             var b = onClick != null ? UiKit.MakeButton(text, onClick) : UiKit.MakeButton(text, null, false);
             b.style.height = 44;
+            b.style.marginTop = 4;
             b.style.fontSize = 16;
-            b.style.marginBottom = 6;
             return b;
         }
     }

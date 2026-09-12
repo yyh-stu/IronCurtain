@@ -11,12 +11,23 @@
 }
 
 .panel {
-    background-color: var(--panel-bg);
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: var(--panel-border);
-    padding: 8px;
+    /* 2026-09-13 制作人:UI 皮肤(木框白底九宫格)在 UITK 迁移时漏接,现接回。
+       木框白底 = 浅底 → 面板内文字统一转深色(见下方 .panel 文本规则),否则浅字白底不可读。 */
+    background-image: resource("UI/panel_wood");
+    -unity-slice-left: 82;
+    -unity-slice-right: 82;
+    -unity-slice-top: 82;
+    -unity-slice-bottom: 82;
+    -unity-slice-scale: 0.55;
+    padding: 10px;
 }
+.panel .label { color: rgb(46, 38, 30); }
+.panel .label-dim { color: rgba(46, 38, 30, 0.72); }
+.panel .label-title { color: rgb(38, 30, 24); }
+.panel .label-clock, .panel .label-clock-overtime, .panel .label-phase { color: rgb(38, 30, 24); }
+.panel .bp-card-name, .panel .bp-group-tag { color: rgb(38, 30, 24); -unity-text-outline: 0 rgb(0,0,0); }
+.panel .feedback-ok { color: rgb(24, 96, 40); }
+.panel .feedback-err { color: rgb(150, 30, 24); }
 
 .topbar {
     background-color: rgba(8, 10, 14, 0.66);
@@ -34,24 +45,20 @@
 .feedback-err { color: rgb(255, 122, 110); }
 
 .btn {
-    background-color: rgb(43, 51, 64);
-    color: var(--text);
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: rgb(70, 83, 102);
+    /* 2026-09-13 接回木底按钮皮肤(九宫格) */
+    background-image: resource("UI/button_wood");
+    -unity-slice-left: 60;
+    -unity-slice-right: 60;
+    -unity-slice-top: 60;
+    -unity-slice-bottom: 60;
+    -unity-slice-scale: 0.5;
+    color: rgb(255, 248, 236);
     padding: 4px 10px;
     transition-property: background-color, border-color, scale;
     transition-duration: 0.08s;
 }
-.btn:hover {
-    background-color: rgb(58, 70, 90);
-    border-color: rgb(107, 124, 148);
-}
-.btn:active {
-    background-color: rgb(47, 111, 174);
-    border-color: var(--accent);
-    scale: 0.97;
-}
+.btn:hover { color: rgb(255, 238, 206); scale: 1.02; }
+.btn:active { color: rgb(255, 226, 170); scale: 0.97; }
 .btn:disabled { opacity: 0.4; }
 .btn-accent {
     background-color: rgb(35, 80, 130);
@@ -96,4 +103,48 @@
     border-width: 1px;
     border-color: rgba(140, 160, 190, 0.5);
     padding: 4px 8px;
+}
+
+/* ===== BP 选将页(2026-09-13,DeepSeek 视觉审查指令) ===== */
+.bp-pill {
+    background-color: rgba(0, 0, 0, 0.45);
+    border-radius: 8px;
+    padding: 6px 18px;
+    font-size: 26px;
+    color: rgb(255, 217, 102);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+}
+.bp-card {
+    background-color: rgba(30, 42, 68, 0.90);
+    border-radius: 12px;
+    border-width: 2px;
+    border-color: rgba(255, 255, 255, 0.12);
+}
+.bp-card-name {
+    font-size: 16px;
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    -unity-text-outline: 1px rgb(0, 0, 0);
+    -unity-text-align: middle-center;
+}
+.bp-namebar { background-color: rgba(11, 18, 32, 0.95); border-radius: 6px; height: 32px; }
+.bp-group-tag {
+    font-size: 18px;
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    -unity-text-outline: 1px rgb(0, 0, 0);
+}
+.bp-group-line { background-color: rgb(59, 130, 246); height: 2px; width: 156px; }
+.bp-slot {
+    background-color: rgba(26, 31, 46, 0.70);
+    border-radius: 12px;
+    border-width: 2px;
+    border-color: rgb(58, 74, 107);
+}
+.bp-done {
+    font-size: 32px;
+    color: rgb(255, 217, 102);
+    -unity-font-style: bold;
+    -unity-text-outline: 1px rgb(0, 0, 0);
 }

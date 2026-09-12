@@ -39,7 +39,7 @@ namespace IronCurtain.View
                 || (_e.Kind == EntityKind.Unit && !_e.IsSoldier);
             _hpRoot.gameObject.SetActive(show);
             _hpFill.localScale = new Vector3(_w * t, _barH, 1f);
-            _hpFill.localPosition = new Vector3(-_w * (1f - t) * 0.5f, 0f, 0f);
+            _hpFill.localPosition = new Vector3(-_w * (1f - t) * 0.5f, 0f, 0.005f);   // z 偏移:与槽底共面会 z-fighting(制作人报'黑色部分')
         }
 
         private void UpdateShield()
@@ -52,7 +52,7 @@ namespace IronCurtain.View
                 // 2026-09-10 制作人拍板:盾条=血条右侧灰色段,长度与血同尺度(盾值/最大生命)
                 float len = _w * Mathf.Clamp01(_e.Shield / _e.MaxHp);
                 _shFill.localScale = new Vector3(len, _barH * 0.8f, 1f);
-                _shFill.localPosition = new Vector3(_w * 0.5f + len * 0.5f + 0.04f, 0f, 0f);
+                _shFill.localPosition = new Vector3(_w * 0.5f + len * 0.5f + 0.04f, 0f, 0.006f);
             }
         }
 
@@ -74,7 +74,7 @@ namespace IronCurtain.View
             // 刻度:主将 10 血一格,建筑 40 血一格(制作人拍板,格数随血量非百分比)
             int per = _e.Kind == EntityKind.Building ? 40 : 10;
             int seg = _e.MaxHp > 0f ? Mathf.Max(1, Mathf.FloorToInt(_e.MaxHp / per)) : 1;
-            Material tickMat = ViewAssets.Unlit(new Color(0.08f, 0.09f, 0.11f));
+            Material tickMat = ViewAssets.Unlit(new Color(0.62f, 0.64f, 0.68f));   // 2026-09-13:近黑刻度线读成"黑块",改浅灰
             for (int i = 1; i < seg; i++)
             {
                 float x = -_w * 0.5f + _w * i / seg;

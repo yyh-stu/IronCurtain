@@ -38,6 +38,8 @@ namespace IronCurtain.View
                 : (AppFlow.Current == AppFlow.Mode.AiSimple ? AiTier.Simple : AiTier.Hard);
             var cfg = GameConfigParser.FromJson(Resources.Load<TextAsset>("gameconfig").text);
             Sim = MatchSetup.Build(cfg, null, redAi);
+            if (AppFlow.Current == AppFlow.Mode.Practice)
+                Sim.PopulationCapOverride = 999;   // 训练场:将名额上限无限制(制作人 2026-09-13)
 
             CreateCamera(player);
             _rig = Cam.gameObject.AddComponent<CameraRig>();
@@ -144,7 +146,7 @@ namespace IronCurtain.View
             Cam.clearFlags = CameraClearFlags.SolidColor;
             Cam.backgroundColor = new Color32(0x79, 0xb5, 0xea, 0xff); // 明亮天空蓝(部落冲突式明快)
             Cam.nearClipPlane = 0.3f;
-            Cam.farClipPlane = 300f;
+            Cam.farClipPlane = 900f;   // 2026-09-12:拉远到整图视野(~400m 宽)时远处不能被裁
             // ART-P0 2026-09-10:正交 → 透视(FOV 30°,落在规格 30-40° 下沿)。
             // 机位距离由 66.85(=√(55²+38²))收到 60,方向不变(按 55:38 比例缩放为 49.4:34.1),
             // 这样焦点平面上的横向视野仍≈57.2m(=1/5 地图宽),取景范围感与原正交一致,只多了透视纵深。

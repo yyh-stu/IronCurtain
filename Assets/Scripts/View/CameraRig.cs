@@ -13,7 +13,7 @@ namespace IronCurtain.View
         public const float MapWidthM = 270f;
         public const float DefaultViewWidth = MapWidthM / 5f; // 57.2m
         public const float MinViewWidth = 22f;                // 近景上限(单位足够大)
-        public const float MaxViewWidth = 150f;               // 半图纵览
+        public const float MaxViewWidth = 400f;               // 2026-09-12 制作人:拉到能把整张地图框进来(270×160)
 
         // 初始焦点单一来源(flash 审查:两处硬编码易再发 bug2)
         public const float InitFocusCol = 40f;

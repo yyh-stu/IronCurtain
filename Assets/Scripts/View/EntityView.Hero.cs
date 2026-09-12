@@ -12,9 +12,21 @@ namespace IronCurtain.View
         private Transform _hips;
         private Vector3 _hips0;
 
-        private static RuntimeAnimatorController _heroCtrl;
-        private static RuntimeAnimatorController HeroCtrl =>
-            _heroCtrl != null ? _heroCtrl : (_heroCtrl = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/HeroAnimator"));
+        // 2026-09-12 按英雄取动画控制器:远程各用专属攻击动作(坠日拉弓/星落举杖),其余共用近战三段;
+        // 待机统一改为新生成的"站立待机"(替掉原先六人共用的镇岳跪姿)。
+        private static readonly System.Collections.Generic.Dictionary<HeroId, RuntimeAnimatorController> _heroCtrls
+            = new System.Collections.Generic.Dictionary<HeroId, RuntimeAnimatorController>();
+        public static RuntimeAnimatorController HeroAnimatorFor(HeroId hero)
+        {
+            RuntimeAnimatorController c;
+            if (_heroCtrls.TryGetValue(hero, out c)) return c;
+            string n = hero == HeroId.ZhuiRi ? "ZhuiRiAnimator"
+                     : (hero == HeroId.XingLuo ? "XingLuoAnimator" : "HeroAnimator");
+            c = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/" + n);
+            if (c == null) c = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/HeroAnimator");
+            _heroCtrls[hero] = c;
+            return c;
+        }
         // 身高档:A(镇岳)/B(男标)/C(磐石·星落)。2026-09-09 用户拍板:将整体放大 20%
         public static float HeroTargetHeight(HeroId hero)
         {
@@ -82,17 +94,23 @@ namespace IronCurtain.View
         private static readonly System.Collections.Generic.Dictionary<HeroId, WeaponSocketCfg[]> HeroWeapons
             = new System.Collections.Generic.Dictionary<HeroId, WeaponSocketCfg[]>
             {
-                { HeroId.ZhenYue, new[] { new WeaponSocketCfg("镇岳_大锤", false, new Vector3(180f, 0f, -15f), 2.3f, 0.28f) } },
+                // 握持标定(2026-09-12 全量扫描后按眼选档;Rot=手骨局部帧,武器纵轴对齐到该帧 +Y):
+                // 站立待机下 +Z ⇒ 竖直(器头朝上)、-Z ⇒ 竖直(器头朝下)、±X/±Y ⇒ 水平。
+                { HeroId.ZhenYue, new[] { new WeaponSocketCfg("镇岳_大锤", false, new Vector3(90f, 0f, 0f), 2.3f, 0.45f) } },
                 { HeroId.PanShi, new[]
                     {
-                        new WeaponSocketCfg("磐石_盾", true, new Vector3(0f, 0f, 0f), 1.9f, 0.5f),
-                        new WeaponSocketCfg("磐石_大刀", false, new Vector3(180f, 0f, -20f), 1.7f, 0.15f)
+                        new WeaponSocketCfg("磐石_盾", true, new Vector3(90f, 0f, 0f), 1.9f, 0.50f),
+                        new WeaponSocketCfg("磐石_大刀", false, new Vector3(-90f, 0f, 0f), 1.7f, 0.22f)
                     } },
-                { HeroId.DuanFeng, new[] { new WeaponSocketCfg("断峰_长矛", false, new Vector3(180f, 0f, -10f), 3.0f, 0.35f) } },
-                { HeroId.ZhuFeng, new[] { new WeaponSocketCfg("逐风_长枪", false, new Vector3(180f, 0f, -15f), 3.2f, 0.35f) } },
-                { HeroId.ZhuiRi, new[] { new WeaponSocketCfg("坠日_大弓", true, new Vector3(0f, 0f, 0f), 1.9f, 0.5f) } },
-                { HeroId.XingLuo, new[] { new WeaponSocketCfg("星落_法杖", false, new Vector3(180f, 0f, -12f), 2.4f, 0.4f) } },
+                { HeroId.DuanFeng, new[] { new WeaponSocketCfg("断峰_长矛", false, new Vector3(90f, 0f, 0f), 2.5f, 0.70f) } },
+                { HeroId.ZhuFeng, new[] { new WeaponSocketCfg("逐风_长枪", false, new Vector3(0f, 0f, 90f), 3.0f, 0.70f) } },
+                { HeroId.ZhuiRi, new[] { new WeaponSocketCfg("坠日_大弓", true, new Vector3(180f, 0f, 0f), 1.9f, 0.50f) } },
+                { HeroId.XingLuo, new[] { new WeaponSocketCfg("星落_法杖", false, new Vector3(-90f, 0f, 0f), 2.0f, 0.60f) } },
             };
+        /// <summary>握持标定扫描用覆盖(仅 Editor 标定工具设置;空=用配置表)。</summary>
+        public static Vector3? WeaponAimOverride;
+        /// <summary>握持标定扫描用握点比例覆盖(&lt;0 = 用配置表)。</summary>
+        public static float WeaponGripOverride = -1f;
         private static readonly System.Collections.Generic.Dictionary<string, Material> WpnMats
             = new System.Collections.Generic.Dictionary<string, Material>();
         private static Material WeaponMaterial(string name)
@@ -130,7 +148,7 @@ namespace IronCurtain.View
                 if (hand == null) { Debug.LogWarning("[EntityView] no hand bone for " + c.Model); continue; }
                 var socket = new GameObject("WS_" + c.Model);
                 socket.transform.SetParent(hand, false);
-                socket.transform.localRotation = Quaternion.Euler(c.Rot);
+                socket.transform.localRotation = Quaternion.Euler(WeaponAimOverride ?? c.Rot);
                 var w = Instantiate(prefab, socket.transform);
                 w.name = c.Model;
                 w.transform.localRotation = prefab.transform.rotation; // 保留 fbx root 自带旋转(Blender X-90,同建筑坑)
@@ -141,8 +159,15 @@ namespace IronCurtain.View
                 float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
                 float s = longest > 0.0001f ? c.Len / longest : 1f;
                 w.transform.localScale = Vector3.one * s;
-                // 握点:武器沿自身纵轴向下平移 grip 比例(近似,截图迭代)
-                w.transform.localPosition = Vector3.down * (c.Grip * c.Len);
+                // 2026-09-12 握持修正(原生多模态取证驱动),两步:
+                // ①把武器自身纵轴(局部最长轴)旋到 socket 的 +Y ⇒ 武器指向只由 socket 帧决定,与模型自身朝向解耦;
+                // ②把纵轴上 grip 比例处锚定到 socket 原点(=手骨) ⇒ 握点真正落在手里。
+                Vector3 la = LongAxisDirLocal(w.transform);
+                w.transform.localRotation = Quaternion.FromToRotation(w.transform.localRotation * la, Vector3.up)
+                                          * w.transform.localRotation;
+                Vector3 anchor = GripAnchorLocal(w.transform, WeaponGripOverride >= 0f ? WeaponGripOverride : c.Grip);
+                w.transform.localPosition = -(w.transform.localRotation *
+                    Vector3.Scale(w.transform.localScale, anchor));
                 var mat = WeaponMaterial(c.Model);
                 if (mat != null)
                     for (int i = 0; i < rr.Length; i++)
@@ -152,6 +177,54 @@ namespace IronCurtain.View
                         rr[i].sharedMaterials = ms;
                     }
             }
+        }
+
+        /// <summary>武器握点在"武器自身空间"的坐标:局部包围盒最长轴上 grip 比例处(全程只读局部 TRS)。</summary>
+        private static Vector3 GripAnchorLocal(Transform weapon, float grip)
+        {
+            bool any = false;
+            Bounds box = new Bounds(Vector3.zero, Vector3.zero);
+            AccumulateLocal(weapon, true, Matrix4x4.identity, ref box, ref any);
+            if (!any) return Vector3.zero;
+            Vector3 size = box.size;
+            int ax = (size.x >= size.y && size.x >= size.z) ? 0 : ((size.y >= size.z) ? 1 : 2);
+            Vector3 axis = Vector3.zero; axis[ax] = 1f;
+            return axis * (box.min[ax] + size[ax] * Mathf.Clamp01(grip));
+        }
+
+        /// <summary>武器自身空间里最长轴的方向(单位向量,与 GripAnchorLocal 同一包围盒口径)。</summary>
+        private static Vector3 LongAxisDirLocal(Transform weapon)
+        {
+            bool any = false;
+            Bounds box = new Bounds(Vector3.zero, Vector3.zero);
+            AccumulateLocal(weapon, true, Matrix4x4.identity, ref box, ref any);
+            if (!any) return Vector3.up;
+            Vector3 size = box.size;
+            int ax = (size.x >= size.y && size.x >= size.z) ? 0 : ((size.y >= size.z) ? 1 : 2);
+            Vector3 dir = Vector3.zero; dir[ax] = 1f;
+            return dir;
+        }
+
+        /// <summary>累加子树 Renderer 的 localBounds 到"武器根自身空间"(根用 identity,不读 world 矩阵)。</summary>
+        private static void AccumulateLocal(Transform node, bool isRoot, Matrix4x4 parent,
+            ref Bounds box, ref bool any)
+        {
+            Matrix4x4 m = isRoot ? Matrix4x4.identity
+                : parent * Matrix4x4.TRS(node.localPosition, node.localRotation, node.localScale);
+            var r = node.GetComponent<Renderer>();
+            if (r != null)
+            {
+                Bounds lb = r.localBounds;
+                for (int i = 0; i < 8; i++)
+                {
+                    Vector3 corner = m.MultiplyPoint3x4(lb.center + Vector3.Scale(lb.extents,
+                        new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f)));
+                    if (!any) { box = new Bounds(corner, Vector3.zero); any = true; }
+                    else box.Encapsulate(corner);
+                }
+            }
+            for (int i = 0; i < node.childCount; i++)
+                AccumulateLocal(node.GetChild(i), false, m, ref box, ref any);
         }
 
         // ===== 2026-09-10 逐风骑乘:战马模型+骑乘动画三段+行军 bob =====
@@ -275,7 +348,8 @@ namespace IronCurtain.View
                 }
                 _anim = body.GetComponent<Animator>();
                 if (_anim == null) _anim = body.AddComponent<Animator>();
-                if (HeroCtrl != null) _anim.runtimeAnimatorController = HeroCtrl;
+                var ctrl = HeroAnimatorFor(hero);
+                if (ctrl != null) _anim.runtimeAnimatorController = ctrl;
                 _hips = _anim.GetBoneTransform(HumanBodyBones.Hips);
                 if (_hips != null) _hips0 = _hips.localPosition;
                 // 2026-09-10 武器分离件挂手骨;逐风骑战马(资产缺失静默跳过)
