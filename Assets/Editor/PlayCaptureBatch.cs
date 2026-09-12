@@ -73,6 +73,19 @@ namespace IronCurtain.EditorTools
             EditorApplication.EnterPlaymode();
         }
 
+
+        // BP 选将取证(2026-09-13):进 BP 场景拍 选将中/揭示/完成槽位 三张(带 IC_BPCAP)。
+        // Unity.exe -projectPath <proj> -executeMethod IronCurtain.EditorTools.PlayCaptureBatch.BpCapture -logFile <log>
+        [MenuItem("IronCurtain/BP Capture Batch %#&b")]
+        public static void BpCapture()
+        {
+            if (!File.Exists("Assets/Scenes/BP.unity")) IronCurtainSceneTools.CreateBpScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/BP.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            SessionState.SetBool("ic.bpcap", true);
+            EditorApplication.EnterPlaymode();
+        }
+
         private static void EnsureMenuScene()
         {
             if (!File.Exists("Assets/Scenes/Menu.unity")) IronCurtainSceneTools.CreateMenuScene();

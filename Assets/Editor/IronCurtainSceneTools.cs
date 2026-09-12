@@ -33,6 +33,36 @@ namespace IronCurtain.EditorTools
                 CreateMainScene();
         }
 
+        // 2026-09-13 BP 选将场景(BpBootstrap),Build Settings 排在 Menu 之后、Main 之前。
+        [MenuItem("IronCurtain/Create BP Scene")]
+        public static void CreateBpScene()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = new GameObject("BP");
+            go.AddComponent<BpBootstrap>();
+
+            Directory.CreateDirectory("Assets/Scenes");
+            string path = "Assets/Scenes/BP.unity";
+            EditorSceneManager.SaveScene(scene, path);
+            EditorBuildSettings.scenes = new[]
+            {
+                new EditorBuildSettingsScene("Assets/Scenes/Menu.unity", true),
+                new EditorBuildSettingsScene(path, true),
+                new EditorBuildSettingsScene("Assets/Scenes/Main.unity", true),
+            };
+            AssetDatabase.Refresh();
+            Debug.Log("[IronCurtain] BP scene created at " + path);
+        }
+
+        [MenuItem("IronCurtain/Open BP Scene")]
+        public static void OpenBpScene()
+        {
+            if (File.Exists("Assets/Scenes/BP.unity"))
+                EditorSceneManager.OpenScene("Assets/Scenes/BP.unity");
+            else
+                CreateBpScene();
+        }
+
         // 2026-09-12 主界面:菜单场景(MenuBootstrap),Build Settings 索引 0 作为游戏入口。
         [MenuItem("IronCurtain/Create Menu Scene")]
         public static void CreateMenuScene()
