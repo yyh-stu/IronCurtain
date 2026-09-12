@@ -26,6 +26,14 @@ namespace IronCurtain.Sim
             e.HeroDamage += amount; _table[Key(side, hero)] = e;
         }
 
+        /// <summary>出场注册(2026-09-12):主将出生即建条目,保证没打出伤害的出场主将(含阵亡将)
+        /// 在结算面板里也有行——与"列双方出场主将各四项"的定稿口径一致。</summary>
+        public static void Register(Side side, HeroId hero)
+        {
+            _table.TryGetValue(Key(side, hero), out var e);
+            _table[Key(side, hero)] = e;
+        }
+
         public static void AddDamageTaken(Side side, HeroId hero, float amount)
         {
             _table.TryGetValue(Key(side, hero), out var e);   // 无则 default 起步

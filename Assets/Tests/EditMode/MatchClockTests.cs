@@ -40,7 +40,7 @@ public class MatchClockTests
     public void T1_InitialState()
     {
         Assert.AreEqual(MatchPhase.Normal, sim.Phase);
-        Assert.AreEqual(4, sim.PopulationCapOf(Side.Blue));
+        Assert.AreEqual(8, sim.PopulationCapOf(Side.Blue));   // 2026-09-13 上限 8
         Assert.AreEqual("10:00", TopBarModel.FormatCountdown(sim));
         Assert.AreEqual("对战中", TopBarModel.PhaseText(sim));
     }
@@ -54,7 +54,7 @@ public class MatchClockTests
         Assert.GreaterOrEqual(el, 600f);
         Assert.Less(el, 605f);
         Assert.AreEqual("02:00", TopBarModel.FormatCountdown(sim));
-        Assert.AreEqual(5, sim.PopulationCapOf(Side.Blue));
+        Assert.AreEqual(9, sim.PopulationCapOf(Side.Blue));   // 加时 8+1
     }
 
     [Test]

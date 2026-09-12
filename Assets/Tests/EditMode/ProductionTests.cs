@@ -70,44 +70,44 @@ namespace IronCurtain.Tests
 
             Step(sim, 200);
             var wave2 = GeneralsOf(sim, Side.Blue);
-            Assert.AreEqual(4, wave2.Count, "tick460 第 4 将产出,名额满 4");
+            Assert.AreEqual(5, wave2.Count, "tick460 第 5 将产出(名额 8 不拦)");
             foreach (var g in wave2)
                 Assert.AreEqual(12, SoldiersOf(sim, g), "每个将均带满编 12 兵");
-            Assert.AreEqual(4, sim.PopulationOf(Side.Blue), "名额满 4");
+            Assert.AreEqual(5, sim.PopulationOf(Side.Blue));
 
             // 第 5 个待名额:某槽保持进行中(未清空)
             bool waiting = false;
             foreach (var slot in b.Prod.Slots)
                 if (slot.Current != null) waiting = true;
-            Assert.IsTrue(waiting, "第 5 将应待名额(槽未清空)");
+            Assert.IsNull(b.Prod.Slots[0].Current);Assert.IsNull(b.Prod.Slots[1].Current);Assert.IsNull(b.Prod.Slots[2].Current);
         }
 
         [Test]
-        public void T2_GeneralCap4()
+        public void T2_GeneralCap8()
         {
             var sim = NewSim();
             var b = MakeBase(sim, Side.Blue, 15, 110);
-            Assert.AreEqual(4, SimCore.GeneralCap, "测试版名额 4");
-            Assert.AreEqual(4, sim.PopulationCapOf(Side.Blue));
+            Assert.AreEqual(8, SimCore.GeneralCap, "2026-09-13 制作人:正常对局名额 8");
+            Assert.AreEqual(8, sim.PopulationCapOf(Side.Blue));
             Assert.AreEqual(0, sim.PopulationOf(Side.Blue), "0 将起步");
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 9; i++)
                 ProductionSystem.Enqueue(sim, b.Id, HeroId.PanShi, out _);
 
-            Step(sim, 450); // 错峰出生:第 4 将 ~tick401+ε
-            Assert.AreEqual(4, sim.PopulationOf(Side.Blue), "产 4 将后 PopulationOf==4==Cap");
-            Assert.AreEqual(4, GeneralsOf(sim, Side.Blue).Count);
+            Step(sim, 700); // 三槽错峰:#8 ~tick626 产满
+            Assert.AreEqual(8, sim.PopulationOf(Side.Blue), "产满 8 将 == Cap");
+            Assert.AreEqual(8, GeneralsOf(sim, Side.Blue).Count);
 
-            // 将死 1 个 → 释放名额 → 第 5 将补位
+            // 将死 1 个 → 释放名额 → 第 9 将补位
             GeneralsOf(sim, Side.Blue)[0].State = EntityState.Dead;
-            Assert.AreEqual(3, sim.PopulationOf(Side.Blue), "死亡将不占名额");
+            Assert.AreEqual(7, sim.PopulationOf(Side.Blue), "死亡将不占名额");
 
-            Step(sim, 250); // 第 5 将 ~tick601 补位
+            Step(sim, 250); // 释放的名额 20s 后补位
             var generals = GeneralsOf(sim, Side.Blue);
-            Assert.AreEqual(4, generals.Count, "第 5 将应补位产出(存活 4)");
+            Assert.AreEqual(8, generals.Count, "第 9 将应补位产出(存活 8)");
             foreach (var g in generals)
                 Assert.AreEqual(12, SoldiersOf(sim, g), "补位将同样满编 12 兵");
-            Assert.AreEqual(4, sim.PopulationOf(Side.Blue));
+            Assert.AreEqual(8, sim.PopulationOf(Side.Blue));
         }
 
         [Test]

@@ -207,6 +207,7 @@ namespace IronCurtain.Sim
         public static Entity SpawnGeneral(SimCore sim, Side side, HeroId hero, GridPos pos)
         {
             var c = sim.Game.Heroes[(int)hero];
+            MatchStats.Register(side, hero);   // 出场注册:结算面板按"出场主将"列行(2026-09-12)
 
             var g = sim.SpawnEntity(side, EntityKind.Unit, pos);
             g.Hero = hero;

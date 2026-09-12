@@ -230,17 +230,36 @@ public class GarrisonTests
     }
 
     [Test]
-    public void 依托射击坠日士兵箭塔()
+    public void 城池主动攻击_射手驻将守城5伤半秒一发_特效归因主将()
     {
-        var g = Gen(Side.Red, HeroId.ZhuiRi, new GridPos(5, 128)); // 主将距红塔 ~10.8m <15m,城后等候有效
-        var archer = SoldiersOf(g).First(); // 坠日士兵:Attack=坠日主将/10
+        var g = Gen(Side.Red, HeroId.ZhuiRi, new GridPos(5, 128));
+        // 城内驻将=占领进驻语义(交换力10/12):直接登记(EnterFormal 仅士兵,另一条路)
+        redTower.GarrisonFormal.Add(g.Id);
+        g.GarrisonBuildingId = redTower.Id;
+        var target = SpawnHero(Side.Blue, HeroId.ZhenYue, new GridPos(15, 129)); // 距塔 3m,塔视野 24 内
+        float before = target.Hp;
+        TickN(100);   // 10s ≈ 20 发
+        float dealt = before - target.Hp;
+        Assert.GreaterOrEqual(dealt, 15 * GarrisonSystem.CityAttackDamage, "10s 至少 15 发(0.5s 间隔)");
+        Assert.LessOrEqual(dealt, 25 * GarrisonSystem.CityAttackDamage, "10s 至多 25 发(0.5s 间隔)");
+    }
+
+    [Test]
+    public void 城池主动攻击_射手士兵驻军不开火_无射手驻将也不开火()
+    {
+        // 只有射手士兵(非主将)驻城 → 不触发
+        var g1 = Gen(Side.Red, HeroId.ZhuiRi, new GridPos(5, 128));
+        var archerSoldier = SoldiersOf(g1).First();
         string err;
-        Assert.IsTrue(GarrisonSystem.EnterTemp(sim, new List<int> { archer.Id }, redTower.Id, out err), "临时登记");
-        Assert.IsTrue(redTower.GarrisonTemp.Contains(archer.Id), "士兵在临时列表");
-        var target = SpawnHero(Side.Blue, HeroId.PanShi, new GridPos(15, 129)); // 距塔中心 3,坠日射程 5
-        float before = target.Hp + target.Shield;
-        TickN(100);
-        Assert.Less(target.Hp + target.Shield, before, "100 tick 内磐石应被依托射击命中掉血(平伤=士兵 Attack)");
+        GarrisonSystem.EnterTemp(sim, new List<int> { archerSoldier.Id }, redTower.Id, out err);
+        // 磐石士兵驻城 → 不触发
+        var g2 = Gen(Side.Red, HeroId.PanShi, new GridPos(6, 128));
+        var melee = SoldiersOf(g2).First();
+        GarrisonSystem.EnterTemp(sim, new List<int> { melee.Id }, redTower.Id, out err);
+        var target = SpawnHero(Side.Blue, HeroId.ZhenYue, new GridPos(15, 129));
+        float before = target.Hp;
+        TickN(50);
+        Assert.AreEqual(before, target.Hp, "无射手驻将的城不应主动开火");
     }
 
     [Test]

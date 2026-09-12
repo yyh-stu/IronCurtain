@@ -13,6 +13,14 @@ namespace IronCurtain.Sim
 
         private static readonly HashSet<HeroId> RangedHeroes = new HashSet<HeroId> { HeroId.ZhuiRi, HeroId.XingLuo };
 
+        /// <summary>城池主动攻击(2026-09-13 制作人):5 伤/0.5s(DPS 10=坠日+星落并肩;两射手 TTK 一致)。</summary>
+        public const float CityAttackDamage = 5f;
+        public const float CityAttackInterval = 0.5f;
+
+        /// <summary>城池攻击射程=建筑视野(大本营 40/箭塔 24/其余 20,制作人口径"建筑视野范围内")。</summary>
+        private static int VisionRadiusOf(Entity b) =>
+            b.Building == BuildingId.Base ? 40 : b.Building == BuildingId.Tower ? 24 : 20;
+
         public static bool EnterFormal(SimCore sim, IReadOnlyList<int> unitIds, int buildingId, out string error)
         {
             error = null;
@@ -240,17 +248,41 @@ namespace IronCurtain.Sim
             foreach (var b in sim.Entities.Values.Where(e => e.Kind == EntityKind.Building).ToList())
             {
                 var garrison = b.GarrisonFormal.Concat(b.GarrisonTemp).ToList();
-                // 2) 依托射击(远程)
+                // 2) 城池主动攻击(2026-09-13 制作人拍板两轮修正,替换旧"依托射击"):
+                //    触发=城内驻有**射手主将**(坠日/星落的非士兵驻将;士兵不算);
+                //    攻击者=该主将(冷却挂主将、弹道特效经 DamageDealt.AttackerId 从主将位置发出);
+                //    伤害 5、间隔 0.5s(DPS 10=坠日+星落并肩),数值固定 → 两射手守城 TTK 一致、驻多少主将不叠加(B3);
+                //    射程=建筑视野;直伤(先扣盾),不套英雄克制。
+                Entity archerGeneral = null;
                 foreach (var id in garrison)
                 {
                     var u = sim.GetEntity(id);
-                    if (u == null || u.Hero == null || !RangedHeroes.Contains(u.Hero.Value)) continue;
-                    u.AttackCooldown -= dt;
-                    if (u.AttackCooldown > 0f) continue;
-                    var tgt = FindRangedTarget(sim, b, (int)u.Range);
-                    if (tgt == null) continue;
-                    ApplyDamage(sim, u, tgt);
-                    u.AttackCooldown = u.AttackIntervalSec;
+                    if (u == null || u.IsSoldier || u.Hero == null || !RangedHeroes.Contains(u.Hero.Value)) continue;
+                    archerGeneral = u;
+                    break;
+                }
+                if (archerGeneral != null)
+                {
+                    archerGeneral.AttackCooldown -= dt;
+                    if (archerGeneral.AttackCooldown <= 0f)
+                    {
+                        var tgt = FindRangedTarget(sim, b, VisionRadiusOf(b));
+                        if (tgt != null)
+                        {
+                            float dmg = CityAttackDamage;
+                            if (tgt.Shield > 0)
+                            {
+                                float abs = System.Math.Min(tgt.Shield, dmg);
+                                tgt.Shield -= abs; dmg -= abs;
+                            }
+                            if (dmg > 0f) tgt.Hp -= dmg;
+                            if (tgt.Hp <= 0f && tgt.State != EntityState.Dead)
+                            { tgt.State = EntityState.Dead; sim.RemoveEntity(tgt.Id); }
+                            archerGeneral.AttackCooldown = CityAttackInterval;
+                            sim.Emit(new SimEvent(sim.Tick, SimEventType.DamageDealt, tgt.Id, CityAttackDamage, archerGeneral.Id));
+                        }
+                        else archerGeneral.AttackCooldown = 0f;   // 无目标不积累冷却
+                    }
                 }
                 // 3) 近战出击:敌单位欧氏≤2.5 米(建筑中心起算)
                 var bc = SimVec2.FromGrid(b.Pos);
@@ -350,7 +382,7 @@ namespace IronCurtain.Sim
             var bc = SimVec2.FromGrid(b.Pos);
             foreach (var e in sim.Entities.Values)
             {
-                if (e.Kind != EntityKind.Unit || e.Side == b.Side) continue;
+                if (e.Kind != EntityKind.Unit || e.Side == b.Side || e.Side == Side.Neutral) continue;
                 if (e.GarrisonBuildingId != 0 || e.State == EntityState.Dead || e.State == EntityState.Exchanging) continue;
                 float d = SimVec2.Distance(e.PosF, bc);
                 if (d > range) continue;

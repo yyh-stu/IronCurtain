@@ -14,8 +14,8 @@ namespace IronCurtain.Sim
         /// <summary>海克斯抽取/手牌/效果的对局级权威状态；不得放回 View 或静态系统。</summary>
         internal HexRuntimeState HexRuntime { get; } = new HexRuntimeState();
 
-        /// <summary>将名额上限(M8.4b 名额制)。测试版 4;正式版 8。</summary>
-        public const int GeneralCap = 4;
+        /// <summary>将名额上限(M8.4b 名额制)。2026-09-13 制作人:全图三路下正常对局上限 8。</summary>
+        public const int GeneralCap = 8;
 
         /// <summary>游戏数值配置(由调用方注入;null 时战斗模块不生效)。</summary>
         public GameConfig Game { get; set; }
@@ -237,8 +237,12 @@ namespace IronCurtain.Sim
             return used;
         }
 
-        /// <summary>名额上限 = GeneralCap(测试版 4);加时 +1(GDD「人口+10」在名额制下的映射,M6.4a)。</summary>
-        public int PopulationCapOf(Side side) => GeneralCap + (Phase == MatchPhase.Overtime ? 1 : 0);
+        /// <summary>训练场名额上限覆盖(2026-09-13 制作人:训练场上限无限制;null=用 GeneralCap)。
+        /// 由 View 层按模式设置,Sim 不感知 AppFlow。</summary>
+        public int? PopulationCapOverride;
+
+        /// <summary>名额上限 = 覆盖值 ?? GeneralCap(测试版 4);加时 +1(GDD「人口+10」在名额制下的映射,M6.4a)。</summary>
+        public int PopulationCapOf(Side side) => (PopulationCapOverride ?? GeneralCap) + (Phase == MatchPhase.Overtime ? 1 : 0);
 
         public float EpOf(Side side) => _ep.TryGetValue(side, out var v) ? v : 0f;
 
@@ -448,6 +452,15 @@ namespace IronCurtain.Sim
                 if (e.AttackCooldown > 0f)
                     e.AttackCooldown -= dt;
 
+                // 2026-09-13 制作人规则⑩:带攻城令的单位优先攻击视野内的敌人单位(防"无视出城迎战硬拆")。
+                // 视野口径与 VisionSystem.UnitRadius 同源(射手将 9/近战将 6;士兵 远程6/近战3)。
+                // 视野内发现敌人 → 弃攻城目标,移动接战(进射程后由下方正常索敌结算)。
+                if (e.TargetBuildingId != 0 && EnemyInVision(e, out var vt))
+                {
+                    e.TargetBuildingId = 0;
+                    SetMoveTarget(e.Id, vt.Pos);
+                }
+
                 Entity target = FindNearestEnemy(e, e.State == EntityState.Routing ? 1.4f : float.MaxValue);
                 if (target == null)
                 {
@@ -503,6 +516,31 @@ namespace IronCurtain.Sim
                     Emit(new SimEvent(Tick, SimEventType.EntityRemoved, id));
                 }
             }
+        }
+
+        /// <summary>攻城单位的视野半径(与 VisionSystem.UnitRadius 同口径;那边是 private,这里同数值)。</summary>
+        internal static float SiegeVisionRadius(Entity e)
+        {
+            if (e.IsSoldier)
+                return (e.Hero == HeroId.ZhuiRi || e.Hero == HeroId.XingLuo) ? 6f : 3f;
+            if (e.Hero == null) return 6f;
+            return (e.Hero == HeroId.ZhuiRi || e.Hero == HeroId.XingLuo) ? 9f : 6f;
+        }
+
+        /// <summary>视野内是否有可交战的敌方单位(城内/交换中除外)。规则⑩:攻城优先打人。</summary>
+        private bool EnemyInVision(Entity e, out Entity found)
+        {
+            found = null;
+            float r = SiegeVisionRadius(e), best = float.MaxValue;
+            foreach (var o in _entities.Values)
+            {
+                if (o.Kind != EntityKind.Unit || o.Side == e.Side || o.Side == Side.Neutral) continue;
+                if (o.State == EntityState.Dead || o.State == EntityState.Exchanging || o.GarrisonBuildingId != 0) continue;
+                float d = SimVec2.Distance(e.PosF, o.PosF);
+                if (d > r || d >= best) continue;
+                found = o; best = d;
+            }
+            return found != null;
         }
 
         private Entity FindNearestEnemy(Entity e, float maxDist)
