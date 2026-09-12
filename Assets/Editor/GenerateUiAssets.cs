@@ -34,10 +34,13 @@ namespace IronCurtain.EditorTools
             if (File.Exists(psPath)) AssetDatabase.DeleteAsset(psPath);
             var ps = ScriptableObject.CreateInstance<PanelSettings>();
             ps.themeStyleSheet = tss;
-            ps.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            // 2026-09-12 制作人报"UI 一个屏放不下、左右都超出":根因是 ScaleWithScreenSize 下
+            // 面板画布尺寸与实际渲染缩放会在某些视口尺寸/重组时机上不一致,导致画布比画面宽。
+            // 改为恒定像素(1 单位 = 1 像素):画布恒等于屏幕,结构上不可能溢出。UI 尺寸按像素书写。
+            ps.scaleMode = PanelScaleMode.ConstantPixelSize;
             ps.referenceResolution = new Vector2Int(1920, 1080);
             ps.screenMatchMode = PanelScreenMatchMode.MatchWidthOrHeight;
-            ps.match = 0.5f;
+            ps.match = 0f;
             AssetDatabase.CreateAsset(ps, psPath);
 
             AssetDatabase.SaveAssets();
