@@ -33,6 +33,13 @@ namespace IronCurtain.View
         /// <summary>当前视野宽度(米,横向)。</summary>
         public float ViewWidth { get { return _viewWidth; } }
 
+        /// <summary>取证/工具用:直接设定视野宽度(米),与滚轮同语义同夹取。</summary>
+        public void SetViewWidth(float w)
+        {
+            _viewWidth = Mathf.Clamp(w, MinViewWidth, MaxViewWidth);
+            ApplyProjection();
+        }
+
         public void Init(Camera cam, float focusColM, float focusRowM)
         {
             _cam = cam;

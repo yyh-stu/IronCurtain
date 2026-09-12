@@ -70,12 +70,61 @@ namespace IronCurtain.View
 
         private void OnEvent(SimEvent evt)
         {
-            if (!EventMap.TryGetValue(evt.Type, out var spec)) return;
-            // 节流:同类型音效 50ms 内不重复(防一帧多单位同事件爆音)
             float now = Time.unscaledTime;
+            // 2026-09-12 音效补齐(拍板 A+C):屏障与建筑走石响/碎裂;单位受击按攻击者细分
+            // 近战=挥砍,远程(坠日/星落系)=施法音,塔/未指名=通用命中。四新音效均为 Kenney CC0。
+            if (evt.Type == SimEventType.WallDamaged)
+            {
+                PlayThrottled("sfx_build_hit", 3, 0.95f, 1.05f, now);
+                return;
+            }
+            if (evt.Type == SimEventType.WallBroken)
+            {
+                PlayThrottled("sfx_build_break", 4, 1f, 1f, now);
+                return;
+            }
+            if (!EventMap.TryGetValue(evt.Type, out var spec)) return;
+            if (evt.Type == SimEventType.DamageDealt)
+            {
+                var target = _sim.GetEntity(evt.SubjectId);
+                if (target != null && target.Kind == EntityKind.Building)
+                {
+                    PlayThrottled("sfx_build_hit", 3, 0.95f, 1.05f, now);
+                    return;
+                }
+                var atk = evt.AttackerId != 0 ? _sim.GetEntity(evt.AttackerId) : null;
+                if (atk == null)
+                {
+                    PlayThrottled("sfx_hit", 3, spec.PitchMin, spec.PitchMax, now);   // 塔/未指名
+                    return;
+                }
+                if (atk.Hero == HeroId.ZhuiRi || atk.Hero == HeroId.XingLuo)
+                {
+                    PlayThrottled("sfx_cast", 3, 0.95f, 1.1f, now);                  // 远程施法/放箭
+                    return;
+                }
+                PlayThrottled("sfx_swing", 3, 0.9f, 1.15f, now);                     // 近战挥砍
+                return;
+            }
+            if (evt.Type == SimEventType.EntityDied)
+            {
+                var dead = _sim.GetEntity(evt.SubjectId);
+                if (dead != null && dead.Kind == EntityKind.Building)
+                {
+                    PlayThrottled("sfx_build_break", 4, 1f, 1f, now);
+                    return;
+                }
+            }
             if (_lastPlayTime.TryGetValue(spec.Name, out float last) && now - last < ThrottleSeconds) return;
             _lastPlayTime[spec.Name] = now;
             Play(spec.Name, spec.Priority, spec.PitchMin, spec.PitchMax);
+        }
+
+        private void PlayThrottled(string name, int priority, float pitchMin, float pitchMax, float now)
+        {
+            if (_lastPlayTime.TryGetValue(name, out float last) && now - last < ThrottleSeconds) return;
+            _lastPlayTime[name] = now;
+            Play(name, priority, pitchMin, pitchMax);
         }
 
         /// <summary>播放入口:clip 缺失静默跳过(每音效名仅警告一次);空闲源优先,无空闲则抢占最低优先级。</summary>

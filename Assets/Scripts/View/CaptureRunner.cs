@@ -24,6 +24,11 @@ namespace IronCurtain.View
                 StartCoroutine(RunArtCapture());
                 return;
             }
+            if (SessionState.GetBool("ic.resultcap", false))
+            {
+                gameObject.AddComponent<ResultCaptureRunner>();   // 结算/tooltip 取证通道(自带退出)
+                return;
+            }
             if (!SessionState.GetBool("ic.capture", false))
             {
                 if (SessionState.GetBool("ic.fastresult", false))

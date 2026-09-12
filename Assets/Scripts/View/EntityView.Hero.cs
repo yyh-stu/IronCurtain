@@ -16,7 +16,7 @@ namespace IronCurtain.View
         private static RuntimeAnimatorController HeroCtrl =>
             _heroCtrl != null ? _heroCtrl : (_heroCtrl = UnityEngine.Resources.Load<RuntimeAnimatorController>("Models/Heroes/HeroAnimator"));
         // 身高档:A(镇岳)/B(男标)/C(磐石·星落)。2026-09-09 用户拍板:将整体放大 20%
-        private static float HeroTargetHeight(HeroId hero)
+        public static float HeroTargetHeight(HeroId hero)
         {
             switch (hero)
             {
@@ -29,7 +29,7 @@ namespace IronCurtain.View
 
         // ===== 单位:英雄 → Kenney 角色映射(后续替换机甲模型只改此处)=====
 
-        private static string HeroModelName(HeroId hero)
+        public static string HeroModelName(HeroId hero)
         {
             switch (hero)
             {
@@ -60,7 +60,7 @@ namespace IronCurtain.View
         // 管线修复后的英雄材质(FBX 内嵌彩色贴图直挂;懒加载)
         private static readonly System.Collections.Generic.Dictionary<HeroId, Material> HeroMats
             = new System.Collections.Generic.Dictionary<HeroId, Material>();
-        private static Material HeroMaterial(HeroId hero)
+        public static Material HeroMaterial(HeroId hero)
         {
             Material m;
             if (HeroMats.TryGetValue(hero, out m)) return m;
@@ -117,7 +117,7 @@ namespace IronCurtain.View
             return null;
         }
 
-        private void AttachWeapons(HeroId hero, GameObject body)
+        public static void AttachWeapons(HeroId hero, GameObject body)
         {
             WeaponSocketCfg[] cfgs;
             if (!HeroWeapons.TryGetValue(hero, out cfgs)) return;

@@ -21,12 +21,27 @@ namespace IronCurtain.View
         private void Awake()
         {
             if (Sim != null) return; // 域重载防护:已初始化则跳过
+            // 2026-09-12 主界面流程:AI对战(简单/困难)或练习场(无AI,AppFlow.SwitchPracticeSide 重载换边);
+            // 直接 Play Main(取证/旧流程)默认等价困难AI+蓝方,行为与既有通道完全一致。
+            // 批处理取证注意:EnterPlaymode 域重载会清静态 AppFlow,模式经 SessionState "ic.mode" 传递。
+#if UNITY_EDITOR
+            switch (UnityEditor.SessionState.GetInt("ic.mode", -1))
+            {
+                case 0: AppFlow.Current = AppFlow.Mode.Menu; break;
+                case 1: AppFlow.Current = AppFlow.Mode.AiSimple; break;
+                case 2: AppFlow.Current = AppFlow.Mode.AiHard; break;
+                case 3: AppFlow.Current = AppFlow.Mode.Practice; break;
+            }
+#endif
+            var player = AppFlow.PlayerSide;
+            AiTier? redAi = AppFlow.Current == AppFlow.Mode.Practice ? (AiTier?)null
+                : (AppFlow.Current == AppFlow.Mode.AiSimple ? AiTier.Simple : AiTier.Hard);
             var cfg = GameConfigParser.FromJson(Resources.Load<TextAsset>("gameconfig").text);
-            Sim = MatchSetup.Build(cfg, null, AiTier.Hard);
+            Sim = MatchSetup.Build(cfg, null, redAi);
 
-            CreateCamera();
+            CreateCamera(player);
             _rig = Cam.gameObject.AddComponent<CameraRig>();
-            _rig.Init(Cam, 40f, 80f); // 三路地图:开局聚焦蓝主城前方(中路 col40/row80)
+            _rig.Init(Cam, player == Side.Red ? CameraRig.MapWidthM - CameraRig.InitFocusCol : CameraRig.InitFocusCol, 80f); // 红方开局聚焦红主城前方
             CreateLighting();
             CreatePostProcess();
 
@@ -35,7 +50,7 @@ namespace IronCurtain.View
             boardGo.transform.SetParent(transform, false);
             Board = boardGo.AddComponent<BoardView>();
             Board.Init(Sim, transform);
-            Board.PlayerSide = Side.Blue;
+            Board.PlayerSide = player;
             Sim.AddEventListener(Board.OnSimEvent);
             // 2026-09-11 屏障氛围粒子(每方一个系统,单 draw call;edit 模式由 CaptureBatch 手动推进)
             WallFx.SpawnAmbient(boardGo.transform, Side.Blue);
@@ -46,16 +61,16 @@ namespace IronCurtain.View
             // 2026-09-11 UI demo→成品迁移:UITK 根必须先于**所有**面板建立(含最早 Init 的兵营总览/建筑命令)
             gameObject.AddComponent<UiRoot>();
             var overview = gameObject.AddComponent<BarracksOverviewPanel>();
-            overview.Init(Sim, Side.Blue);
+            overview.Init(Sim, player);
             gameObject.AddComponent<CaptureRunner>();
             var selection = gameObject.AddComponent<SelectionSystem>();
-            selection.Init(Sim, Cam);
+            selection.Init(Sim, Cam, player);
             var buildingCommands = gameObject.AddComponent<BuildingCommandPanel>();
-            buildingCommands.Init(Sim, Side.Blue, selection.SelectedIds);
+            buildingCommands.Init(Sim, player, selection.SelectedIds);
             selection.SetBuildingCommandPanel(buildingCommands);
             // 2026-09-10 两阶段 BGM(参考平安京):敌方首建筑被推/占领时切后期曲;音频缺席时自静默
             var bgm = gameObject.AddComponent<BgmController>();
-            bgm.Init(Sim, Side.Blue);
+            bgm.Init(Sim, player);
             var audio = gameObject.AddComponent<AudioSystem>(); // M3-S01 SFX 框架(事件驱动+对象池)
             audio.Init(Sim);
 #if UNITY_EDITOR
@@ -64,31 +79,41 @@ namespace IronCurtain.View
 #endif
 
             var topBar = gameObject.AddComponent<TopBarPanel>();
-            topBar.Init(Sim, Side.Blue);
+            topBar.Init(Sim, player);
             var upgrades = gameObject.AddComponent<UpgradeCommandPanel>();
-            upgrades.Init(Sim, Side.Blue);
+            upgrades.Init(Sim, player);
             var hexes = gameObject.AddComponent<HexCommandPanel>();
-            hexes.Init(Sim, Side.Blue, selection.SelectedIds);
+            hexes.Init(Sim, player, selection.SelectedIds);
             var tools = gameObject.AddComponent<ToolCommandPanel>();
-            tools.Init(Sim, Side.Blue);
+            tools.Init(Sim, player);
             selection.SetToolCommandPanel(tools);
             var commandPanels = new CommandPanelCoordinator();
             commandPanels.Attach(upgrades, hexes, tools, buildingCommands);
             var result = gameObject.AddComponent<ResultPanel>();
-            result.Init(Sim, Side.Blue);
+            result.Init(Sim, player);
+            // 练习场:无AI,顶部提供重载式换边入口(制作人定稿:切换操控双方)
+            if (AppFlow.Current == AppFlow.Mode.Practice)
+            {
+                var practiceHud = gameObject.AddComponent<PracticeHud>();
+                practiceHud.Init(player);
+#if UNITY_EDITOR
+                if (UnityEditor.SessionState.GetBool("ic.pracap", false))
+                    gameObject.AddComponent<PracticeCaptureRunner>();
+#endif
+            }
             var ftGo = new GameObject("FloatingText");
             ftGo.transform.SetParent(transform, false);
             var floats = ftGo.AddComponent<FloatingTextView>();
-            floats.Init(Sim, Side.Blue, Board);
+            floats.Init(Sim, player, Board);
 
             var fogGo = new GameObject("FogView");
             fogGo.transform.SetParent(transform, false);
             _fog = fogGo.AddComponent<FogView>();
-            _fog.Init(Sim, Side.Blue, transform);
+            _fog.Init(Sim, player, transform);
             var minimap = gameObject.AddComponent<MinimapPanel>();
-            minimap.Init(Sim, Side.Blue, _rig, _fog, Cam);
+            minimap.Init(Sim, player, _rig, _fog, Cam);
 
-            Debug.Log("[GameBootstrap] Match started");
+            Debug.Log("[GameBootstrap] Match started mode=" + AppFlow.Current + " player=" + player + " redAi=" + redAi);
         }
 
         private void Update()
@@ -110,7 +135,7 @@ namespace IronCurtain.View
             if (Sim != null) Sim.ClearEventListeners();
         }
 
-        private void CreateCamera()
+        private void CreateCamera(Side player)
         {
             var go = new GameObject("MainCamera");
             go.transform.SetParent(transform, false);
@@ -128,7 +153,9 @@ namespace IronCurtain.View
             // 2026-09-09 bug2 真因修复:相机必须摆在初始焦点正上方同构偏移,
             // 原摆在 col143 → CameraRig._offset 恒带 +103 米横向偏差,小地图/键盘怎么挪都错位,
             // 两边基地被推出视野。用户拍板:鼠标点哪里,视图中心就在哪里。焦点常量见 CameraRig。
-            float fx = CameraRig.InitFocusCol, fz = 3f - CameraRig.InitFocusRow;
+            // 2026-09-12 换边:红方玩家初始焦点镜像到红主城前方。
+            float fx = player == Side.Red ? CameraRig.MapWidthM - CameraRig.InitFocusCol : CameraRig.InitFocusCol;
+            float fz = 3f - CameraRig.InitFocusRow;
             go.transform.position = new Vector3(fx, 49.4f, fz - 34.1f);
             go.transform.LookAt(new Vector3(fx, 0f, fz));
             var data = go.AddComponent<UniversalAdditionalCameraData>();

@@ -28,6 +28,22 @@ namespace IronCurtain.View
             if (UiRoot.Current != null && UiRoot.Current.Screen != null) Build(UiRoot.Current.Screen);
         }
 
+        /// <summary>取证/排障用:面板当前关键状态一行(显示/透明度/大字/包围盒+布局链)。</summary>
+        public string DebugState()
+        {
+            if (_root == null) return "result:no-root";
+            var scr = UiRoot.Current != null ? UiRoot.Current.Screen : null;
+            var rve = scr != null && scr.parent != null ? scr.parent : null;
+            return string.Format(
+                "result:disp={0} dim={1:F2} titleOp={2:F2} title=[{3}] panelOp={4:F2} box={5:F0}x{6:F0}" +
+                " | screen={7:F0}x{8:F0} rve={9:F0}x{10:F0} screenKids={11}",
+                _root.resolvedStyle.display, _dim.resolvedStyle.opacity, _title.resolvedStyle.opacity,
+                _title.text, _panel.resolvedStyle.opacity, _root.worldBound.width, _root.worldBound.height,
+                scr != null ? scr.worldBound.width : -1f, scr != null ? scr.worldBound.height : -1f,
+                rve != null ? rve.worldBound.width : -1f, rve != null ? rve.worldBound.height : -1f,
+                scr != null ? scr.childCount : -1);
+        }
+
         public static string VerdictText(Side player, SimCore sim)
         {
             if (!sim.Winner.HasValue) return "平局";
@@ -96,7 +112,10 @@ namespace IronCurtain.View
             again.style.width = 150; again.style.height = 36;
             var watch = UiKit.MakeButton("继续观战", () => { _dismissed = true; });
             watch.style.width = 150; watch.style.height = 36; watch.style.marginLeft = 12;
-            btnRow.Add(again); btnRow.Add(watch);
+            // 2026-09-12 主界面流程:结算后可直接回菜单(AppFlow 保持默认,菜单重新选模式)
+            var toMenu = UiKit.MakeButton("返回主界面", () => AppFlow.EnterMenu());
+            toMenu.style.width = 150; toMenu.style.height = 36; toMenu.style.marginLeft = 12;
+            btnRow.Add(again); btnRow.Add(watch); btnRow.Add(toMenu);
             _panel.Add(btnRow);
 
             var credit = UiKit.MakeLabel("Music: Netherplace / Tower Defense / Our Mountain by Eric Matyas (soundimage.org)", "label-dim");

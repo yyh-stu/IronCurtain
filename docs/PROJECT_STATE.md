@@ -329,6 +329,16 @@
 > ⑤**测试故事**:草坪塔参战测试三轮才绿——第一轮发现"改 Side 模拟失守"被 **g1 贴身即时占领瞬间翻回**(驻军尽职反证机制工作正常),改真实场景(撤红军+蓝兵进城驻守=有守军不可即时翻)后通过;顺带沉淀 `AiSystem.DebugStateOf(side)` 调试快照(排障/心跳配套)。
 > **⑥换窗待办(明天)**:**主界面**(已批定稿:左英雄展示台六英雄3D可自选纯展示+左上头像占位+右列[商城/活动占位、AI对战简单困难两档、练习场]+bgm_menu 接入[曲已入库])+**练习场**(无 AI+切换操控双方,重载式换边先行);游戏侧余项:音效补齐4个+程序化UI音、穿模录屏/骑乘动作管线、制作人 Play 终审清单(M6.1/M6.2/M8.6/M8.7/M6.4a+屏障手感+AI两档节奏+结算节奏+UI实机)。
 >
+> **2026-09-12 下午·换窗待办主批落地(主界面+练习场+音效补齐+穿模录屏+结算取证翻修;EditMode 323/323,`error CS=0` results_menu2.xml,随本块提交)**:
+> ①**结算取证翻修(制作人发现 12_结算与驻军 全是战场图)**:旧三张经像素统计实锤为无 UI 战场帧;新建确定性取证通道 ResultCaptureRunner(SessionState ic.resultcap,同步抓帧 CaptureScreenshotAsTexture + ResultPanel.DebugState 探针)。探针揪出 **UITK 全局面板高度 0 潜伏 bug**:rootVisualElement 宽 2188 正常但高恒 0——旧面板全用显式 top+height+overflow 可见故从未暴露,结算全屏遮罩/百分比布局是第一个受害者;修复=UiRoot.Update 按宽度缩放比显式补高度(**NaN 坑:布局未就绪时 resolvedStyle=NaN 且 NaN 比较恒 false,常规守卫形同虚设,必须显式 float.IsNaN 排除**),修后 rve=2188x929 全渲染。带字四图已替换入 12 号夹。
+> ②**字体坑(新)**:无值守抓帧(编辑器无焦点)下 UITK 默认字体(Inter)+OS 回退链**不光栅化 CJK 字形**(按钮/标题零亮像素;交互会话正常——制作人此前读到的文案均来自有焦点会话);修复=UiRoot 运行时创建微软雅黑动态 FontAsset(TextCore)直挂根,摆脱回退链依赖,对打包版同为加固。**视觉验收两教训重申:引导式提问诱发迎合性读数(本轮两次实锤:把占位胶囊读成"铠甲战士"、给无字按钮读出具体文案),一律开放式提问;文字有无用缩放裁剪+逐字核对,全图阈值统计会因遮罩/缩略误判。**
+> ③**主界面落地(制作人定稿)**:Menu.unity(MenuBootstrap:相机/灯光/后处理同战斗口径+bgm_menu 循环已接入)+MenuPanel(标题/左上头像占位/右列[商城/活动占位+AI简单+AI困难+练习场]/左下英雄图鉴)+MenuStage(六英雄 3D 自选展示台,复用 EntityView 加载口径[fbx root 旋转/身高归一/HeroMat/武器挂骨],逐风含战马+RiderAnimator,展示台缓转;**坑:HeroModelName 返回已带 Heroes/ 前缀,拼路径勿重复加**);AppFlow 静态路由(Mode/PlayerSide;再来一局保留模式);结算面板新增"返回主界面"。双图开放提问逐字验证通过,入 14_主界面。
+> ④**练习场落地与全链实证**:GameBootstrap 全面阵营参数化(红方初始焦点镜像红主城;AI 按模式[简单/困难/无]);SelectionSystem 三处 Blue 硬编码参数化(换边后可选/框选红方单位);PracticeHud 顶部"切换操控(重载)"=AppFlow.SwitchPracticeSide() 重载式换边;PracticeCaptureRunner 自动验证:**蓝方帧(ai=no-ai 实证)→真实换边重载→红方帧(mode=Practice player=Red)**,HUD 文字逐字可读、视角镜像切换,入 16_练习场换边。**坑:EnterPlaymode 域重载清空静态 AppFlow——真实玩家路径(LoadScene)无此问题,批处理入口经 SessionState "ic.mode" 传递模式。**
+> ⑤**音效补齐(拍板 A+C)**:4 个 Kenney CC0 入库接线(sfx_swing 挥砍/sfx_cast 远程施法/sfx_build_hit 建筑屏障受击/sfx_build_break 建筑屏障摧毁);AudioSystem 按事件细分(目标建筑→石响/攻击者坠日星落系→施法/近战→挥砍/塔或未指名→通用命中;WallDamaged/WallBroken 接入);UiSfx 程序化 UI 音层(零资产合成,Click 经 UiKit.MakeButton 全按钮统一挂钩,Select 框选命中,Open/Error 预留)。候选+同名 WAV 试听版入待审核音频/13。
+> ⑥**穿模录屏收口(M6.0f 尾巴)**:ClipAuditBatch(AnimationMode 逐帧采样;**坑:SampleAnimationClip 必须包在 StartAnimationMode/StopAnimationMode 里,否则 InvalidOperationException**)六英雄×三段(逐风用骑乘三段)216 帧→imageio-ffmpeg 装配 MP4(18 段×[标题卡+12 帧])入 15_穿模录屏。AI 抽检:磐石/镇岳无穿模(镇岳锤头略高=握持点微调项);**已知问题:逐风骑乘冲锋长枪尾部穿马颈**(前倾姿态枪杆后伸),处置[调 socket/缩枪长/接受]待制作人看片拍板。骑乘动作管线核实:RiderIdle/Charge/Thrust 即 hy-3d-motion 正式产物,2026-09-10 已接线验收,尾巴仅剩录屏。
+> ⑦工具沉淀:PlayCaptureBatch 增 ResultCapture/MenuCapture/PracticeCapture 三批处理入口;IronCurtainSceneTools 增 Create/OpenMenuScene(Menu 入 BuildSettings 首位);CameraRig.SetViewWidth;EntityView 英雄加载辅助公开化;SelectionSystem.Init 增 playerSide 参数。
+> **剩:制作人 Play 终审清单(累积:主界面/练习场/新音效+M6.1/M6.2/M8.6/M8.7/M6.4a+屏障手感+AI 两档节奏+结算节奏+穿模处置)。**
+
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):

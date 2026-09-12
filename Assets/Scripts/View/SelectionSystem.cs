@@ -33,11 +33,13 @@ namespace IronCurtain.View
         private GameObject _rangeRing;
         // M6.2 移动路径线(单位 id → 线;Update 每帧自管建/刷/拆)
         private readonly Dictionary<int, LineRenderer> _paths = new Dictionary<int, LineRenderer>();
-        public void Init(SimCore sim, Camera cam)
+        private Side _player = Side.Blue;
+        public void Init(SimCore sim, Camera cam, Side playerSide)
         {
             _sim = sim;
             _cam = cam;
-            _interaction = new SelectionInteractionCoordinator(sim, Side.Blue, _selected);
+            _player = playerSide;
+            _interaction = new SelectionInteractionCoordinator(sim, playerSide, _selected);
         }
         public void SetBuildingCommandPanel(BuildingCommandPanel panel) => _interaction.AttachBuildingPanel(panel);
         public void SetToolCommandPanel(ToolCommandPanel panel) => _interaction.AttachToolPanel(panel);
@@ -91,13 +93,14 @@ namespace IronCurtain.View
                 foreach (var kv in _sim.Entities)
                 {
                     var e = kv.Value;
-                    if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != Side.Blue
+                    if (e == null || e.Kind != EntityKind.Unit || e.IsSoldier || e.Side != _player
                         || e.State == EntityState.Dead) continue;
                     var sp = _cam.WorldToScreenPoint(BoardView.WorldPos(e.PosF));
                     if (rect.Contains(new Vector2(sp.x, sp.y), true)) _selected.Add(e.Id);
                 }
             }
             SelectionInteractionCoordinator.LogSelection(click, _selected);
+            if (!click && _selected.Count > 0) UiSfx.Select();   // 框选命中:程序化 UI 音
         }
         private int PickGeneral()
         {
@@ -111,7 +114,7 @@ namespace IronCurtain.View
             foreach (var kv in _sim.Entities)
             {
                 var e = kv.Value;
-                if (e == null || e.Kind != EntityKind.Unit || e.Side != Side.Blue || e.State == EntityState.Dead) continue;
+                if (e == null || e.Kind != EntityKind.Unit || e.Side != _player || e.State == EntityState.Dead) continue;
                 float dx = e.PosF.X - p.X, dy = e.PosF.Y - p.Y;
                 float d = dx * dx + dy * dy;
                 if (e.IsSoldier)

@@ -32,5 +32,31 @@ namespace IronCurtain.EditorTools
             else
                 CreateMainScene();
         }
+
+        // 2026-09-12 主界面:菜单场景(MenuBootstrap),Build Settings 索引 0 作为游戏入口。
+        [MenuItem("IronCurtain/Create Menu Scene")]
+        public static void CreateMenuScene()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var go = new GameObject("Menu");
+            go.AddComponent<MenuBootstrap>();
+
+            Directory.CreateDirectory("Assets/Scenes");
+            string path = "Assets/Scenes/Menu.unity";
+            EditorSceneManager.SaveScene(scene, path);
+            var main = new EditorBuildSettingsScene("Assets/Scenes/Main.unity", true);
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true), main };
+            AssetDatabase.Refresh();
+            Debug.Log("[IronCurtain] Menu scene created at " + path);
+        }
+
+        [MenuItem("IronCurtain/Open Menu Scene")]
+        public static void OpenMenuScene()
+        {
+            if (File.Exists("Assets/Scenes/Menu.unity"))
+                EditorSceneManager.OpenScene("Assets/Scenes/Menu.unity");
+            else
+                CreateMenuScene();
+        }
     }
 }

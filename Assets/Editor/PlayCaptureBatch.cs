@@ -1,4 +1,5 @@
 using System.IO;
+using IronCurtain.View;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 
@@ -23,6 +24,58 @@ namespace IronCurtain.EditorTools
             SessionState.SetBool("ic.inputaudit", false);
             SessionState.SetBool("ic.playcap", true);
             EditorApplication.EnterPlaymode();
+        }
+
+        // 结算+驻军 tooltip 取证(2026-09-12):需在进程环境里带 IC_UI_RESULT=1 IC_UI_TIP=1。
+        // Unity.exe -projectPath <proj> -executeMethod IronCurtain.EditorTools.PlayCaptureBatch.ResultCapture -logFile <log>
+        [MenuItem("IronCurtain/Result Capture Batch %#&r")]
+        public static void ResultCapture()
+        {
+            EnsureMenuScene();
+            if (!File.Exists("Assets/Scenes/Main.unity"))
+                IronCurtainSceneTools.CreateMainScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            SessionState.SetBool("ic.capture", false);
+            SessionState.SetBool("ic.fastresult", false);
+            SessionState.SetBool("ic.playcap", false);
+            SessionState.SetInt("ic.mode", -1);
+            SessionState.SetBool("ic.resultcap", true);
+            EditorApplication.EnterPlaymode();
+        }
+
+        // 主界面取证(2026-09-12):开菜单场景拍默认英雄+逐风骑乘两张。
+        // Unity.exe -projectPath <proj> -executeMethod IronCurtain.EditorTools.PlayCaptureBatch.MenuCapture -logFile <log>
+        [MenuItem("IronCurtain/Menu Capture Batch %#&k")]
+        public static void MenuCapture()
+        {
+            EnsureMenuScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/Menu.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            SessionState.SetBool("ic.menucap", true);
+            EditorApplication.EnterPlaymode();
+        }
+
+        // 练习场自动验证(2026-09-12):练习模式蓝方帧→真实换边重载→红方帧,验证无AI+HUD+换边全链。
+        // Unity.exe -projectPath <proj> -executeMethod IronCurtain.EditorTools.PlayCaptureBatch.PracticeCapture -logFile <log>
+        [MenuItem("IronCurtain/Practice Capture Batch %#&v")]
+        public static void PracticeCapture()
+        {
+            if (!File.Exists("Assets/Scenes/Main.unity"))
+                IronCurtainSceneTools.CreateMainScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            AppFlow.Current = AppFlow.Mode.Practice;   // 练习场:双方无 AI
+            AppFlow.PlayerSide = IronCurtain.Sim.Side.Blue;
+            SessionState.SetInt("ic.mode", 3);         // 域重载会清静态,经 SessionState 传递
+            SessionState.SetInt("ic.pracapPhase", 0);
+            SessionState.SetBool("ic.pracap", true);
+            EditorApplication.EnterPlaymode();
+        }
+
+        private static void EnsureMenuScene()
+        {
+            if (!File.Exists("Assets/Scenes/Menu.unity")) IronCurtainSceneTools.CreateMenuScene();
         }
     }
 }
