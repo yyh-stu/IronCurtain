@@ -339,6 +339,11 @@
 > ⑦工具沉淀:PlayCaptureBatch 增 ResultCapture/MenuCapture/PracticeCapture 三批处理入口;IronCurtainSceneTools 增 Create/OpenMenuScene(Menu 入 BuildSettings 首位);CameraRig.SetViewWidth;EntityView 英雄加载辅助公开化;SelectionSystem.Init 增 playerSide 参数。
 > **剩:制作人 Play 终审清单(累积:主界面/练习场/新音效+M6.1/M6.2/M8.6/M8.7/M6.4a+屏障手感+AI 两档节奏+结算节奏+穿模处置)。**
 
+> **2026-09-12 晚·屏障瓷器碎裂音+制作人视觉线裁定(323/323,随本块提交)**:
+> ①**制作人反馈与分工裁定(重要)**:主界面与结算仍有视觉问题、穿模审核实为**严重穿模+握持姿势不合常理**——根因=ZCode 侧多模态非原生、取证精度不足(前块"开放提问验证通过"的结论按此降级,视觉裁决以制作人/DeepSeek 复核为准);**边看边改类视觉问题移交 DeepSeek 处理**(与 v5 架构一致)。本轮后续视觉验收默认不作为放行依据,仅供初审线索。
+> ②**屏障音频替代(制作人指令)**:击碎=清脆瓷器碎裂——选 BigSoundBank"Broken Plate #1"(瓷盘落地摔碎,公有领域)整段 1.74s 入库 sfx_wall_break;受击=同源音频**弃前 1/7(0.249s,去起始瞬态)取后 6/7(1.49s)** 为 sfx_wall_hit(ffmpeg atrim 裁剪,时长数学核对);AudioSystem 屏障事件(WallDamaged/WallBroken)与建筑音分家(石造建筑仍走 sfx_build_hit/sfx_build_break)。备选(Kenney Sci-Fi forceField 000/004 能量护盾音)与说明入待审核音频/17,制作人耳朵终审。
+> 门禁:EditMode 323/323、`error CS=0`(results_wall.xml)。
+
 > ## ★★ 新窗口启动协议(2026-09-06 用户拍板,常驻)
 > **用户会直接开新窗口来控制 GLM 额度成本(长会话上下文膨胀 → 编排循环 token 消耗快),不需要向你解释前因后果;进度不允许因此中断。**
 > 新会话按此清单冷启动(勿再追问用户背景):

@@ -71,16 +71,17 @@ namespace IronCurtain.View
         private void OnEvent(SimEvent evt)
         {
             float now = Time.unscaledTime;
-            // 2026-09-12 音效补齐(拍板 A+C):屏障与建筑走石响/碎裂;单位受击按攻击者细分
-            // 近战=挥砍,远程(坠日/星落系)=施法音,塔/未指名=通用命中。四新音效均为 Kenney CC0。
+            // 2026-09-12 拍板:屏障与建筑分家——屏障=瓷器材质(Broken Plate,bigsoundbank 公有领域),
+            // 击碎=整段(瓷盘落碎);受击=同源音频弃前 1/7 取后 6/7(去掉起始瞬态,做"被打"听感)。
+            // 建筑(石造棱堡)仍走 sfx_build_hit(采矿石响)/sfx_build_break。单位受击按攻击者细分同下。
             if (evt.Type == SimEventType.WallDamaged)
             {
-                PlayThrottled("sfx_build_hit", 3, 0.95f, 1.05f, now);
+                PlayThrottled("sfx_wall_hit", 3, 0.95f, 1.05f, now);
                 return;
             }
             if (evt.Type == SimEventType.WallBroken)
             {
-                PlayThrottled("sfx_build_break", 4, 1f, 1f, now);
+                PlayThrottled("sfx_wall_break", 4, 1f, 1f, now);
                 return;
             }
             if (!EventMap.TryGetValue(evt.Type, out var spec)) return;
