@@ -124,14 +124,12 @@ public class SiegeTests
         var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
         var atk = SoldiersOf(g).Take(2).ToList();
         AttackAndArrive(redTowerId, atk.ToArray());
-        RunUntil(() => SiegeSystemSealedNever(), 5); // 推进若干 tick(交换可能进行中)
+        RunUntil(() => false, 5); // 推进若干 tick(交换可能进行中)
         Assert.IsTrue(SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Destroy, out var err), "交换期间切换意图应放行(2026-09-11 废封城)");
     }
 
-    private static bool SiegeSystemSealedNever() => false;
-
     [Test]
-    public void T4_交换1比1_守军与攻方士兵同归于尽()
+    public void T4_交换1比1_守军与攻方士兵同归于尽_幸存者随军出城()
     {
         var defs = Garrison(redTowerId, 1, Side.Red);
         SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Capture, out _);
@@ -144,15 +142,15 @@ public class SiegeTests
         Assert.AreEqual(Side.Blue, b.Side, "建筑应归属蓝方");
         Assert.IsFalse(sim.Entities.ContainsKey(defs[0].Id), "守军士兵应阵亡(1:1 互换)");
         Assert.IsFalse(sim.Entities.ContainsKey(a.Id), "攻方士兵 a 应阵亡(1:1 互换)");
-        // 攻方 b2 幸存并自动驻军
-        Assert.IsTrue(sim.Entities.ContainsKey(b2.Id) && b2.GarrisonBuildingId == redTowerId, "幸存攻方士兵应自动驻军");
-        Assert.IsFalse(b.Sealed, "占领后应解除封城");
+        // 2026-09-14 制作人口径:「每个军团要么全留,要么全出,不要主将出去兵还在城里」——
+        // 本用例主将未参战(只在城外),所以这个团**整团出城**,幸存士兵不驻入。
+        Assert.IsTrue(sim.Entities.ContainsKey(b2.Id) && b2.GarrisonBuildingId == 0, "主将未参战 → 幸存士兵随军出城");
         Assert.IsNotNull(sim.GetEntity(g.Id), "攻方主将存活(永不因交换阵亡)");
-        Assert.AreEqual(1, b.GarrisonFormal.Count, "幸存 1 人驻军");
+        Assert.AreEqual(0, b.GarrisonFormal.Count, "半团不驻入:主将在城外时一个兵都不留城");
     }
 
     [Test]
-    public void T5_攻方多余_幸存者自动正式驻军()
+    public void T5_攻方多余_幸存者整团出城不驻入()
     {
         Garrison(redTowerId, 2, Side.Red);
         SiegeSystem.SetIntent(sim, redTowerId, Side.Blue, SiegeIntent.Capture, out _);
@@ -162,9 +160,13 @@ public class SiegeTests
         Assert.IsTrue(RunUntil(() => sim.Entities[redTowerId].Side == Side.Blue), "超时未完成占领");
         var b = sim.Entities[redTowerId];
         Assert.AreEqual(Side.Blue, b.Side, "建筑应归属蓝方");
-        Assert.AreEqual(2, b.GarrisonFormal.Count, "攻 4 守 2 应幸存 2 人自动驻军");
-        foreach (var id in b.GarrisonFormal)
-            Assert.AreEqual(redTowerId, sim.Entities[id].GarrisonBuildingId, "驻军士兵应记录所在建筑");
+        // 2026-09-14 制作人:「每个军团要么全留,要么全出」——主将没参战,该团整团出城
+        Assert.AreEqual(0, b.GarrisonFormal.Count, "攻 4 守 2:主将未参战 → 幸存者整团出城,不驻入");
+        int survivors = us.Count(u => sim.Entities.ContainsKey(u.Id));
+        Assert.Greater(survivors, 0, "应有幸存士兵(2 名:攻 4 守 2,1:1 互换)");
+        foreach (var u in us)
+            if (sim.Entities.ContainsKey(u.Id))
+                Assert.AreEqual(0, sim.GetEntity(u.Id).GarrisonBuildingId, "幸存士兵应留在城外");
         Assert.IsNotNull(sim.GetEntity(g.Id), "攻方主将存活");
     }
 
@@ -180,8 +182,11 @@ public class SiegeTests
         var b = sim.Entities[redTowerId];
         Assert.AreEqual(Side.Blue, b.Side, "建筑应归属蓝方");
         Assert.IsFalse(sim.Entities.ContainsKey(defs[0].Id), "守军士兵应被清零");
-        Assert.AreEqual(1, b.GarrisonFormal.Count, "攻 2 守 1:1:1 互换后 1 名攻方士兵幸存驻军");
-        Assert.AreEqual(redTowerId, sim.Entities[b.GarrisonFormal[0]].GarrisonBuildingId, "幸存者登记驻军");
+        // 2026-09-14 制作人口径:「每个军团要么全留,要么全出」——主将没参战 → 整团出城
+        Assert.AreEqual(0, b.GarrisonFormal.Count, "攻 2 守 1:主将未参战 → 幸存者随军出城,不驻入");
+        var survivor = sim.GetEntity(atk[0].Id) ?? sim.GetEntity(atk[1].Id);
+        Assert.IsNotNull(survivor, "应有 1 名攻方士兵幸存");
+        Assert.AreEqual(0, survivor.GarrisonBuildingId, "幸存士兵应留在城外");
         var gen = sim.GetEntity(g.Id);
         Assert.IsNotNull(gen, "攻方主将应存活");
         Assert.Greater(gen.Hp, 0, "主将永不因交换阵亡");
@@ -202,11 +207,11 @@ public class SiegeTests
         Assert.IsTrue(RunUntil(() => !sim.Entities.ContainsKey(a.Id)), "超时攻方未被肃清");
         var b = sim.Entities[redTowerId];
         Assert.AreEqual(Side.Red, b.Side, "建筑应仍属红方");
-        Assert.IsFalse(b.Sealed, "攻方肃清后应解除封城");
         Assert.AreEqual(SiegeIntent.Capture, b.Intent, "意图应保留为 Capture");
         Assert.AreEqual(2, b.GarrisonFormal.Count, "剩余守军应留城(3-1=2)");
         Assert.IsFalse(sim.Entities.ContainsKey(a.Id), "攻方士兵阵亡");
-        Assert.IsNotNull(sim.GetEntity(g.Id), "攻方主将虽败不死于交换(城外待命)");
+        Assert.IsNotNull(sim.GetEntity(g.Id), "攻方主将虽败不死于交换");
+        Assert.AreEqual(EntityState.Idle, sim.GetEntity(g.Id).State, "攻城失败后主将应收兵出城(不留在 Exchanging)");
     }
 
     [Test]
@@ -223,7 +228,6 @@ public class SiegeTests
         Assert.AreEqual(Side.Blue, b.Side, "最终建筑应归属蓝方");
         foreach (var d in defs)
             Assert.IsFalse(sim.Entities.ContainsKey(d.Id), "守军士兵应清零");
-        Assert.IsFalse(b.Sealed, "占领后应解封");
     }
 
     [Test]
@@ -244,8 +248,13 @@ public class SiegeTests
     }
 
     [Test]
-    public void T11_兵团命令只展开士兵_主将获城外集结点不参与交换()
+    public void T11_兵团命令只展开士兵_主将带兵团行军到位后放兵入场()
     {
+        // 2026-09-14 修正用例场景:原来这口箭塔**没有守军**,主将一"到场"就满足
+        // 「无人建筑直接占领」→ 城池易主,攻方整队被占领复位取消(见 Capture 里的全量复位),
+        // 于是"到位放兵"这一步在用例里从未真正被检到。补 3 名守军,回到本用例的本意:
+        // 攻城中,令下只展开士兵、主将获城外集结点,到场后士兵入场。
+        Garrison(redTowerId, 3, Side.Red);
         var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(5, 105));
         var soldiers = SoldiersOf(g);
         var generalPos = g.PosF;
@@ -315,7 +324,7 @@ public class SiegeTests
     }
 
     [Test]
-    public void T14_零兵武将占空点_返回NoEligible且零副作用()
+    public void T14_零兵武将占空点_孤将可单独占领()
     {
         var lone = SpawnUnit(Side.Blue, new GridPos(5, 105), HeroId.PanShi);
         var before = lone.PosF;
@@ -324,11 +333,15 @@ public class SiegeTests
         var result = SiegeSystem.TryIssueRegimentOrder(
             sim, new[] { lone.Id }, neutralId, Side.Blue, SiegeIntent.Capture);
 
-        Assert.AreEqual(SiegeOrderError.NoEligibleSoldiers, result.Error);
-        Assert.AreEqual(SiegeIntent.None, target.Intent, "失败不得残留占领意图");
-        Assert.IsFalse(lone.HasMoveTarget);
-        Assert.AreEqual(0, lone.TargetBuildingId);
-        Assert.AreEqual(before, lone.PosF);
+        // 2026-09-14 制作人:「主将和他的兵团就是一个单位」→ 零兵孤将同样可单独受令占点
+        // (旧用例断言"必须被拒且零副作用",与这条口径冲突,已按新口径改写)。
+        Assert.IsTrue(result.Success, "孤将应能受令:" + result.Error);
+        Assert.AreEqual(0, result.SoldierIds.Count, "孤将没有士兵可展开");
+        Assert.AreEqual(SiegeIntent.Capture, target.Intent, "应写下占领意图");
+        Assert.IsTrue(lone.HasMoveTarget, "孤将应获行军令");
+        Assert.AreEqual(neutralId, lone.TargetBuildingId, "孤将应带攻城标记");
+        sim.Step();
+        Assert.AreNotEqual(before, lone.PosF, "孤将应开始向集结点移动");
     }
 
     [Test]

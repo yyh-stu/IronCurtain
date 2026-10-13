@@ -65,7 +65,7 @@
       "AttackIntervalSec": 2.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 9,
+      "Range": 8,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "攻击镇岳无视其20%基础免伤,附加重伤(全属性-15%,3秒)"
@@ -79,7 +79,7 @@
       "AttackIntervalSec": 1.0,
       "MoveSpeed": 2.0,
       "ChargeSpeed": 2.0,
-      "Range": 9,
+      "Range": 8,
       "Population": 1,
       "Shield": 0,
       "PassiveText": "沉默非镇岳单位禁止冲锋;攻击磐石护盾伤害减半"
@@ -202,14 +202,7 @@
     "ZhuFengRangedTaken": 1.25
   },
   "Production": {
-    "Pop1Seconds": 6.0,
-    "ZhenYueSeconds": 9.0,
-    "ZhenYueUpgradedSeconds": 7.5,
-    "QueuesPerBarracks": 3,
-    "BasePopulation": 40,
-    "ResourcePointPopulation": 5,
-    "InitialOwnedResourcePoints": 3,
-    "MaxResourcePoints": 8
+    "ZhenYueUpgradedSeconds": 7.5
   },
   "Ep": {
     "Cap": 5,
@@ -391,7 +384,7 @@
     {
       "Id": 4,
       "Name": "铁壁防线",
-      "Description": "生成30血堡垒,可驻军,每3s伤敌15",
+      "Description": "重装军团(磐石/镇岳)承伤-30%(30s)",
       "DurationSeconds": 30,
       "DrawNodes": [
         3,
@@ -468,7 +461,6 @@
   "Tools": {
     "RamDamage": 15.0,
     "FortHp": 100,
-    "FortGarrison": 3,
     "FortDurationSeconds": 30
   },
   "TowerGarrison": {

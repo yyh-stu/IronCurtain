@@ -77,18 +77,30 @@ namespace IronCurtain.Tests
         }
 
         [Test]
-        public void T3_EngageBeatsSupport()
+        public void T3_SupportBeatsEngage_20格内友军挨打优先支援()
         {
+            // 2026-09-14 制作人口径(推翻原先的"索敌优先"):「20 格以内队友挨打,除非玩家有调度安排,
+            // 否则**必须支援,写进最优先**」。所以这里 A 正在挨打、B 自己视野里也有敌人时,
+            // B 的**第一决策**必须是去支援 A,而不是追自己视野里那个敌人。
             var sim = NewAutoSim();
             var a = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 100));
             RegimentSystem.SpawnGeneral(sim, Side.Red, HeroId.PanShi, new GridPos(15, 102)); // A 的交战对象
-            var b = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 114)); // B 距 A 10
+            var b = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 114)); // B 距 A 14
 
             var e = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 119)); // 距 B 5 ≤ 视野 6,B 可见
             e.Hero = HeroId.PanShi; e.Hp = e.MaxHp = 5000f; e.Attack = 0f;
 
-            for (int i = 0; i < 20; i++) sim.Step();
-            Assert.AreEqual(1, b.AutoKind, "索敌进攻优先于支援");
+            int firstKind = 0;
+            float distToA0 = SimVec2.Distance(b.PosF, a.PosF);
+            for (int i = 0; i < 200 && firstKind == 0; i++)
+            {
+                sim.Step();
+                if (b.AutoKind != 0) firstKind = b.AutoKind;
+            }
+            Assert.AreEqual(2, firstKind, "20 格内友军挨打 → 第一个自动决策应是支援(实际 AutoKind=" + firstKind + ")");
+            for (int i = 0; i < 60; i++) sim.Step();   // 给几步让它真的朝友军走过去
+            Assert.Less(SimVec2.Distance(b.PosF, a.PosF), distToA0,
+                "支援就应往挨打的友军那边走");
         }
 
         [Test]

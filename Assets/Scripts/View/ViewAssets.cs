@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using IronCurtain.Sim;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace IronCurtain.View
 {
@@ -9,9 +10,67 @@ namespace IronCurtain.View
         private static Font _font;
         private static Mesh _quadMesh;
 
+        // 2026-09-14 ★交付级修复:全工程 13 处 `Shader.Find("Universal Render Pipeline/…")`。
+        // 编辑器里 Shader.Find 总能命中(URP 包里的 shader 全在),**独立构建里会被剥掉** ——
+        // 实测第一次进战斗场景 `new Material(null)` 直接抛 ArgumentNullException,
+        // GameBootstrap.Awake 中断 → 地图/屏障/单位/UI 全都不建,播放器里整局是空的。
+        // 两层修法:①编辑器工具把这些 shader 写进 GraphicsSettings.Always Included Shaders(根因);
+        // ②这里做兜底 —— 万一还有漏网的,退到 Sprites/Default 而不是崩掉整局。
+        private static readonly Dictionary<string, Shader> _shaderCache = new Dictionary<string, Shader>();
+        private static readonly HashSet<string> _shaderWarned = new HashSet<string>();
+
+        private static Shader RawFind(string n) => Shader.Find(n);
+
+        // Resources/Shaders 下的材质资产(由 EnsureShaderMaterials 生成)。它们是 shader **进包**的凭据:
+        // 只被 Shader.Find 引用的 URP shader 会在构建里被剥掉,而被打进包的材质会带上它的 shader。
+        private static readonly Dictionary<string, string> ShaderMaterialKeys = new Dictionary<string, string>
+        {
+            { "Universal Render Pipeline/Lit", "urp_lit" },
+            { "Universal Render Pipeline/Unlit", "urp_unlit" },
+            { "Universal Render Pipeline/Particles/Unlit", "urp_particles_unlit" },
+            { "Sprites/Default", "sprites_default" },
+        };
+
+        /// <summary>先走 Resources 材质(拿到的一定是打进包的那份),再退回 Shader.Find。</summary>
+        private static Shader ResolveShader(string name)
+        {
+            string key;
+            if (ShaderMaterialKeys.TryGetValue(name, out key))
+            {
+                var mat = Resources.Load<Material>("Shaders/" + key);
+                if (mat != null && mat.shader != null) return mat.shader;
+            }
+            return RawFind(name);
+        }
+
+        /// <summary>取 shader(带缓存与兜底)。找不到时喊一次错并退回通用 shader,绝不返回 null。</summary>
+        public static Shader FindShader(string name)
+        {
+            Shader s;
+            if (_shaderCache.TryGetValue(name, out s) && s != null) return s;
+            s = ResolveShader(name);
+            if (s == null)
+            {
+                if (_shaderWarned.Add(name))
+                    Debug.LogError("[ViewAssets] 构建里找不到 shader:「" + name
+                        + "」—— 请把它加进 ProjectSettings/GraphicsSettings 的 Always Included Shaders"
+                        + "(菜单 IronCurtain/Ensure Shaders Included)。已退回兜底 shader。");
+                s = RawFind("Universal Render Pipeline/Unlit");
+                if (s == null) s = RawFind("Sprites/Default");
+                if (s == null) s = RawFind("Unlit/Color");
+                if (s == null)
+                {
+                    Debug.LogError("[ViewAssets] 连兜底 shader 都找不到 —— 画面将不可见。");
+                    return null;
+                }
+            }
+            _shaderCache[name] = s;
+            return s;
+        }
+
         public static Material Mat(Color albedo, float metallic, float smoothness, Color emission, float emissionIntensity)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Lit"));
             m.SetColor("_BaseColor", albedo);
             m.SetFloat("_Metallic", metallic);
             m.SetFloat("_Smoothness", smoothness);
@@ -27,8 +86,29 @@ namespace IronCurtain.View
         // UI 元素(血条/光环/刻度)一律 Unlit 纯色,不受场景光影响
         public static Material Unlit(Color c)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             m.SetColor("_BaseColor", c);
+            return m;
+        }
+
+        /// <summary>
+        /// 可淡出的 Unlit(2026-09-13 去廉价感):默认 URP/Unlit 是**不透明**的,
+        /// 顶点色/BaseColor 的 alpha 会被直接丢弃 —— 弹道、点击标记此前的"淡出"全是空写,
+        /// 观感是"啪一下出现、啪一下消失"。这里显式走 Transparent 队列,alpha 才真的生效。
+        /// brightness>1 时叠爆阈值(URP 资产 bloom threshold=1.0)让元素吃到泛光。
+        /// </summary>
+        public static Material UnlitFade(Color c, float brightness = 1f)
+        {
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
+            m.SetColor("_BaseColor", new Color(c.r * brightness, c.g * brightness, c.b * brightness, c.a));
+            m.SetFloat("_Surface", 1f);            // Transparent
+            m.SetFloat("_Blend", 0f);              // Alpha 混合
+            m.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            m.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            m.SetFloat("_ZWrite", 0f);
+            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            m.DisableKeyword("_ALPHATEST_ON");
+            m.renderQueue = (int)RenderQueue.Transparent;
             return m;
         }
 
@@ -118,7 +198,7 @@ namespace IronCurtain.View
         /// <summary>贴图材质(URP/Lit);tex 为空时退化为纯色。</summary>
         public static Material Textured(Texture2D tex, Color tint, float smoothness)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Lit"));
             m.SetColor("_BaseColor", tint);
             m.SetFloat("_Metallic", 0f);
             m.SetFloat("_Smoothness", smoothness);

@@ -11,7 +11,17 @@ namespace IronCurtain.View
     /// 2026-09-11 demo→成品迁移:IMGUI OnGUI → UI Toolkit。逻辑方法(Arm/TryHandleWorldClick/
     /// CancelTargeting/CanShowActions)与公开契约(PendingTarget/HasPendingTarget/Expanded/
     /// SetExpanded/SetOpenedCallback/LastPanelRect)全部原样保留,仅绘制层更换。
-    /// 位置:左上、跟随兵营总览(暂仍为 IMGUI)底边,每帧对齐(LateUpdate)。</summary>
+    ///
+    /// 2026-09-14 制作人"点开有内容但点了没用" + "面板下面加道具背包,点道具→点敌方建筑使用":
+    /// 三个真缺陷一起修掉 ——
+    /// ① **布局**:本面板是唯一给自己写 `position:absolute / left / top` 的中央面板,而它的父级
+    ///    (UiRoot 的 `.center-frame`)高度只由在流子元素撑开 → 绝对定位的子元素不撑父级,
+    ///    框高≈50px 而面板从框顶往下 60px 起画,**画到框外面去了**(所以"有内容"却看不见/点不到);
+    /// ② **输入拦截**:`LateUpdate` 每帧无条件把 `LastPanelRect` 设成自己的 worldBound,于是屏幕正中央
+    ///    凭空多出一块"UI 区",后续点建筑的那一下被判定为"点在 UI 上"而**被吞掉** → 道具永远用不出去;
+    /// ③ **不重绘**:正文只在 `_expanded && !_contentBuilt` 时构建一次,选定道具后"取消当前目标"那行
+    ///    和背包高亮永远不会出现。改为按状态键重绘。
+    /// </summary>
     public sealed class ToolCommandPanel : MonoBehaviour
     {
         public static Rect LastPanelRect = Rect.zero;
@@ -61,7 +71,7 @@ namespace IronCurtain.View
                 return false;
             }
             _pending = mode;
-            Show(mode == ToolTargetMode.Ram ? "请点击可见敌方建筑" : "请点击地图内空格", true);
+            Show(mode == ToolTargetMode.Ram ? "请点击可见敌方建筑（世界或小地图）" : "请点击地图内空格", true);
 #if UNITY_EDITOR
             InputAudit.Log("tool_target arm=" + mode);
 #endif
@@ -90,6 +100,48 @@ namespace IronCurtain.View
             return true;
         }
 
+        /// <summary>
+        /// 小地图选目标(2026-09-14 制作人:"再点敌方建筑(世界或小地图)")。
+        /// 小地图点的是**像素点**,可点住的敌方建筑比世界点击小得多 —— 所以这里按
+        /// "小地图上的建筑点位"就近取(1 格内),而不是把像素点换算成世界点再去撞拾取容差。
+        /// 返回 true = 这次点击被道具目标模式消费掉了(小地图不再执行"跳转视野")。
+        /// </summary>
+        public bool TryHandleMinimapClick(SimVec2 mapPoint)
+        {
+            if (_pending == ToolTargetMode.None) return false;
+            var mode = _pending;
+            ToolCommandFeedback result;
+            if (mode == ToolTargetMode.Ram)
+            {
+                int target = PickEnemyBuildingNear(mapPoint, 2);
+                result = _model.UseRam(target);
+            }
+            else if (!TerrainMap.IsInside(mapPoint) || !TerrainMap.IsInside(mapPoint.ToGrid()))
+                result = new ToolCommandFeedback(false, ToolCommandError.InvalidTarget, "临时阵地需要地图内合法空格");
+            else
+                result = _model.UseFort(mapPoint.ToGrid());
+            Report("use_minimap", mode, result);
+            if (result.Success) _pending = ToolTargetMode.None;
+            return true;
+        }
+
+        /// <summary>小地图取点:离该格最近的可选敌方建筑(rows/Cols 容差内)。0=没取到。</summary>
+        private int PickEnemyBuildingNear(SimVec2 p, float cellTolerance)
+        {
+            if (_sim == null) return 0;
+            int best = 0; float bestD = float.MaxValue;
+            foreach (var kv in _sim.Entities)
+            {
+                var b = kv.Value;
+                if (b == null || b.Kind != EntityKind.Building || b.Rubbled) continue;
+                if (b.Side == _player || b.Side == Side.Neutral) continue;
+                float d = SimVec2.Distance(new SimVec2(b.Pos.Col, b.Pos.Row), p);
+                if (d > cellTolerance) continue;
+                if (d < bestD) { bestD = d; best = b.Id; }
+            }
+            return best;
+        }
+
         public bool CancelTargeting(string reason)
         {
             if (_pending == ToolTargetMode.None) return false;
@@ -116,11 +168,13 @@ namespace IronCurtain.View
         public static bool CanShowActions(ToolCommandState state) => state.Valid;
 
         private bool _expanded;
+        private string _stateKey = "";
         public bool Expanded => _expanded;
         public void SetOpenedCallback(Action callback) => _openedCallback = callback;
         public void SetExpanded(bool expanded)
         {
             _expanded = expanded;
+            if (!expanded) _stateKey = "";   // 收起即作废内容,下次展开重绘
             if (expanded) _openedCallback?.Invoke();
             ApplyExpanded();
         }
@@ -129,10 +183,9 @@ namespace IronCurtain.View
         {
             _root = new VisualElement { name = "ToolPanel" };
             _root.AddToClassList("panel");
-            _root.style.position = Position.Absolute;
-            _root.style.left = 12;
-            _root.style.top = 60;
-            _root.style.width = 348;
+            // 2026-09-14:去掉 position/left/top —— 中央框的尺寸靠**在流子元素**撑开,
+            // 绝对定位的子元素既不撑框、又会被画到框外(根因见类注释①)。
+            _root.style.minWidth = 320;
 
             var head = new VisualElement();
             head.style.flexDirection = FlexDirection.Row;
@@ -149,7 +202,6 @@ namespace IronCurtain.View
             var spacer = new VisualElement(); spacer.style.flexGrow = 1; head.Add(spacer);
             _ep = UiKit.MakeLabel("", "label-dim");
             head.Add(_ep);
-            _root.Add(head);
 
             _body = new VisualElement();
             _body.style.marginTop = 6;
@@ -159,24 +211,36 @@ namespace IronCurtain.View
             _feedbackLabel.style.marginTop = 4;
             _root.Add(_feedbackLabel);
 
-            parent.Add(_root);
+            UiRoot.Current.RegisterCenterEntry("道具", _root, () => SetExpanded(true), () => SetExpanded(false));
             ApplyExpanded();
         }
 
         private void ApplyExpanded()
         {
             if (_header == null) return;
-            _header.text = _expanded ? "道具 ▲" : "道具 ▼";
-            if (_body != null) _body.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
-            if (_feedbackLabel != null) _feedbackLabel.style.display = _expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            // 入口在屏幕底部、内容向屏幕中央(上方)展开 → 折叠态用 ▲,展开态用 ▼
+            _header.text = _expanded ? "道具 ▼" : "道具 ▲";
+            if (_body != null) _body.style.display = DisplayStyle.Flex;   // 中央框里始终展开(显隐由 UiRoot 管)
+            if (_feedbackLabel != null) _feedbackLabel.style.display = DisplayStyle.Flex;
         }
+
+        /// <summary>2026-09-14 供实机自检:本面板累计重建正文的次数(正常应为 0 或极少)。
+        /// 制作人报"面板不稳定、点一下才恢复、这一下不算数"的根因就是"每帧/每秒重建正文"。</summary>
+        public static int Rebuilds;
 
         private void Update()
         {
             if (_model == null || _root == null) return;
             var state = _model.Describe();
             _ep.text = state.Valid ? "EP " + state.Ep.ToString("0.#") : "状态不可用";
-            if (_expanded) RebuildContents(state);
+            // 状态键:可抽性/EP/目标态 任一变化就重绘(原来只在展开时构建一次 → 选定后没有任何可视反馈)
+            string key = state.Valid
+                // 2026-09-14:键里去掉 `(int)EP`(持续累积 → 每秒整块重绘 = 制作人报的"面板不稳定/点一下不算数");
+                // EP 文本逐帧原地更新,重绘只跟"结构/阈值"走。
+                ? (state.RamCost + "|" + state.FortCost + "|" + (int)_pending
+                    + "|" + (state.CanAffordRam ? 1 : 0) + (state.CanAffordFort ? 1 : 0))
+                : "inv";
+            if (_expanded && key != _stateKey) { _stateKey = key; RebuildContents(state); }
 
             if (_feedback != null && Time.unscaledTime < _feedbackUntil)
             {
@@ -189,21 +253,22 @@ namespace IronCurtain.View
 
         private void RebuildContents(ToolCommandState state)
         {
+            Rebuilds++;
             _body.Clear();
+            // 2026-09-13 临时诊断("道具点开无字符"):打印走了哪个分支
+            Debug.Log("[ToolPanel] rebuild valid=" + state.Valid + " ep=" + state.Ep
+                + " ram=" + state.RamCost + " fort=" + state.FortCost + " pending=" + _pending);
             if (!CanShowActions(state))
             {
                 _body.Add(UiKit.MakeLabel("道具状态不可用", "feedback-err"));
                 return;
             }
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            var ram = UiKit.MakeButton("攻城锥 " + state.RamCost + "EP", () => Arm(ToolTargetMode.Ram));
-            ram.style.height = 32; ram.style.flexGrow = 1;
-            var fort = UiKit.MakeButton("临时阵地 " + state.FortCost + "EP", () => Arm(ToolTargetMode.Fort));
-            fort.style.height = 32; fort.style.flexGrow = 1; fort.style.marginLeft = 8;
-            row.Add(ram); row.Add(fort);
-            _body.Add(row);
+
+            // ===== 道具背包(制作人 2026-09-13:"道具面板下面加一个道具背包,点背包里的道具 →
+            //       再点敌方建筑(世界或小地图)即可使用") =====
+            _body.Add(UiKit.MakeLabel("道具背包", "label-title"));
+            _body.Add(BackpackSlot(ToolTargetMode.Ram, "攻城锥", state.RamCost, state.CanAffordRam, "点选后点敌方建筑"));
+            _body.Add(BackpackSlot(ToolTargetMode.Fort, "临时阵地", state.FortCost, state.CanAffordFort, "点选后点地图空格"));
 
             if (_pending != ToolTargetMode.None)
             {
@@ -212,7 +277,7 @@ namespace IronCurtain.View
                 targetRow.style.alignItems = Align.Center;
                 targetRow.style.marginTop = 4;
                 targetRow.Add(UiKit.MakeLabel(
-                    _pending == ToolTargetMode.Ram ? "目标：可见敌方建筑" : "目标：地图内空格", "label-dim"));
+                    _pending == ToolTargetMode.Ram ? "目标：点敌方建筑(世界/小地图)" : "目标：点地图内空格", "label-dim"));
                 var cancel = UiKit.MakeButton("取消当前目标", () => CancelTargeting("button"));
                 cancel.style.height = 26; cancel.style.marginLeft = 8;
                 targetRow.Add(cancel);
@@ -220,14 +285,42 @@ namespace IronCurtain.View
             }
         }
 
+        /// <summary>背包一格:名字 + 消耗 + 可用性;已选中时高亮并提示"再点目标"。</summary>
+        private VisualElement BackpackSlot(ToolTargetMode mode, string name, int cost, bool affordable, string hint)
+        {
+            bool armed = _pending == mode;
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 3;
+            row.style.paddingLeft = 6; row.style.paddingRight = 6;
+            row.style.paddingTop = 4; row.style.paddingBottom = 4;
+            row.style.borderTopLeftRadius = 6; row.style.borderTopRightRadius = 6;
+            row.style.borderBottomLeftRadius = 6; row.style.borderBottomRightRadius = 6;
+            row.style.backgroundColor = armed
+                ? new Color(0.16f, 0.42f, 0.24f, 0.95f)
+                : new Color(0.12f, 0.16f, 0.22f, 0.85f);
+
+            var label = UiKit.MakeLabel((armed ? "▶ " : "") + name + "  ×" + cost + " EP", "label");
+            label.style.flexGrow = 1;
+            row.Add(label);
+            string btnText = !affordable ? "EP 不足" : (armed ? "已选中 · 点目标" : "选中");
+            var b = UiKit.MakeButton(btnText, () => Arm(mode), affordable);
+            // 2026-09-16 三十七轮:宽度定死为最大态(132)—— 原来 armed 切换 64↔132,
+            // 选中一下整行重排,属制作人报的"面板内部元素莫名微变"之一类。
+            b.style.width = 132;
+            row.Add(b);
+            if (!affordable) row.Add(UiKit.MakeLabel("（" + hint + "）", "label-dim"));
+            return row;
+        }
+
         private void LateUpdate()
         {
             if (_root == null) return;
-            // 跟随兵营总览(暂仍 IMGUI)底边;它迁完后此跟随逻辑自然失效可删
-            var b = BarracksOverviewPanel.LastPanelRect;
-            float top = b.height > 0f ? b.yMax + 8f : 60f;
-            _root.style.top = top;
-            LastPanelRect = UiKit.WorldRect(_root);   // 输入拦截桥
+            // 2026-09-14:只在**真的可见**时才上报拦截矩形。原来无条件上报,于是屏幕中央常驻一块
+            // 假"UI 区",把"点建筑用道具"的那一下吞掉 —— 这正是"点了没用"的机器层原因。
+            // 2026-09-15:手写判定并入 `UiKit.VisibleRectOrZero`(同一口径,且补上"祖先被隐藏"那一档)。
+            LastPanelRect = UiKit.VisibleRectOrZero(_root);
         }
 
         private void OnDisable() { LastPanelRect = Rect.zero; _pending = ToolTargetMode.None; }
@@ -242,6 +335,7 @@ namespace IronCurtain.View
                 + (result.Success ? "ok" : "error") + " code=" + result.Error
                 + " message=\"" + result.Message + "\"");
 #endif
+            Debug.Log("[ToolPanel] " + action + " mode=" + mode + " ok=" + result.Success + " msg=" + result.Message);
         }
 
         private void Show(string message, bool success)

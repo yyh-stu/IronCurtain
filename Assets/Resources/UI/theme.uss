@@ -1,150 +1,241 @@
-/* 铁幕:前线 · UI 主题 v1(2026-09-11 demo→成品迁移第 0 步)
- * 纯 USS 代码主题,先成形后换肤;集中在此,换皮=换这份文件。
- * 色板:深石板底 + 冰蓝阵营强调(与蓝方屏障色系一致)。 */
+/* 铁幕:前线 · UI 主题 v2(2026-09-13 制作人:去掉木皮皮肤,改纯代码绘制)
+ *
+ * 为什么删掉 v1 的木皮九宫格:
+ *   v1 用 `background-image: resource("UI/panel_wood")` + `-unity-slice-*: 82`,但两张皮肤贴图
+ *   导入设置是 `textureType: 0`(Default,非 Sprite)、`spriteBorder: 0,0,0,0`(无九宫格边界)。
+ *   USS 的九宫格切片**只有在资源是带 border 的 Sprite 时才有意义** —— 所以这套皮肤的九宫格
+ *   从未真正生效,渲染结果是畸形的(这就是"木框只占一条 / 空容器出现看不懂的木框"的来源),
+ *   而且它把面板文字设成深棕(假设浅木底),一旦木底不渲染就成了深色压深色 = 文字消失。
+ *
+ * v2 的原则:
+ *   1. **不引用任何贴图** —— 全部由 background-color / border / border-radius 画出来,不依赖导入设置;
+ *   2. **文字一律浅色** —— 面板是不透明性较高的深色玻璃,不存在"浅底深字"的假设,任何面板上文字都可读;
+ *   3. 色板集中在 :root,换皮=换这几个变量。
+ *
+ * 色板:深石板玻璃 + 冰蓝强调(与蓝方屏障色系同源) + 暖金(标题/结算)。 */
 
 :root {
     --accent: rgb(88, 166, 255);
-    --panel-bg: rgba(16, 20, 28, 0.92);
-    --panel-border: rgba(120, 140, 170, 0.55);
+    --accent-dim: rgba(88, 166, 255, 0.35);
+    --panel-bg: rgba(13, 17, 25, 0.90);
+    --panel-bg-solid: rgb(15, 19, 27);
+    --panel-border: rgba(122, 142, 172, 0.40);
+    --panel-border-strong: rgba(140, 162, 196, 0.62);
     --text: rgb(232, 238, 246);
     --text-dim: rgba(232, 238, 246, 0.62);
+    --gold: rgb(255, 217, 132);
 }
 
+/* ===== 面板:深色玻璃 + 1px 冷灰边 + 圆角(纯代码) ===== */
 .panel {
-    /* 2026-09-13 制作人:UI 皮肤(木框白底九宫格)在 UITK 迁移时漏接,现接回。
-       木框白底 = 浅底 → 面板内文字统一转深色(见下方 .panel 文本规则),否则浅字白底不可读。 */
-    background-image: resource("UI/panel_wood");
-    -unity-slice-left: 82;
-    -unity-slice-right: 82;
-    -unity-slice-top: 82;
-    -unity-slice-bottom: 82;
-    -unity-slice-scale: 0.55;
+    background-color: var(--panel-bg);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 6px;
     padding: 10px;
 }
-.panel .label { color: rgb(46, 38, 30); }
-.panel .label-dim { color: rgba(46, 38, 30, 0.72); }
-.panel .label-title { color: rgb(38, 30, 24); }
-.panel .label-clock, .panel .label-clock-overtime, .panel .label-phase { color: rgb(38, 30, 24); }
-.panel .bp-card-name, .panel .bp-group-tag { color: rgb(38, 30, 24); -unity-text-outline: 0 rgb(0,0,0); }
-.panel .feedback-ok { color: rgb(24, 96, 40); }
-.panel .feedback-err { color: rgb(150, 30, 24); }
+/* 注意:v1 在这里把 .panel 内文字改成深棕(依赖浅木底)。
+   v2 面板是深底,故不覆盖文字色 —— 统一走下方全局浅色,这是"文字消失"的结构性修复。 */
 
-.topbar {
-    background-color: rgba(8, 10, 14, 0.66);
-    border-bottom-width: 1px;
-    border-bottom-color: rgba(120, 140, 170, 0.35);
+/* ===== 文字层级 ===== */
+.label { color: var(--text); font-size: 14px; }
+.label-dim { color: var(--text-dim); font-size: 13px; }
+.label-title {
+    font-size: 17px;
+    color: var(--text);
+    -unity-font-style: bold;
 }
-
-.label { color: var(--text); }
-.label-dim { color: var(--text-dim); }
-.label-title { font-size: 18px; color: rgb(255, 255, 255); }
-.label-clock { font-size: 21px; color: rgb(255, 255, 255); -unity-text-align: middle-center; }
-.label-clock-overtime { font-size: 21px; color: rgb(255, 140, 51); -unity-text-align: middle-center; }
-.label-phase { font-size: 12px; color: rgba(232, 238, 246, 0.7); -unity-text-align: middle-center; }
+.label-clock {
+    font-size: 22px;
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+.label-clock-overtime { color: rgb(255, 152, 64); }
+.label-phase {
+    font-size: 12px;
+    color: var(--text-dim);
+    -unity-text-align: middle-center;
+}
 .feedback-ok { color: rgb(126, 224, 138); }
 .feedback-err { color: rgb(255, 122, 110); }
 
-.btn {
-    /* 2026-09-13 接回木底按钮皮肤(九宫格) */
-    background-image: resource("UI/button_wood");
-    -unity-slice-left: 60;
-    -unity-slice-right: 60;
-    -unity-slice-top: 60;
-    -unity-slice-bottom: 60;
-    -unity-slice-scale: 0.5;
-    color: rgb(255, 248, 236);
-    padding: 4px 10px;
-    transition-property: background-color, border-color, scale;
-    transition-duration: 0.08s;
-}
-.btn:hover { color: rgb(255, 238, 206); scale: 1.02; }
-.btn:active { color: rgb(255, 226, 170); scale: 0.97; }
-.btn:disabled { opacity: 0.4; }
-.btn-accent {
-    background-color: rgb(35, 80, 130);
-    border-color: rgb(88, 166, 255);
+/* ===== 顶栏 ===== */
+.topbar {
+    background-color: rgba(9, 12, 18, 0.88);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(122, 142, 172, 0.34);
 }
 
+/* ===== 按钮:深底 + 冷灰边,悬停提亮边框,按下压深 ===== */
+.btn {
+    background-color: rgba(40, 50, 66, 0.96);
+    border-width: 1px;
+    border-color: var(--panel-border-strong);
+    border-radius: 5px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 5px 12px;
+    transition-property: background-color, border-color, color, scale;
+    transition-duration: 0.08s;
+}
+.btn:hover {
+    background-color: rgba(56, 70, 92, 0.98);
+    border-color: var(--accent);
+    color: rgb(255, 255, 255);
+    scale: 1.02;
+}
+.btn:active {
+    background-color: rgba(28, 36, 48, 1);
+    border-color: var(--accent);
+    color: var(--gold);
+    scale: 0.97;
+}
+.btn:disabled { opacity: 0.40; }
+.btn-accent {
+    background-color: rgba(30, 66, 108, 0.96);
+    border-color: var(--accent);
+    color: rgb(255, 255, 255);
+    -unity-font-style: bold;
+}
+
+/* ===== 血条 ===== */
 .hpbar-shell {
     height: 14px;
     border-radius: 3px;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: rgba(0, 0, 0, 0.78);
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.20);
     overflow: hidden;
 }
 .hpbar-fill { height: 100%; border-radius: 2px; }
 
-.row { flex-direction: row; align-items: center; }
-.gap { margin-left: 8px; }
-.grow { flex-grow: 1; }
-
+/* ===== 小地图外框:给一层深底,避免底图暗处与战场糊在一起 ===== */
 .map-frame {
+    background-color: rgba(9, 12, 18, 0.72);
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.35);
+    border-color: var(--panel-border-strong);
+    border-radius: 4px;
+    overflow: hidden;
 }
 
+/* ===== 飘字/世界标记 ===== */
 .marker {
-    color: rgb(255, 230, 128);
+    color: var(--gold);
     font-size: 13px;
     -unity-text-align: middle-center;
 }
 
+/* ===== 2026-09-13 屏幕中央面板(底部入口按钮点开) ===== */
+.center-entry { min-width: 104px; margin-left: 6px; margin-right: 6px; }
+.center-frame {
+    background-color: var(--panel-bg-solid);
+    border-width: 1px;
+    border-color: var(--panel-border-strong);
+    border-radius: 8px;
+    padding: 10px;
+    min-width: 440px;
+    max-width: 880px;
+    max-height: 84%;
+}
+.center-close { min-width: 32px; padding: 2px 6px; }
+
+/* ===== 布局工具 ===== */
+.row { flex-direction: row; align-items: center; }
+.gap { margin-left: 8px; }
+.grow { flex-grow: 1; }
+
+/* ===== 2026-09-13 命令面板:底部居中入口条 + 屏幕中央展开宿主 =====
+   制作人:"不要让他们常态化展开,而是在屏幕下方中间并列,点击后在屏幕中央展开"。
+   两者都居中,所以不会再像贴左右边那样被推到屏幕外。 */
+.bottom-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 14px;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+}
+.bottom-bar > .panel {
+    margin-left: 6px;
+    margin-right: 6px;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+.center-host {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+}
+.center-host > .panel {
+    min-width: 380px;
+    max-width: 780px;
+    max-height: 82%;
+}
+
+/* ===== 结算 ===== */
 .victory-title {
     font-size: 76px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: rgb(255, 220, 120);
-    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+    color: var(--gold);
 }
 .tooltip-bg {
-    background-color: rgba(10, 13, 18, 0.88);
+    background-color: rgba(11, 15, 22, 0.94);
     border-radius: 4px;
     border-width: 1px;
-    border-color: rgba(140, 160, 190, 0.5);
-    padding: 4px 8px;
+    border-color: var(--panel-border-strong);
+    padding: 5px 9px;
 }
 
-/* ===== BP 选将页(2026-09-13,DeepSeek 视觉审查指令) ===== */
+/* ===== BP 选将页(与 v2 色板统一:同一族深蓝 + 同一族边框/圆角) ===== */
 .bp-pill {
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: rgba(13, 17, 25, 0.92);
     border-radius: 8px;
     padding: 6px 18px;
     font-size: 26px;
-    color: rgb(255, 217, 102);
+    color: var(--gold);
     -unity-text-align: middle-center;
     -unity-font-style: bold;
 }
 .bp-card {
-    background-color: rgba(30, 42, 68, 0.90);
-    border-radius: 12px;
-    border-width: 2px;
-    border-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(20, 30, 46, 0.94);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+    padding: 8px;
 }
 .bp-card-name {
     font-size: 16px;
-    color: rgb(255, 255, 255);
+    color: var(--text);
     -unity-font-style: bold;
-    -unity-text-outline: 1px rgb(0, 0, 0);
     -unity-text-align: middle-center;
 }
-.bp-namebar { background-color: rgba(11, 18, 32, 0.95); border-radius: 6px; height: 32px; }
+.bp-namebar {
+    background-color: rgba(9, 12, 18, 0.95);
+    border-radius: 6px;
+    height: 32px;
+}
 .bp-group-tag {
     font-size: 18px;
-    color: rgb(255, 255, 255);
+    color: var(--text);
     -unity-font-style: bold;
-    -unity-text-outline: 1px rgb(0, 0, 0);
 }
-.bp-group-line { background-color: rgb(59, 130, 246); height: 2px; width: 156px; }
+.bp-group-line { background-color: var(--accent); height: 2px; width: 156px; }
 .bp-slot {
-    background-color: rgba(26, 31, 46, 0.70);
-    border-radius: 12px;
-    border-width: 2px;
-    border-color: rgb(58, 74, 107);
+    background-color: rgba(17, 24, 36, 0.86);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: var(--panel-border);
 }
 .bp-done {
-    font-size: 32px;
-    color: rgb(255, 217, 102);
+    font-size: 30px;
+    color: var(--gold);
     -unity-font-style: bold;
-    -unity-text-outline: 1px rgb(0, 0, 0);
+    -unity-text-align: middle-center;
 }

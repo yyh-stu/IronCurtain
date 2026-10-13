@@ -1,0 +1,5 @@
+== MeshGripFist ZhenYue RightHand 02:28:42 ==
+手部顶点=1254 骨局部包围盒 size=(0.222, 0.313, 0.224) 指尖方向(骨局部)=(0.00, 1.00, 0.00)
+掌厚方向=(0.00, 0.00, -1.00) 屈曲轴=(-1.00, 0.00, 0.00)
+卷曲顶点数=1166 / 总顶点=23395 (pivot=(0.02, 0.08, 0.05) span=0.313)
+写出 Assets/Resources/Models/Heroes/ZhenYue_grip.asset

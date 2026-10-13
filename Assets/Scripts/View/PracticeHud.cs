@@ -31,7 +31,7 @@ namespace IronCurtain.View
             _sideLabel.style.marginRight = 10;
             _sideLabel.style.color = player == Side.Blue
                 ? new Color(0.45f, 0.75f, 1f) : new Color(1f, 0.55f, 0.45f);
-            var btn = UiKit.MakeButton("切换操控(重载)", () =>
+            var btn = UiKit.MakeButton("切换操控", () =>
             {
                 Debug.Log("[PracticeHud] switch side from " + AppFlow.PlayerSide);
                 AppFlow.SwitchPracticeSide();

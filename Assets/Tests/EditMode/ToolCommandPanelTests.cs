@@ -111,7 +111,7 @@ namespace IronCurtain.Tests
                 Assert.AreEqual(ToolTargetMode.Fort, panel.PendingTarget);
                 Assert.AreEqual(before, sim.EntityCount);
                 Assert.AreEqual(1f, sim.EpOf(Side.Blue), 0.001f);
-                Assert.IsTrue(panel.TryHandleWorldClick(true, SimVec2.FromGrid(new GridPos(15, 100))));
+                Assert.IsTrue(panel.TryHandleWorldClick(true, SimVec2.FromGrid(new GridPos(80, 10))));   // 2026-09-16 补记:换己方大本营区域内的合法格(旧格 (15,100) 非路非广场)
                 Assert.AreEqual(ToolTargetMode.None, panel.PendingTarget);
                 Assert.AreEqual(before + 1, sim.EntityCount);
             }

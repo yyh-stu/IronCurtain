@@ -33,10 +33,12 @@ namespace IronCurtain.View
 
         private readonly List<Row> _rows = new List<Row>();
         private static Material _tickMat;
+        private GameObject _rootGo;
 
         public void Init(Transform parent)
         {
             var root = new GameObject("WallHpBars");
+            _rootGo = root;
             root.transform.SetParent(parent, false);
             var slate = UiSkin.HpSlate();
             for (int s = 0; s < 2; s++)
@@ -101,6 +103,15 @@ namespace IronCurtain.View
                 if (cam != null)
                     row.Root.rotation = Quaternion.LookRotation(cam.transform.position - row.Root.position, cam.transform.up);
             }
+        }
+
+        /// <summary>2026-09-14 换边残留:血条根是自己 new 的物体,组件被 Destroy 不会带走它
+        /// → 换边后叠两套。随组件一起销毁。</summary>
+        private void OnDestroy()
+        {
+            if (_rootGo != null) Destroy(_rootGo);
+            _rootGo = null;
+            _rows.Clear();
         }
     }
 }

@@ -1,0 +1,34 @@
+  点击 主界面入口(练习场)("练 习 场(无 AI · 可换边)") 已派发
+主界面按钮 → 已进入对局(真实路由)
+---- VR 视觉返修:①血盾一体 ②磐石盾贴臂 ③镇岳握锤 ----
+  [full_shield] Hp=100 Shield=52 盾段宽=0.82 active=True 填充在外框内=是
+  ★判据:VR01_full_shield_护盾在血槽内=是
+  [low_shield] Hp=60 Shield=22 盾段宽=0.53 active=True 填充在外框内=是
+  ★判据:VR01_low_shield_护盾在血槽内=是
+  [zero_shield] Hp=75 Shield=4 盾段宽=0.10 active=True 填充在外框内=是
+  ★判据:VR01_zero_shield_护盾在血槽内=是
+  [over_shield] Hp=100 Shield=200 盾段宽=1.60 active=True 填充在外框内=是
+  ★判据:VR01_over_shield_护盾在血槽内=是
+  ★判据:VR01_破盾后_护盾在血槽内=是
+  [red] 红方单位 Hp=80/100 Shield=25(阵营色血条+灰盾段)
+  [idle] 盾纵轴与竖直夹角=0.0°(判据<20°)
+  ★判据:VR02_待机盾近竖直=是
+  [臂dump] 前臂pos=(102.53, 1.19, -75.10) X(世界)=(0.46, 0.89, 0.03) Y(世界)=(0.85, -0.43, -0.32) Z(世界)=(-0.27, 0.17, -0.95)
+  [臂dump] 盾socket(前臂局部)=(0.000, 0.130, -0.080) 世界=(102.65, 1.13, -75.07)
+  [walk] 8帧 盾离前臂最大距离=0.142m(判据<0.4m 不脱臂)
+  ★判据:VR02_行走盾不离臂=是
+  [attack] 10帧 State=Attacking AttackSeq=8 盾倾角最大=35.2° 离臂最大=0.142m
+  ★判据:VR02_攻击期发生真实攻击=是(seq=8)
+  ★判据:VR02_攻击期盾不脱臂=是
+  ★判据:VR02_攻击期盾不翻面成横躺=是
+  [dump] zyv 子Transform=79
+    ws: WS_镇岳_大锤
+    ws: 镇岳_大锤
+    smr: node_0.001 mesh=ZhenYue_grip#23395
+  [idle] 主SMR mesh=ZhenYue_grip(应为 ZhenYue_grip)
+  ★判据:VR03_握拳mesh已应用=是
+  [idle] 锤握点-掌心距离=0.0000m(判据<0.023m=身高1%)
+  ★判据:VR03_锤柄穿掌心=是
+  [attack] 10帧 State=Attacking AttackSeq=12 掌心接触最大距离=0.0000m
+  ★判据:VR03_攻击期发生真实攻击=是(seq=12)
+  ★判据:VR03_攻击全程锤不滑柄(0.000m<0.046m=身高2%)=是

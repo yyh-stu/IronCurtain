@@ -99,12 +99,23 @@ namespace IronCurtain.View
                     PlayThrottled("sfx_hit", 3, spec.PitchMin, spec.PitchMax, now);   // 塔/未指名
                     return;
                 }
+                // 2026-09-13 箭塔开火此前不发伤害事件,所以这一段从未走到过;补发后到这里按放箭音处理
+                if (atk.Kind == EntityKind.Building)
+                {
+                    PlayThrottled("sfx_cast", 3, 0.80f, 0.90f, now);                 // 箭塔放箭
+                    return;
+                }
                 if (atk.Hero == HeroId.ZhuiRi || atk.Hero == HeroId.XingLuo)
                 {
                     PlayThrottled("sfx_cast", 3, 0.95f, 1.1f, now);                  // 远程施法/放箭
                     return;
                 }
-                PlayThrottled("sfx_swing", 3, 0.9f, 1.15f, now);                     // 近战挥砍
+                // 2026-09-14 制作人:"近战挥砍听感极差,把金属摩擦音换成金属清脆碰撞音"。
+                // 旧 sfx_swing 客观指标就是"摩擦/挥空":起振 **0.258s**、谱重心 **337Hz**、高频占比 **3%**。
+                // 新 sfx_melee 为合成金属碰撞(3ms 噪声起振 + 不谐和分音组 + 撞击钝音垫底):
+                // 起振 **0.006s**、谱重心 **1961Hz**、高频占比 **48%**,时长 0.653→0.220s。
+                PlayThrottled("sfx_melee", 3, 0.92f, 1.12f, now);                    // 近战:金属清脆碰撞
+                MeleePlays++;
                 return;
             }
             if (evt.Type == SimEventType.EntityDied)
@@ -120,6 +131,9 @@ namespace IronCurtain.View
             _lastPlayTime[spec.Name] = now;
             Play(spec.Name, spec.Priority, spec.PitchMin, spec.PitchMax);
         }
+
+        /// <summary>供实机自检:近战命中音累计播放次数(证明接线走到了新音效)。</summary>
+        public static int MeleePlays;
 
         private void PlayThrottled(string name, int priority, float pitchMin, float pitchMax, float now)
         {
@@ -166,6 +180,23 @@ namespace IronCurtain.View
         {
             // 防域重载重复注册
             if (_sim != null) _sim.RemoveEventListener(OnEvent);
+        }
+
+        /// <summary>
+        /// 2026-09-14:与 `BgmController` 同一个漏 —— 池里 10 条 AudioSource 是**挂在物体上的独立组件**,
+        /// `GameBootstrap.TeardownView` 只销毁 `AudioSystem` 组件,音源会留在物体上:换边一次多 10 条
+        /// (实测换边后音源总数 12→24)。这里由组件自己把池收干净。
+        /// </summary>
+        private void OnDestroy()
+        {
+            for (int i = 0; i < _pool.Count; i++)
+            {
+                var s = _pool[i];
+                if (s == null) continue;
+                s.Stop();
+                Object.Destroy(s);
+            }
+            _pool.Clear();
         }
     }
 }

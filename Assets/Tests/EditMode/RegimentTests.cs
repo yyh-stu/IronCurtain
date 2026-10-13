@@ -226,47 +226,43 @@ namespace IronCurtain.Tests
             zrSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 112));
             zrSoldier.Pos = new GridPos(15, 112);
 
-            // 探针:红方单位在目标格,由蓝方士兵视野揭示判定
-            var probeA = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 113));
+            // 探针(2026-09-14 新口径:近战兵视野 4 = 主将 8 的一半;射手兵 9 = 射手主将全值)
+            // ——先把坠日士兵挪远,单测磐石士兵:
+            zrSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 200));
+            zrSoldier.Pos = new GridPos(15, 200);
+            var probeA = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 114));
             probeA.Hero = HeroId.DuanFeng; probeA.Hp = probeA.MaxHp = 100f; probeA.Attack = 0f;
-            sim.Step();
-            // 磐石士兵 (15,110) 视野 3:欧氏距 sqrt(0+9)=3 ≤ 3 → (15,113) 可见
+            for (int i = 0; i < 2; i++) sim.Step();
             Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, probeA.Id),
-                "磐石士兵视野 3,应揭示 (15,113)");
+                "磐石士兵视野 4:距 (15,110) 4 格应可见");
             sim.RemoveEntity(probeA.Id);
 
-            var probeB = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 114));
+            var probeB = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 115));
             probeB.Hero = HeroId.DuanFeng; probeB.Hp = probeB.MaxHp = 100f; probeB.Attack = 0f;
-            sim.Step();
-            // 把坠日士兵移远到 (15,122):距 (15,114)=8 > 6,不再覆盖;磐石士兵距其 4 > 3 亦不覆盖
-            zrSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 122));
-            zrSoldier.Pos = new GridPos(15, 122);
-            for (int i = 0; i < 35; i++) sim.Step(); // 视野信息 3s(30 tick)保鲜过期
+            for (int i = 0; i < 35; i++) sim.Step();   // 视野保鲜 3s 过期
             Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, probeB.Id),
-                "坠日士兵移远后,(15,114) 距磐石士兵 4 超出视野 3,应不可见");
+                "磐石士兵视野 4:距 5 格不应可见");
             sim.RemoveEntity(probeB.Id);
 
-            // 坠日士兵(远程 6):从 (15,112) 移回
+            // 再单测坠日士兵(视野 9):磐石士兵挪开避免干扰
+            psSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 60));
+            psSoldier.Pos = new GridPos(15, 60);
             zrSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 110));
             zrSoldier.Pos = new GridPos(15, 110);
-            psSoldier.PosF = SimVec2.FromGrid(new GridPos(15, 108));
-            psSoldier.Pos = new GridPos(15, 108); // 磐石士兵移开避免干扰
-            for (int i = 0; i < 35; i++) sim.Step(); // 旧视野保鲜(此前坠日士兵在 112/122 处覆盖过远端格)过期
-
-            var probeC = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 116));
+            for (int i = 0; i < 35; i++) sim.Step();
+            var probeC = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 119));
             probeC.Hero = HeroId.DuanFeng; probeC.Hp = probeC.MaxHp = 100f; probeC.Attack = 0f;
-            sim.Step();
-            // 坠日士兵 (15,110) 视野 6:距 (15,116)=6 ≤ 6 → 可见;距磐石士兵(15,108)=8 不可见
+            for (int i = 0; i < 2; i++) sim.Step();
             Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, probeC.Id),
-                "坠日士兵视野 6,应揭示 (15,116)");
+                "坠日士兵视野 9(= 射手主将全值):距 9 格应可见");
             sim.RemoveEntity(probeC.Id);
 
-            var probeD = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 117));
+            var probeD = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(15, 120));
             probeD.Hero = HeroId.DuanFeng; probeD.Hp = probeD.MaxHp = 100f; probeD.Attack = 0f;
-            sim.Step();
-            // 距坠日士兵 7 > 6;距磐石士兵 9 > 3 → 不可见
+            for (int i = 0; i < 35; i++) sim.Step();
             Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, probeD.Id),
-                "坠日士兵视野 6,(15,117) 距 7 不应被揭示");
+                "坠日士兵视野 9:距 10 格不应可见");
+            sim.RemoveEntity(probeD.Id);
         }
 
         [Test]

@@ -10,6 +10,7 @@ namespace IronCurtain.View
         private Side _player;
         private Texture2D _tex;
         private float _timer;
+        private GameObject _quad;
 
         public Texture2D Tex { get { return _tex; } }
 
@@ -39,7 +40,7 @@ namespace IronCurtain.View
             mesh.triangles = tris;
 
             // URP 17 Unlit 透明配方(已验证)
-            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f);
             m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
             m.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
@@ -49,6 +50,7 @@ namespace IronCurtain.View
             m.SetTexture("_BaseMap", _tex); m.SetColor("_BaseColor", Color.white);
 
             var fogGo = new GameObject("FogQuad");
+            _quad = fogGo;
             fogGo.transform.SetParent(parent, false);
             fogGo.AddComponent<MeshFilter>().sharedMesh = mesh;
             var fogMr = fogGo.AddComponent<MeshRenderer>();
@@ -73,6 +75,18 @@ namespace IronCurtain.View
                 }
             _tex.SetPixels32(px);
             _tex.Apply();
+        }
+
+        /// <summary>
+        /// 2026-09-14 ★制作人"频繁切换阵营时全地图异常变暗"的真因:
+        /// 迷雾平面是自建的独立物体 **FogQuad**,而换边拆除只按名字删 Board/FloatingText/**FogView**,
+        /// FogQuad 不在名单里 → **每换一次边就留下一整张半透明暗色平面**(alpha 160),叠得越多地图越暗。
+        /// 现随组件一起销毁(与 WallHpBars 同一类修法)。
+        /// </summary>
+        private void OnDestroy()
+        {
+            if (_quad != null) Destroy(_quad);
+            _quad = null;
         }
 
         private void Update()

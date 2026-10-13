@@ -17,13 +17,15 @@ public class HexTests
         sim = NewSim(12345);
     }
 
-    private SimCore NewSim(ulong seed)
-    {
-        var s = new SimCore(new SimConfig(), new SeededRng(seed)) { Game = _cfg };
-        s.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(1, 0));
-        s.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(1, 22));
-        return s;
-    }
+        private SimCore NewSim(ulong seed)
+        {
+            var s = new SimCore(new SimConfig(), new SeededRng(seed)) { Game = _cfg };
+            // 2026-09-16 三十七轮补记:蓝基地从 (1,0)(地图轮廓外的角落,临时阵地放置规则上线后不再可用)
+            // 移到中路己方广场内 (80,8) —— 与真实对局同款几何。
+            s.SpawnBuilding(Side.Blue, BuildingId.Base, new GridPos(80, 8));
+            s.SpawnBuilding(Side.Red, BuildingId.Tower, new GridPos(1, 22));
+            return s;
+        }
 
     private void GiveEp(Side side, int amount)
     {
@@ -126,7 +128,9 @@ public class HexTests
         Assert.AreEqual(1.0 / 1.4, HexSystem.ProductionSecondsMultiplier(sim, Side.Blue), 0.01, "生产时间应 ×1/1.4");
         double ticks = 60 * 0.1 * HexSystem.ProductionSecondsMultiplier(sim, Side.Blue) * 10; // 60 tick 基准
         Assert.AreEqual(60 / 1.4, ticks, 2.0, "60 tick 生产应约 42.9 tick 完成(容差 2 tick)");
-        Assert.AreEqual(10, HexSystem.PopCapBonusOf(sim, Side.Blue), "人口上限应 +20%(基础 50 → +10)");
+        // 2026-09-16 三十七轮反写:v1.6 旧口径"基础 50 → +10"已废,名额制基础 8(GDD)→ +2;
+        // 真实路径(生产/名额校验实际读 PopulationCapOf)由 HexIntegrationTests.T02 覆盖
+        Assert.AreEqual(2, HexSystem.PopCapBonusOf(sim, Side.Blue), "人口上限应 +20%(名额制基础 8 → +2)");
     }
 
     [Test]
@@ -145,28 +149,29 @@ public class HexTests
     }
 
     [Test]
-    public void T07_铁壁防线_堡垒生成脉冲与到期撤军()
+    public void T07_铁壁防线_重装军团承伤减免()
     {
+        // 2026-09-16 制作人拍板:铁壁防线由"生成 30 血堡垒"改为**对重装军团生效**的增益卡。
+        // 重装 = 主将 Tag 以「重装」开头(磐石·重装塔盾 / 镇岳·重装攻城);军团口径 = 主将 + 其士兵。
         PrepareHeld(HexId.IronWall, 1);
+        var zhen = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(80, 12));
+        zhen.Hero = HeroId.ZhenYue;
+        var pan = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(80, 13));
+        pan.Hero = HeroId.PanShi;
+        var duan = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(80, 14));
+        duan.Hero = HeroId.DuanFeng;
+        var soldier = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(80, 15));
+        soldier.IsSoldier = true; soldier.GeneralId = zhen.Id;   // 镇岳的兵:随主将整团生效
+
         Assert.AreEqual(HexUseError.None, HexSystem.TryUseHeld(sim, Side.Blue, HexId.IronWall), "激活铁壁防线");
-        var fort = sim.Entities.Values.FirstOrDefault(e => e.Side == Side.Blue && e.Kind == EntityKind.Building && e.IsFort);
-        Assert.IsNotNull(fort, "激活后应生成堡垒");
-        Assert.AreEqual(100f, fort.MaxHp, 0.01, "堡垒应为 100 血(2026-09-11 制作人裁决)");
+        Assert.AreEqual(-0.30f, HexSystem.DamageTakenBonusOf(sim, zhen), 0.01, "镇岳(重装攻城)承伤应 -30%");
+        Assert.AreEqual(-0.30f, HexSystem.DamageTakenBonusOf(sim, pan), 0.01, "磐石(重装塔盾)承伤应 -30%");
+        Assert.AreEqual(-0.30f, HexSystem.DamageTakenBonusOf(sim, soldier), 0.01, "重装主将的士兵随军团整团生效");
+        Assert.AreEqual(0f, HexSystem.DamageTakenBonusOf(sim, duan), 0.01, "断峰(战士·长矛)不受影响");
+        Assert.IsFalse(sim.Entities.Values.Any(e => e.IsFort), "铁壁防线不再生成堡垒(旧为 30 血堡垒)");
 
-        var enemy = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(fort.Pos.Row + 0, fort.Pos.Col + 1)); // 堡垒为临时工事不受即时占领(2026-09-11),恢复 1 格贴身
-        enemy.Hp = enemy.MaxHp = 100f;
-        float hp0 = enemy.Hp;
-        Advance(30); // 3 秒
-        Assert.Less(enemy.Hp, hp0, "3 秒后 2 格内敌单位应受到堡垒伤害");
-        Assert.AreEqual(hp0 - 15, enemy.Hp, 0.01, "应恰好受到 15 伤害");
-
-        // 2026-09-11 制作人裁决:堡垒不可驻军(只可摧毁,持续攻击,100 血)——驻军路径改为拒绝验证
-        var unit = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(0, 0));
-        string garrisonError;
-        Assert.IsFalse(GarrisonSystem.EnterTemp(sim, new[] { unit.Id }, fort.Id, out garrisonError), "堡垒应拒绝临时驻军");
-        Assert.AreEqual("堡垒不可驻军(2026-09-11 制作人裁决)", garrisonError);
-        Advance(300); // 共 30 秒+,堡垒到期
-        Assert.IsFalse(sim.Entities.ContainsKey(fort.Id), "30 秒后堡垒应消失");
+        Advance(305); // 30s+ 过期
+        Assert.AreEqual(0f, HexSystem.DamageTakenBonusOf(sim, zhen), 0.01, "到期后增益应消失");
     }
 
     [Test]
@@ -204,24 +209,41 @@ public class HexTests
         var enemyB = sim.Entities.Values.First(e => e.Side == Side.Red && e.Kind == EntityKind.Building && !e.Rubbled);
         float max = enemyB.MaxHp;
         enemyB.Hp = 50f;
-        Assert.IsTrue(HexSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "使用攻城锥应成功");
+        Assert.IsTrue(ToolsSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "使用攻城锥应成功");
         Assert.AreEqual(35f, enemyB.Hp, 0.01, "50 血建筑应受 15 直伤变 35");
         for (int i = 0; i < 2; i++)
         {
-            Assert.IsTrue(HexSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "攻城锥 " + i);
+            Assert.IsTrue(ToolsSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "攻城锥 " + i);
             enemyB.Hp = 5f; // 压到 5 血验证废墟化
-            Assert.IsTrue(HexSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "最后一击");
+            Assert.IsTrue(ToolsSystem.UseRam(sim, Side.Blue, enemyB.Id, out _), "最后一击");
             if (enemyB.Rubbled) break;
         }
         Assert.IsTrue(enemyB.Rubbled, "攻城锥连续命中后建筑应废墟化");
 
-        var cell = new GridPos(0, 10);
-        Assert.IsTrue(HexSystem.UseFort(sim, Side.Blue, cell, out _), "空闲格放临时阵地应成功");
+        // 2026-09-16 三十七轮补记:格子换到中路己方视野内(基地 (80,8) 视野 40,此格距 8);
+        // 并把旧 T07(铁壁堡垒)的 脉冲/到期/不可驻军 覆盖迁到道具堡垒上(铁壁已改增益卡)。
+        var cell = new GridPos(80, 16);
+        Assert.IsTrue(ToolsSystem.UseFort(sim, Side.Blue, cell, out _), "空闲格放临时阵地应成功");
         var fort = sim.Entities.Values.First(e => e.Side == Side.Blue && e.IsFort);
-        Assert.AreEqual(sim.Game.Tools.FortHp, fort.Hp, 0.01, "临时阵地应为 30 血");
+        Assert.AreEqual(sim.Game.Tools.FortHp, fort.Hp, 0.01, "临时阵地应为 100 血(道具口径)");
         string err;
-        Assert.IsFalse(HexSystem.UseFort(sim, Side.Blue, cell, out err), "占用格再放应报错");
+        Assert.IsFalse(ToolsSystem.UseFort(sim, Side.Blue, cell, out err), "占用格再放应报错");
         Assert.IsTrue(err.Contains("目标"), "错误信息应含'目标'");
+
+        // 堡垒不可驻军(2026-09-11 制作人裁决:只可摧毁,持续攻击)
+        var unit = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(80, 15));
+        string garrisonError;
+        Assert.IsFalse(GarrisonSystem.EnterTemp(sim, new[] { unit.Id }, fort.Id, out garrisonError), "堡垒应拒绝临时驻军");
+        Assert.AreEqual("堡垒不可驻军(2026-09-11 制作人裁决)", garrisonError);
+
+        // 脉冲:每 3 秒对 2 米内敌军 15 伤(自旧 T07 迁来;道具堡垒持续攻击)
+        var foe = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(80, 17));
+        foe.Hp = foe.MaxHp = 100f;
+        float f0 = foe.Hp;
+        Advance(30);
+        Assert.AreEqual(f0 - 15, foe.Hp, 0.01, "3 秒后 2 米内敌军应恰受 15 脉冲伤害");
+        Advance(310); // 共 30 秒+,到期
+        Assert.IsFalse(sim.Entities.ContainsKey(fort.Id), "30 秒后临时阵地应消失");
     }
 
     [Test]
@@ -295,7 +317,7 @@ public class HexTests
     {
         GiveEp(Side.Blue, 1);
         float before = sim.EpOf(Side.Blue);
-        Assert.IsFalse(HexSystem.UseFort(sim, Side.Blue, new GridPos(999, 999), out var error));
+        Assert.IsFalse(ToolsSystem.UseFort(sim, Side.Blue, new GridPos(999, 999), out var error));
         StringAssert.Contains("越界", error);
         Assert.AreEqual(before, sim.EpOf(Side.Blue), 0.001f, "非法落点不得扣 EP");
     }
@@ -303,12 +325,14 @@ public class HexTests
     [Test]
     public void T16_临时阵地废墟占位_不扣费不抛异常()
     {
-        var rubble = sim.Entities.Values.First(e => e.Kind == EntityKind.Building);
+        // 2026-09-16 三十七轮补记:废墟建筑摆在**中路己方视野内**(基地 (80,8) 视野 40 内),
+        // 让校验穿过 轮廓/水域/路权 三关后停在"占用"上(旧格在轮廓外会先报别的)。
+        var rubble = sim.SpawnBuilding(Side.Blue, BuildingId.Tower, new GridPos(80, 20));
         rubble.Rubbled = true; // SimCore remains authoritative for the reserved building cell.
         GiveEp(Side.Blue, 1);
         float before = sim.EpOf(Side.Blue);
 
-        Assert.IsFalse(HexSystem.UseFort(sim, Side.Blue, rubble.Pos, out var error));
+        Assert.IsFalse(ToolsSystem.UseFort(sim, Side.Blue, rubble.Pos, out var error));
         StringAssert.Contains("占用", error);
         Assert.AreEqual(before, sim.EpOf(Side.Blue), 0.001f, "SpawnEntity 会拒绝的格子不得先扣 EP");
     }
@@ -360,5 +384,28 @@ public class HexTests
         Assert.AreEqual(HexDrawError.InvalidState, draw.Error);
         Assert.AreEqual(before, sim.EpOf(Side.Blue), 0.001f);
         Assert.AreEqual(0, HexSystem.PendingChoicesOf(sim, Side.Blue).Count);
+    }
+
+    [Test]
+    public void T19_训练场自由抽取_不限时不限次()
+    {
+        // 2026-09-17 制作人拍板:"训练场海克斯抽卡不限时间不限次数"。
+        // HexFreeDraw=true:解锁分钟之前(tick≈905,远未到第 3 分钟窗口)可抽,且连续抽两次不记节点消耗;
+        // 对照:常规对局同一时刻 NotInDrawWindow。
+        sim.HexFreeDraw = true;
+        GiveEp(Side.Blue, 4);
+        float ep0 = sim.EpOf(Side.Blue);
+        var d1 = HexSystem.TryDraw(sim, Side.Blue);
+        Assert.IsTrue(d1.Success, "窗口外应可自由抽取,错误=" + d1.Error);
+        Assert.AreEqual(HexChooseError.None, HexSystem.TryChoose(sim, Side.Blue, d1.Choices[0]));
+        var d2 = HexSystem.TryDraw(sim, Side.Blue);
+        Assert.IsTrue(d2.Success, "同节点应可再次抽取(不限次),错误=" + d2.Error);
+        Assert.AreEqual(ep0 - 2 * sim.Game.Ep.HexDrawCost, sim.EpOf(Side.Blue), 0.001f, "每次抽取仍照扣 EP");
+
+        var control = NewSim(77);
+        control.SpawnBuilding(Side.Blue, BuildingId.ResourcePoint, new GridPos(0, 24));
+        for (int i = 0; i < 905; i++) control.Step();
+        Assert.AreEqual(HexDrawError.NotInDrawWindow, HexSystem.TryDraw(control, Side.Blue).Error,
+            "对照:常规对局(未设 HexFreeDraw)窗口外仍不可抽");
     }
 }

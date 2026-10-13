@@ -31,7 +31,8 @@ namespace IronCurtain.View
                     : ViewAssets.Flat(new Color(0.62f, 0.62f, 0.58f), 0.3f));
                 SoldierBodyMats[_side] = body;
             }
-            var style = hero ?? HeroId.PanShi;
+            var style = hero ?? HeroId.PanShi;   // 制作人规格:士兵头部=武将主色/身体=阵营色/武器=主将武器缩小版
+
             Material am;
             if (!SoldierAccentMats.TryGetValue(style, out am))
             {

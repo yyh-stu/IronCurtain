@@ -87,6 +87,15 @@ namespace IronCurtain.Sim
 
         public static void Reset() => _ais.Clear();
 
+        /// <summary>
+        /// 2026-09-14 制作人:"你不能把 AI 的状态机单独做吗?这样老是搞串还得修"。
+        /// 这是**唯一**用来区分"AI 的调度"与"玩家的部队"的闸门:凡是只该给 AI 用的自动下令
+        /// (如"产出后自动行军到集结点"),都必须先问这里,不允许无条件对双方生效。
+        /// 注意:兵团自主行为层(视野索敌自动进攻/15m 支援/射手靠拢)**不**用这道闸门 ——
+        /// 制作人明确"视野内出现敌人自动攻击是简化逻辑,玩家也一样",那一条是有意对双方生效的。
+        /// </summary>
+        public static bool IsAiControlled(Side side) => _ais.ContainsKey(side) && _ais[side] != null;
+
         /// <summary>调试快照(测试/排障用):指定方 AI 的阶段/失地/地盘/波次。 </summary>
         public static string DebugStateOf(Side side)
         {

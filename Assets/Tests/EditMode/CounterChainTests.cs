@@ -52,7 +52,10 @@ namespace IronCurtain.Tests
             Assert.AreEqual(80f, ps.Hp, "破盾前不扣血");
             for (int i = 0; i < 61; i++) sim.Step(); // 第 7 击(121)致死
             Assert.AreEqual(EntityState.Dead, ps.State, "镇岳 7 击击杀满盾磐石");
-            Assert.AreEqual(200f - 6 * 4.8f, zy.Hp, 0.01f, "磐石反打 6 击仅 28.8 伤害,镇岳存活");
+            // 2026-09-14 "同 tick 同时结算"落地后的语义:本 tick 被打死的单位**仍会打出它这一击**
+            // (同时挥砍 → 互相致命会同归于尽;顺序不再决定生死)。所以磐石反打是 **7 击**(含与死亡同 tick 的那一下),
+            // 原期望 6 击是"立即扣血"时代的产物。
+            Assert.AreEqual(200f - 7 * 4.8f, zy.Hp, 0.01f, "磐石反打 7 击(含与本人阵亡同 tick 的一击)共 33.6 伤害,镇岳存活");
         }
 
         [Test]

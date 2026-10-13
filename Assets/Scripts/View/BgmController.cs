@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using IronCurtain.Sim;
 using UnityEngine;
 
@@ -23,13 +24,46 @@ namespace IronCurtain.View
         private const float FadeSec = 2.5f;
         private const float Volume = 0.5f;
 
+        // 2026-09-14 制作人报"BGM 重复播放":训练场**换边**是"原地重建视图",`GameBootstrap.TeardownView`
+        // 只销毁了 `BgmController` **组件**,而它 `AddComponent<AudioSource>` 挂在物体上的两个音源**不会被一起销毁** ——
+        // 循环的曲子继续播,新视图又建一套 → 两条 `bgm_early` 同时响(实测换边后:24 条音源、3 条 BGM 在播)。
+        // 修法:①组件在 `OnDestroy` 里停掉并销毁自己建的音源;②加**全局单条 BGM 不变量** ——
+        // 任何新控制器起来时先把上一个实例的音源停掉销毁,这样无论从哪条路径重建都不可能叠。
+        private static readonly List<AudioSource> LiveSources = new List<AudioSource>();
+
+        /// <summary>停掉并销毁所有"已被建出来"的 BGM 音源(换边/重建时由新实例调用)。</summary>
+        private static void StopLiveSources()
+        {
+            for (int i = 0; i < LiveSources.Count; i++)
+            {
+                var s = LiveSources[i];
+                if (s == null) continue;
+                s.Stop();
+                s.clip = null;
+                Object.Destroy(s);
+            }
+            LiveSources.Clear();
+        }
+
+        private void OnDestroy()
+        {
+            LiveSources.Remove(_a);
+            LiveSources.Remove(_b);
+            if (_a != null) { _a.Stop(); Object.Destroy(_a); }
+            if (_b != null) { _b.Stop(); Object.Destroy(_b); }
+            _a = null; _b = null;
+        }
+
         public void Init(SimCore sim, Side playerSide)
         {
             _sim = sim;
             _player = playerSide;
             SnapshotEnemyBuildings();
+            StopLiveSources();   // 任何已有 BGM 音源先收掉(换边重建时旧实例的组件已销毁、音源还在播)
             _a = gameObject.AddComponent<AudioSource>();
             _b = gameObject.AddComponent<AudioSource>();
+            LiveSources.Add(_a);
+            LiveSources.Add(_b);
             SetupSource(_a);
             SetupSource(_b);
             var early = UnityEngine.Resources.Load<AudioClip>("Audio/bgm_early");
@@ -40,6 +74,7 @@ namespace IronCurtain.View
                 enabled = false;
                 return;
             }
+            Debug.Log("[bgm] 本实例接管 BGM(已收掉旧音源),当前 BGM 音源数=" + LiveSources.Count);
             _a.clip = early;
             _b.clip = late;
             _a.volume = Volume;
@@ -123,7 +158,13 @@ namespace IronCurtain.View
                 _a.volume = Volume * k;
                 _b.volume = Volume * (1f - k);
             }
-            if (k >= 1f) _fadeT = -1f;
+            if (k >= 1f)
+            {
+                _fadeT = -1f;
+                // 淡化完成后把输的一方**暂停**(音量 0 还继续解码没有意义,也避免任何残留出声)
+                if (_lateOnB) { if (_a != null) _a.Pause(); }
+                else if (_b != null) _b.Pause();
+            }
         }
     }
 }

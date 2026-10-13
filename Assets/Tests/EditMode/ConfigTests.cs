@@ -93,13 +93,13 @@ public class ConfigTests
     {
         var c = Load();
         Assert.AreEqual(15.0, c.Tools.RamDamage);
-        Assert.AreEqual(100, c.Tools.FortHp); // 2026-09-11 制作人:堡垒 100 血
-        Assert.AreEqual(3, c.Tools.FortGarrison);
+        Assert.AreEqual(100, c.Tools.FortHp); // 2026-09-11 制作人:堡垒 100 血(道具口径)
+        // 2026-09-17 死配置清理:FortGarrison 断言删除 —— 堡垒不可驻军(2026-09-11 裁决)后该配置零引用,已从 json+POCO 移除
         Assert.AreEqual(30.0, c.Tools.FortDurationSeconds);
         Assert.AreEqual(2.0, c.TowerGarrison.AttackPerGarrison);
         Assert.AreEqual(12.0, c.TowerGarrison.AttackBonusCap);
-        Assert.AreEqual(9, c.TowerGarrison.SplashRangeBonusAtGarrison);
-        Assert.AreEqual(1, c.TowerGarrison.SplashRangeBonus);
+        Assert.AreEqual(9.0, c.TowerGarrison.SplashRangeBonusAtGarrison);
+        Assert.AreEqual(1.0, c.TowerGarrison.SplashRangeBonus);
     }
 
     [Test]
@@ -110,9 +110,11 @@ public class ConfigTests
         Assert.AreEqual(2, c.Ep.UpgradeCost);
         Assert.AreEqual(2, c.Ep.HexDrawCost);
         Assert.AreEqual(90.0, c.Ep.IntervalSeconds);
-        Assert.AreEqual(6.0, c.Production.Pop1Seconds);
-        Assert.AreEqual(9.0, c.Production.ZhenYueSeconds);
-        Assert.AreEqual(3, c.Production.QueuesPerBarracks);
+        // 2026-09-17 死配置清理:v1.6 兵营时代遗留(Pop1Seconds/ZhenYueSeconds/QueuesPerBarracks,
+        // 将兵化后生产口径 = ProductionSystem.GeneralProductionSeconds=20s 常量 + ZhenYueUpgradedSeconds 配置)
+        // 已从 json+POCO 移除;此处改断言**现行口径**。
+        Assert.AreEqual(7.5, c.Production.ZhenYueUpgradedSeconds);
+        Assert.AreEqual(20f, ProductionSystem.GeneralProductionSeconds);
         var tower = c.Buildings.First(b => b.Id == BuildingId.Tower);
         Assert.AreEqual(18, tower.Attack);
         Assert.AreEqual(12, tower.SplashDamage);

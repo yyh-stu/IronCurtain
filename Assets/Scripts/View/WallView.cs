@@ -253,7 +253,7 @@ namespace IronCurtain.View
         /// <summary>Alpha 混合 Unlit(膜面/底边):色走 _BaseColor,alpha 走贴图 × _BaseColor.a。</summary>
         static Material AlphaMat(Color c, Texture2D tex, int queue)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             if (tex != null) m.SetTexture("_BaseMap", tex);
             m.SetColor("_BaseColor", c);
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f);   // 透明 + Alpha
@@ -268,7 +268,7 @@ namespace IronCurtain.View
         /// <summary>加色自发光(辉光层)。注意:加色在亮背景上会被推向过曝,故必须与膜面层配合。</summary>
         static Material AdditiveMat(Color c, Texture2D tex, int queue)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             if (tex != null) m.SetTexture("_BaseMap", tex);
             m.SetColor("_BaseColor", new Color(c.r, c.g, c.b, 1f));
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 2f);   // 透明 + 叠加

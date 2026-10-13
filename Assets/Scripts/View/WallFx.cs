@@ -45,6 +45,22 @@ namespace IronCurtain.View
         private static readonly float[] _lastDrift = new float[16];
         private static float _clock;
 
+        /// <summary>
+        /// 2026-09-14 换边重建:这些静态池里的物件都挂在**被拆掉的 Board** 下,
+        /// 不清池的话换边后第一次屏障命中会从池里摸到一个已销毁对象 → MissingReferenceException,
+        /// 而且节流时钟还带着上一局的残留。拆除视图时调用一次。
+        /// </summary>
+        public static void ResetWorldPools()
+        {
+            _rings.Clear();
+            _ringPool.Clear();
+            _particles.Clear();
+            for (int i = 0; i < _lastRing.Length; i++) _lastRing[i] = 0f;
+            for (int i = 0; i < _lastDrift.Length; i++) _lastDrift[i] = 0f;
+            _clock = 0f;
+            WallFlash.ResetPools();
+        }
+
         private LineRenderer _ring;
         private float _t, _life, _maxR, _r0, _width;
         private Color _col;
@@ -392,7 +408,7 @@ namespace IronCurtain.View
 
         private static Material AlphaUnlit(Color c)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             m.SetColor("_BaseColor", c);
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f);
             m.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
@@ -405,7 +421,7 @@ namespace IronCurtain.View
 
         private static Material AlphaParticles(Texture2D sprite)
         {
-            var m = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            var m = new Material(ViewAssets.FindShader("Universal Render Pipeline/Particles/Unlit"));
             if (sprite != null) m.SetTexture("_BaseMap", sprite);
             m.SetColor("_BaseColor", Color.white);
             m.SetFloat("_Surface", 1f); m.SetFloat("_Blend", 0f);
@@ -479,6 +495,13 @@ namespace IronCurtain.View
         private static readonly List<WallFlash> _live = new List<WallFlash>();
         private static readonly Stack<WallFlash> _pool = new Stack<WallFlash>();
 
+        /// <summary>换边重建:池中对象挂在被拆的 Board 下 → 清池,避免拿到已销毁对象。</summary>
+        public static void ResetPools()
+        {
+            _live.Clear();
+            _pool.Clear();
+        }
+
         private Transform _quad;
         private Material _mat;
         private Color _col;
@@ -509,7 +532,7 @@ namespace IronCurtain.View
 
         private void Build()
         {
-            _mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            _mat = new Material(ViewAssets.FindShader("Universal Render Pipeline/Unlit"));
             _mat.SetColor("_BaseColor", Color.white);
             _mat.SetFloat("_Surface", 1f); _mat.SetFloat("_Blend", 0f);
             _mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);

@@ -63,7 +63,7 @@ namespace IronCurtain.Tests
             tank.Hero = HeroId.PanShi; tank.IsSoldier = false; tank.Attack = 10f; tank.AttackIntervalSec = 1f; tank.Range = 2f;
             var archer = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(79, 181));
             archer.Hero = HeroId.ZhuiRi; archer.IsSoldier = false; archer.Attack = 10f; archer.AttackIntervalSec = 1f; archer.Range = 5f;
-            // 城内驻将=占领进驻语义(交换力10/12):直接登记(EnterFormal 仅士兵,主动驻军另一条路)
+            // 城内驻将=占领进驻语义(交换力10/12):直接登记(EnterFormal 亦收主将,这里走登记捷径)
             tower.GarrisonFormal.Add(tank.Id); tank.GarrisonBuildingId = tower.Id;
             tower.GarrisonFormal.Add(archer.Id); archer.GarrisonBuildingId = tower.Id;
 

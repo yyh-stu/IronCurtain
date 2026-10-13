@@ -11,6 +11,17 @@ namespace IronCurtain.View
         public readonly float Ep;
         public readonly int DrawCost;
         public readonly bool CanDraw;
+        /// <summary>是否正处在抽取窗口内(2026-09-14:面板要说清"为什么现在抽不了")。</summary>
+        public readonly bool InWindow;
+        /// <summary>当前窗口的分钟节点(不在窗口则 0)。</summary>
+        public readonly int WindowMinute;
+        /// <summary>下一个窗口的分钟(无则 0)。</summary>
+        public readonly int NextDrawMinute;
+        /// <summary>窗口长度(秒)与窗口分钟表,供面板展示。</summary>
+        public readonly int WindowSeconds;
+        public readonly int[] DrawNodes;
+        /// <summary>训练场自由抽取(2026-09-17):不限时不限次,面板提示与按钮可用性按此口径。</summary>
+        public readonly bool FreeDraw;
         public readonly IReadOnlyList<HexId> PendingChoices;
         public readonly IReadOnlyList<HexId> Hand;
         public readonly HexId? Active;
@@ -18,7 +29,9 @@ namespace IronCurtain.View
 
         public HexCommandState(bool valid, float ep, int drawCost, bool canDraw,
             IReadOnlyList<HexId> pendingChoices, IReadOnlyList<HexId> hand,
-            HexId? active, float activeSeconds)
+            HexId? active, float activeSeconds,
+            bool inWindow, int windowMinute, int nextDrawMinute, int windowSeconds, int[] drawNodes,
+            bool freeDraw = false)
         {
             Valid = valid;
             Ep = ep;
@@ -28,6 +41,12 @@ namespace IronCurtain.View
             Hand = hand;
             Active = active;
             ActiveSeconds = activeSeconds;
+            InWindow = inWindow;
+            WindowMinute = windowMinute;
+            NextDrawMinute = nextDrawMinute;
+            WindowSeconds = windowSeconds;
+            DrawNodes = drawNodes;
+            FreeDraw = freeDraw;
         }
     }
 
@@ -64,11 +83,14 @@ namespace IronCurtain.View
             int cost = _sim?.Game?.Ep?.HexDrawCost ?? 0;
             if (!ValidSide() || !ValidState())
                 return new HexCommandState(false, 0, cost, false, Array.Empty<HexId>(),
-                    Array.Empty<HexId>(), null, 0);
+                    Array.Empty<HexId>(), null, 0, false, 0, 0, HexSystem.DrawWindowSeconds, new int[0]);
             return new HexCommandState(true, _sim.EpOf(_player), cost, HexSystem.CanDraw(_sim, _player),
                 HexSystem.PendingChoicesOf(_sim, _player).ToArray(),
                 HexSystem.HandOf(_sim, _player).ToArray(),
-                HexSystem.ActiveOf(_sim, _player), HexSystem.ActiveRemainingOf(_sim, _player));
+                HexSystem.ActiveOf(_sim, _player), HexSystem.ActiveRemainingOf(_sim, _player),
+                HexSystem.DrawWindowMinuteOf(_sim) > 0, HexSystem.DrawWindowMinuteOf(_sim),
+                HexSystem.NextDrawMinuteOf(_sim), HexSystem.DrawWindowSeconds, HexSystem.DrawNodesOf(_sim),
+                _sim.HexFreeDraw);
         }
 
         public HexCommandFeedback Draw()

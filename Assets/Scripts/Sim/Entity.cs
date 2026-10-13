@@ -24,6 +24,38 @@ namespace IronCurtain.Sim
         // M8.5d 卡死自动绕行
         public SimVec2 PrevPosF;     // 上一 tick 位置(卡死检测)
         public int StuckTicks;       // 连续停滞 tick 数
+        /// <summary>2026-09-14:停滞判定改为"**有没有向目标靠近**"(原来按单帧位移判 →
+        /// 贴着建筑边滑行的单位一直有微小位移、永远判不出卡死,实测"被建筑卡住很久过不去";
+        /// 见 SimCore.MoveUnits)。这是历史最优(最小)目标距离。</summary>
+        public float BestGoalDist = float.MaxValue;
+        public int AllyPushTicks;    // 连续被**同阵营**推挤的 tick 数:达 GhostAfterTicks 开穿透窗口
+        public long GhostUntilTick;  // 同阵营穿透窗口截止 tick(2026-09-14 制作人互卡口径)
+        /// <summary>2026-09-14 制作人口径「士兵挨打了,就意味着敌人出现在视野内」:
+        /// 最近一次**打我**的敌人 id(伤害结算处写入)。行为层据此把"打我的那个敌人"当成可见目标 ——
+        /// 射手射程 9 米 &gt; 近战士兵视野 3 / 近战主将视野 6,不记这一笔,近战兵团就会被隔着视野打死不还手。
+        /// 新鲜度沿用 `SecondsSinceCombat`(伤害处归零、3 秒内算"刚刚挨过打")。</summary>
+        public int LastAttackerId;
+
+        /// <summary>F-A03(2026-09-20):本 tick CombatUpdate 实际选定的攻击目标 id(0=无敌在射程)。
+        /// 与 LastAttackerId 的区别:这是"我正在打谁",不是"谁最后打了我"——
+        /// A 攻击 B 同时被侧面的 C 打中时,朝向应朝 B 而非 C。纯信息字段,View 层只读。</summary>
+        public int CurrentTargetId;
+
+        /// <summary>攻击序号(GPT 复核①修复):每次 CombatUpdate 实际发射一次攻击时自增。
+        /// View 层用 `AttackSeq != _lastSeq` 判断"新的一击",替代旧的冷却比较——
+        /// 旧 `cd >= _lastCd` 在两个画面帧之间冷却没变也会误触发,导致动画反复重启。
+        /// 纯信息字段,View 只读,不影响 Sim 结算。</summary>
+        public long AttackSeq;
+
+        /// <summary>2026-09-15:刚被占领的保护期截止 tick —— 防止"打空守军占下城 → 旁边旧主单位立刻
+        /// 即时夺回 → 再夺回…"的来回翻面(实测 `IC_ACCEPT=all` 抓到:塔占下 2.3 秒后又变回红方)。</summary>
+        public long CapturedUntilTick;
+
+        /// <summary>2026-09-14 制作人「自己的建筑被卡住 1s 后可以直接穿透」:被哪栋**同阵营**建筑挤住、
+        /// 连续挤了多久、以及穿透窗口截止 tick(见 SimCore.PushOutOfBuildings)。</summary>
+        public int BuildingBlockId;
+        public int BuildingBlockTicks;
+        public long OwnBuildingGhostUntilTick;
         public SimVec2? Detour;      // 旁路点(null=直行)
         public int DetourTicks;      // 旁路进行 tick 数(超时保险)
 
@@ -38,7 +70,6 @@ namespace IronCurtain.Sim
         public bool IsFort;          // 堡垒(海克斯/道具生成,无 BuildingId,走专用逻辑)
         public SiegeIntent Intent;   // 建筑:当前攻城意图(由进攻方下达)
         public Side IntentIssuer;    // 意图下达方
-        public bool Sealed;          // 建筑:交换封城中
         public int TargetBuildingId; // 单位:攻城目标建筑(0=无)
 
         // 驻军(M3)

@@ -39,7 +39,6 @@ namespace IronCurtain.Sim
         {
             public int EntityId;
             public Side Side;
-            public bool FromHexCard;
             public long ExpireTick;
             public long NextPulseTick;
         }

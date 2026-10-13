@@ -48,21 +48,33 @@ namespace IronCurtain.Tests
         [Test]
         public void SoftCollide_PushPastBlockingUnit()
         {
-            // 连续坐标软碰撞:无占格排队,单位互相推开,阻挡者被挤动,行路者最终到达
+            // 连续坐标软碰撞:无占格排队,单位互相推开,阻挡者被挤动,行路者最终到达。
+            // 2026-09-14 制作人口径更新:"两个单位互卡 2 秒 → 放行**同阵营**穿透"。所以这条用例分两段判:
+            // **穿透窗口之前**软碰撞必须生效(间距不塌陷);**窗口开启之后**允许重叠并穿过去。
             var sim = NewSim();
             var a = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(14, 113)); // 无目标,原地不动
             var b = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(14, 112));
             b.MoveSpeed = 2f;
             sim.SetMoveTarget(b.Id, new GridPos(14, 117));
-            float minDist = 10f;
+
+            bool ghostOpened = false;
+            float minDistBeforeGhost = 10f, minDistAfterGhost = 10f;
             for (int i = 0; i < 120; i++)
             {
                 sim.Step();
-                minDist = System.Math.Min(minDist, SimVec2.Distance(a.PosF, b.PosF));
+                float d = SimVec2.Distance(a.PosF, b.PosF);
+                if (!ghostOpened && (a.GhostUntilTick > sim.Tick || b.GhostUntilTick > sim.Tick))
+                    ghostOpened = true;
+                if (ghostOpened) minDistAfterGhost = System.Math.Min(minDistAfterGhost, d);
+                else minDistBeforeGhost = System.Math.Min(minDistBeforeGhost, d);
             }
             Assert.AreEqual(new GridPos(14, 117), b.Pos, "B 应到达目标");
             Assert.AreEqual(EntityState.Idle, b.State);
-            Assert.GreaterOrEqual(minDist, 0.7f, "推挤过程中单位间距不得塌陷(软碰撞生效)");
+            Assert.GreaterOrEqual(minDistBeforeGhost, 0.7f,
+                "穿透窗口开出之前,单位间距不得塌陷(软碰撞生效),实测 " + minDistBeforeGhost.ToString("F2"));
+            if (ghostOpened)
+                Assert.Less(minDistAfterGhost, 0.7f,
+                    "窗口开出之后应当允许重叠穿过去(实测 " + minDistAfterGhost.ToString("F2") + ")");
         }
 
         [Test]
@@ -170,7 +182,7 @@ namespace IronCurtain.Tests
         {
             // 推出有效/不穿墙:单位撞向兵营占地,被矩形推出且不得停在矩形内部
             var sim = NewSim();
-            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Barracks, new GridPos(15, 120)); // x∈[118,123]
+            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 120)); // 用大本营当稳定障碍(见 NavigationTests.T1 注释)            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 120)); // 用大本营当稳定障碍(见 NavigationTests.T1 注释)
             var u = sim.SpawnEntity(Side.Blue, EntityKind.Unit, new GridPos(15, 116));
             u.MoveSpeed = 2f;
             sim.SetMoveTarget(u.Id, new GridPos(15, 130));

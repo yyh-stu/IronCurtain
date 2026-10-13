@@ -76,10 +76,14 @@ namespace IronCurtain.View
 
             int generals = EligibleGeneralCount(selectedIds);
             bool fresh = b.Side == _player || FogRules.BuildingState(_sim, _player, b) == BuildingFogState.Fresh;
+            bool scouted = b.Side == _player || VisionSystem.IsBuildingKnown(_sim, _player, b.Id);
             string title = RelationName(b.Side) + " " + BuildingName(b) + " #" + b.Id;
-            if (!fresh)
-                return new BuildingCommandInfo(true, false, b.Id, title, "目标不在当前视野",
-                    generals, false, false, false, 0);
+            // 2026-09-14 制作人:"点击敌方建筑→显示信息面板(驻军切片带情报时间,没得到过信息显示？)+ 占领/摧毁"。
+            // 因此**不再**因为"不在当前视野"就把命令全关掉(那样面板里永远看不到"？")。
+            // 建筑按既有口径永远可见可点;命令下发后由军队行军、抵达时再评估。
+            // 情报新旧在状态行如实标注,驻军切片另外标"情报时间/？"。
+            string intelNote = fresh ? null
+                : (scouted ? "情报已过期（靠近可刷新）" : "情报：？（未侦察）");
             if (b.Rubbled)
             {
                 int cost = _sim.Game?.Ep?.RebuildCost ?? 0;
@@ -88,16 +92,14 @@ namespace IronCurtain.View
                 return new BuildingCommandInfo(true, true, b.Id, title, status,
                     generals, false, false, canRebuild, cost);
             }
-            if (b.Sealed)
-                return new BuildingCommandInfo(true, true, b.Id, title, "封城中不可切换命令",
-                    generals, false, false, false, 0);
             if (b.Side == _player)
                 return new BuildingCommandInfo(true, true, b.Id, title, "己方建筑（本阶段无可用操作）",
                     generals, false, false, false, 0);
-            if (generals == 0)
-                return new BuildingCommandInfo(true, true, b.Id, title, "请先选择己方主将",
-                    0, false, false, false, 0);
-
+            string note = intelNote != null ? " · " + intelNote : "";
+            // 2026-09-14 制作人:"**占领/摧毁是建筑的属性**,或者简单点说,**就是不用先框选**"。
+            // 因此这里**不再**因为"没框选军队"就把命令关掉(旧文案"请先选择己方主将")。
+            // 语义与 SetPreference 既有设计一致:未框选=只记录/更新该建筑的进攻偏好(偏好标签),
+            // 框选了军队才会同时给兵团下令。军令执行细节完全不变。
             bool neutral = b.Side == Side.Neutral;
             bool isBase = b.Building == BuildingId.Base;
             bool capture = !isBase && !b.IsFort;   // 堡垒只可摧毁(2026-09-11 制作人)
@@ -106,8 +108,11 @@ namespace IronCurtain.View
             if (!capture && !destroy)
                 return new BuildingCommandInfo(true, true, b.Id, title,
                     "当前建筑没有可用命令", generals, false, false, false, 0);
+            string statusText = generals > 0
+                ? ("已选 " + generals + " 个兵团")
+                : "未框选军队 · 只记录进攻偏好";
             return new BuildingCommandInfo(true, true, b.Id, title,
-                "已选 " + generals + " 个兵团", generals, capture, destroy, false, 0);
+                statusText + note, generals, capture, destroy, false, 0);
         }
 
         /// <summary>2026-09-10 制作人:偏好=据点可修改属性。只设偏好不动军队;有选中兵团时同步下令。</summary>
@@ -183,6 +188,26 @@ namespace IronCurtain.View
                 return new BuildingCommandExecution(true, SiegeOrderError.None, result.SoldierIds.Count,
                     "已下令 " + result.SoldierIds.Count + " 名士兵");
             return Failure(result.Error, ErrorText(result.Error));
+        }
+
+        /// <summary>
+        /// 点选建筑(**不做迷雾过滤**)。2026-09-14 制作人:"点击敌方建筑→显示信息面板(驻军切片带情报时间,
+        /// 没得到过信息显示？)+ 占领/摧毁。”—— 要能点到"记着但此刻不在视野"的敌方建筑,
+        /// 情报新旧改由面板的"驻军（情报）"切片如实标注(不侦察过就是"？")。
+        /// 注意:道具(攻城锥)的目标仍走 `PickVisibleBuilding` —— 那条口径是"只打看得见的",不要混用。
+        /// </summary>
+        public static int PickBuildingAny(SimCore sim, SimVec2 point)
+        {
+            if (sim == null) return 0;
+            Entity best = null;
+            float bestDistance = float.MaxValue;
+            foreach (var b in sim.Entities.Values.OrderBy(e => e.Id))
+            {
+                if (b.Kind != EntityKind.Building || !BuildingFootprint.Contains(b, point)) continue;
+                float distance = SimVec2.Distance(point, SimVec2.FromGrid(b.Pos));
+                if (distance < bestDistance) { best = b; bestDistance = distance; }
+            }
+            return best?.Id ?? 0;
         }
 
         public static int PickVisibleBuilding(SimCore sim, Side player, SimVec2 point)

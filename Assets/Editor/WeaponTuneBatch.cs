@@ -15,7 +15,8 @@ namespace IronCurtain.EditorTools
     {
         private static readonly HeroId[] Heroes =
             { HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng, HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
-        private static readonly string[] Names = { "ZhenYue", "DuanFeng", "ZhuFeng", "XingLuo" };
+        // W02 修复(2026-09-18 GPT 审查):旧版漏掉磐石(PanShi)和坠日(ZhuiRi),六英雄全入
+        private static readonly string[] Names = { "ZhenYue", "PanShi", "DuanFeng", "ZhuFeng", "ZhuiRi", "XingLuo" };
         private static readonly Vector3[] Frames =
         {
             new Vector3(0f, 0f, 0f),      // 手骨 +Y
@@ -34,8 +35,9 @@ namespace IronCurtain.EditorTools
             (2, 0.75f), (3, 0.75f),          // ∓X
             (0, 0.50f), (1, 0.50f),          // ±Y
         };
+        // W02 修复:六英雄全入 TuneSet(旧版漏掉磐石/坠日 → 盾和弓从未进入统一校准)
         private static readonly HeroId[] TuneSet =
-            { HeroId.ZhenYue, HeroId.DuanFeng, HeroId.ZhuFeng, HeroId.XingLuo };
+            { HeroId.ZhenYue, HeroId.PanShi, HeroId.DuanFeng, HeroId.ZhuFeng, HeroId.ZhuiRi, HeroId.XingLuo };
         private const string OutDir = "D:/DevTools/shots/wpntune";
 
         public static void Run()

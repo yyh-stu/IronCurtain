@@ -71,7 +71,7 @@ namespace IronCurtain.View
                 return Fail(ToolCommandError.InvalidTarget, "攻城锥目标必须是敌方建筑");
             if (_sim.EpOf(_player) < _sim.Game.Ep.RamCost)
                 return Fail(ToolCommandError.InsufficientEp, "EP 不足");
-            return HexSystem.UseRam(_sim, _player, buildingId, out var error)
+            return ToolsSystem.UseRam(_sim, _player, buildingId, out var error)
                 ? Ok("攻城锥已造成 " + _sim.Game.Tools.RamDamage + " 点伤害")
                 : MapFailure(error);
         }
@@ -80,11 +80,9 @@ namespace IronCurtain.View
         {
             var guard = Guard();
             if (guard.Error != ToolCommandError.None) return guard;
-            if (!InBounds(cell) || CellOccupied(cell))
-                return Fail(ToolCommandError.InvalidTarget, "临时阵地需要合法空格");
-            if (_sim.EpOf(_player) < _sim.Game.Ep.FortCost)
-                return Fail(ToolCommandError.InsufficientEp, "EP 不足");
-            return HexSystem.UseFort(_sim, _player, cell, out var error)
+            // 2026-09-16 三十七轮:预检(越界/占用/EP)已删 —— ToolsSystem.PlacementBlocked 是唯一校验口径,
+            // 此处重复预检只会把具体原因(水域/视野外/…)压成笼统文案。
+            return ToolsSystem.UseFort(_sim, _player, cell, out var error)
                 ? Ok("临时阵地已部署")
                 : MapFailure(error);
         }
@@ -108,19 +106,8 @@ namespace IronCurtain.View
                 && _sim.Game.Tools.FortDurationSeconds > 0;
         }
 
-        private static bool InBounds(GridPos cell) => cell.Row >= 0 && cell.Row < LaneGrid.Rows
-            && cell.Col >= 0 && cell.Col < LaneGrid.Cols;
-
-        private bool CellOccupied(GridPos cell)
-        {
-            foreach (var entity in _sim.Entities.Values)
-            {
-                if (entity.Pos.Row != cell.Row || entity.Pos.Col != cell.Col) continue;
-                if (entity.Kind == EntityKind.Building) return true;
-                if (entity.State != EntityState.Dead && entity.GarrisonBuildingId == 0) return true;
-            }
-            return false;
-        }
+        // 2026-09-16 三十七轮:InBounds/CellOccupied 预检助手已删(与 ToolsSystem.PlacementBlocked 重复,
+        // 校验口径收敛到 Sim 侧唯一入口)。
 
         private static ToolCommandFeedback MapFailure(string error)
         {

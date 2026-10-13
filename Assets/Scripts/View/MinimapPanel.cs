@@ -78,7 +78,14 @@ namespace IronCurtain.View
             _root.Add(ovEl);
 
             // 点击/拖动跳转(旧 Event.current 语义 → UITK 指针)
-            _root.RegisterCallback<PointerDownEvent>(evt => Jump(evt.localPosition), TrickleDown.TrickleDown);
+            _root.RegisterCallback<PointerDownEvent>(evt =>
+            {
+                // 2026-09-14 制作人:"点背包里的道具 → 再点敌方建筑(世界或小地图)即可使用"。
+                // 道具目标模式激活时,小地图这一下是**选目标**,不再兼做"跳视野"(否则目标和镜头一起动,没法瞄准)。
+                if (Tool != null && Tool.HasPendingTarget && Tool.TryHandleMinimapClick(ToSimPoint(evt.localPosition)))
+                    return;
+                Jump(evt.localPosition);
+            }, TrickleDown.TrickleDown);
             _root.RegisterCallback<PointerMoveEvent>(evt =>
             {
                 if (evt.isPrimary && evt.pressure > 0f || (evt.pressedButtons & 1) != 0)
@@ -86,6 +93,16 @@ namespace IronCurtain.View
             }, TrickleDown.TrickleDown);
 
             parent.Add(_root);
+        }
+
+        /// <summary>道具系统(小地图选目标用)。GameBootstrap 构建顺序保证 minimap 在 tools 之后。</summary>
+        public ToolCommandPanel Tool;
+
+        private SimVec2 ToSimPoint(Vector2 local)
+        {
+            float colM, rowM;
+            MinimapLayout.MiniToWorld(local.x, local.y, _w, _h, out colM, out rowM);
+            return new SimVec2(colM, rowM);
         }
 
         private void Jump(Vector2 local)
@@ -101,12 +118,18 @@ namespace IronCurtain.View
             System.Array.Clear(_ovPx, 0, _ovPx.Length);
 
             // ① 雾(FogView.Tex 行序=row0 北,与 overlay 对齐,直接搬)
+            // 2026-09-13 制作人"小地图几乎全黑":根因=世界迷雾色 (16,20,33) alpha≈255 被原样叠上来,
+            // 未探索区把地形底图整个压黑。小地图只需表达"雾的形状",改小地图形专用浅雾(提亮 + 降不透明度)。
             if (_fog != null && _fog.Tex != null)
             {
                 var fogPx = _fog.Tex.GetPixels32();
                 int n = Mathf.Min(fogPx.Length, _ovPx.Length);
                 for (int i = 0; i < n; i++)
-                    if (fogPx[i].a > 0) _ovPx[i] = fogPx[i];
+                {
+                    byte fa = fogPx[i].a;
+                    if (fa == 0) continue;
+                    _ovPx[i] = new Color32(46, 54, 72, (byte)(fa * 0.62f));
+                }
             }
 
             // ② 建筑点(3×3 texel);敌方走迷雾口径(未知/无快照跳过)
@@ -219,7 +242,7 @@ namespace IronCurtain.View
 
         private void LateUpdate()
         {
-            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 拦截桥
+            if (_root != null) LastPanelRect = UiKit.VisibleRectOrZero(_root);  // 拦截桥
             else LastPanelRect = new Rect(0f, 0f, 0f, 0f);
         }
 

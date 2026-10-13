@@ -35,7 +35,8 @@ namespace IronCurtain.Sim
         }
     }
 
-    /// <summary>海克斯系统 + 道具。全部运行态归属 SimCore；抽取、选择、释放是三个原子阶段。</summary>
+    /// <summary>海克斯系统。全部运行态归属 SimCore；抽取、选择、释放是三个原子阶段。
+    /// 2026-09-16 三十七轮:道具(攻城锥/临时阵地)与堡垒运行态拆出到 ToolsSystem,此处只留卡牌逻辑。</summary>
     public static class HexSystem
     {
         private static HexRuntimeState Rt(SimCore sim) => sim?.HexRuntime;
@@ -71,6 +72,14 @@ namespace IronCurtain.Sim
         public static int PendingNodeMinuteOf(SimCore sim, Side side) =>
             sim == null || side == Side.Neutral ? 0 : St(sim, side).PendingNodeMinute;
 
+        /// <summary>激活戳(2026-09-17 契约 3R 公开):本次激活发生的 tick。
+        /// Q08 修复(2026-09-18):无激活卡时返回 **-1**(旧版返回 0 与"tick0 激活"不可区分);
+        /// 有激活卡时返回 ActivatedTick。消费者用"值变化"检测激活/重放/覆盖,-1→N 即首次。
+        /// ⚠ 非稳定标识:同卡重复释放会刷新该值;消费者不得将其当作跨激活的持久缓存键。</summary>
+        public static long ActivationStampOf(SimCore sim, Side side) =>
+            sim == null || side == Side.Neutral || St(sim, side).Active == null
+                ? -1 : St(sim, side).ActivatedTick;
+
         [Obsolete("Use ActiveOf(SimCore, Side). A match context is required for per-Sim state.")]
         public static HexId? ActiveOf(Side side) => null;
 
@@ -80,16 +89,7 @@ namespace IronCurtain.Sim
         public static void Reset(SimCore sim)
         {
             if (sim == null) return;
-            var forts = sim.HexRuntime.Forts;
-            for (int i = forts.Count - 1; i >= 0; i--)
-            {
-                var entity = sim.GetEntity(forts[i].EntityId);
-                if (entity != null)
-                {
-                    ReleaseGarrison(sim, entity);
-                    sim.RemoveEntity(entity.Id);
-                }
-            }
+            ToolsSystem.RemoveFortsOf(sim, null); // 全清(道具堡垒,双方)
             sim.HexRuntime.Clear();
         }
 
@@ -115,7 +115,8 @@ namespace IronCurtain.Sim
 
             // 校验已全部通过：从此处开始一次性提交节点、RNG 结果和待选择状态。
             var choices = BuildChoices(sim, st);
-            st.ConsumedNodesMask |= 1 << node;
+            if (!sim.HexFreeDraw)
+                st.ConsumedNodesMask |= 1 << node;   // 训练场自由抽取:节点不记消耗(不限次数)
             st.PendingNodeMinute = node;
             st.PendingChoices.Clear();
             st.PendingChoices.AddRange(choices);
@@ -153,13 +154,20 @@ namespace IronCurtain.Sim
             if (sim.Phase == MatchPhase.Ended) return HexDrawError.MatchEnded;
 
             nodeMinute = CurrentDrawNode(sim);
-            if (nodeMinute == 0) return HexDrawError.NotInDrawWindow;
             var st = St(sim, side);
-            if ((st.ConsumedNodesMask & (1 << nodeMinute)) != 0) return HexDrawError.NodeConsumed;
+            // 2026-09-17 制作人:"训练场海克斯抽卡不限时间不限次数" —— HexFreeDraw 跳过窗口/节点两道闸
+            if (!sim.HexFreeDraw)
+            {
+                if (nodeMinute == 0) return HexDrawError.NotInDrawWindow;
+                if ((st.ConsumedNodesMask & (1 << nodeMinute)) != 0) return HexDrawError.NodeConsumed;
+            }
             if (st.PendingChoices.Count > 0) return HexDrawError.PendingChoiceExists;
             if (sim.EpOf(side) < sim.Game.Ep.HexDrawCost) return HexDrawError.InsufficientEp;
             return HexDrawError.None;
         }
+
+        /// <summary>抽取窗口长度(秒)。判定与 UI 说明共用同一常量 —— 此前是散在判定里的字面量 10。</summary>
+        public const int DrawWindowSeconds = 10;
 
         private static int CurrentDrawNode(SimCore sim)
         {
@@ -168,10 +176,44 @@ namespace IronCurtain.Sim
             foreach (var minute in first.DrawNodes)
             {
                 long start = (long)minute * 60 * sim.Config.TickRate;
-                long end = start + 10L * sim.Config.TickRate;
+                long end = start + DrawWindowSeconds * sim.Config.TickRate;
                 if (sim.Tick >= start && sim.Tick < end) return minute;
             }
             return 0;
+        }
+
+        /// <summary>当前是否在抽取窗口(0=不在,>0=窗口分钟节点)。UI 与判定同一来源,避免两处口径漂移。</summary>
+        public static int DrawWindowMinuteOf(SimCore sim)
+        {
+            if (sim == null || sim.Game == null || sim.Game.Hexes == null || sim.Game.Hexes.Length == 0
+                || sim.Config == null) return 0;
+            return CurrentDrawNode(sim);
+        }
+
+        /// <summary>下一个抽取窗口的分钟(0=没有下一个)。2026-09-14 制作人"能看不能抽":
+        /// 面板此前**从不告诉玩家有窗口这回事**,窗口外点抽取只得到一句"当前不在抽取窗口"。</summary>
+        public static int NextDrawMinuteOf(SimCore sim)
+        {
+            if (sim == null || sim.Game == null || sim.Game.Hexes == null || sim.Game.Hexes.Length == 0
+                || sim.Config == null) return 0;
+            var first = sim.Game.Hexes[0];
+            long tick = sim.Tick;
+            if (tick < (long)first.UnlockMinute * 60 * sim.Config.TickRate) return first.UnlockMinute;
+            int best = 0;
+            foreach (var m in first.DrawNodes)
+            {
+                if ((long)m * 60 * sim.Config.TickRate + DrawWindowSeconds * sim.Config.TickRate <= tick) continue;
+                if (best == 0 || m < best) best = m;
+            }
+            return best;
+        }
+
+        /// <summary>抽取窗口已用掉的分钟表(UI 展示"第 X/Y/Z 分钟")。</summary>
+        public static int[] DrawNodesOf(SimCore sim)
+        {
+            if (sim == null || sim.Game == null || sim.Game.Hexes == null || sim.Game.Hexes.Length == 0)
+                return new int[0];
+            return sim.Game.Hexes[0].DrawNodes ?? new int[0];
         }
 
         private static List<HexId> BuildChoices(SimCore sim, HexRuntimeState.SideState st)
@@ -224,7 +266,6 @@ namespace IronCurtain.Sim
             if (handIndex < 0) return HexUseError.CardNotHeld;
 
             Entity sandbagTarget = null;
-            GridPos? fortCell = null;
             if (card == HexId.Sandbag)
             {
                 sandbagTarget = sim.GetEntity(targetUnitId);
@@ -232,11 +273,8 @@ namespace IronCurtain.Sim
                     || sandbagTarget.State == EntityState.Dead)
                     return HexUseError.InvalidTarget;
             }
-            if (card == HexId.IronWall)
-            {
-                fortCell = FindFreeCellNear(sim, side);
-                if (!fortCell.HasValue) return HexUseError.NoValidPlacement;
-            }
+            // 2026-09-16 制作人拍板:铁壁防线不再生成堡垒,改为对重装军团生效的增益卡
+            // (效果查询见 DamageTakenBonusOf;堡垒生成/找位逻辑已全部移除)。
 
             var cfg = sim.Game.Hexes.FirstOrDefault(h => h.Id == card);
             if (cfg == null) return HexUseError.InvalidState;
@@ -251,19 +289,6 @@ namespace IronCurtain.Sim
                 : sim.Tick + Ticks(sim, cfg.DurationSeconds);
             st.UsedCardsMask |= 1 << (int)card;
 
-            if (card == HexId.IronWall)
-            {
-                var f = sim.SpawnEntity(side, EntityKind.Building, fortCell.Value);
-                f.IsFort = true;
-                f.Building = null;
-                f.Hp = f.MaxHp = sim.Game.Tools.FortHp;
-                Rt(sim).Forts.Add(new HexRuntimeState.FortEntry
-                {
-                    EntityId = f.Id, Side = side, FromHexCard = true,
-                    ExpireTick = sim.Tick + Ticks(sim, sim.Game.Tools.FortDurationSeconds),
-                    NextPulseTick = sim.Tick + Ticks(sim, 3.0)
-                });
-            }
             if (card == HexId.Sandbag)
             {
                 st.SandbagUnitId = sandbagTarget.Id;
@@ -296,27 +321,11 @@ namespace IronCurtain.Sim
         private static void Deactivate(SimCore sim, Side side)
         {
             var st = St(sim, side);
-            var active = st.Active;
             st.Active = null;
             st.ActiveExpiresTick = 0;
             st.VengeanceExpiryTicks.Clear();
             st.SandbagUnitId = 0;
             st.SandbagExpiresTick = 0;
-
-            if (active != HexId.IronWall) return;
-            var forts = Rt(sim).Forts;
-            for (int i = forts.Count - 1; i >= 0; i--)
-            {
-                var f = forts[i];
-                if (!f.FromHexCard || f.Side != side) continue;
-                var entity = sim.GetEntity(f.EntityId);
-                if (entity != null)
-                {
-                    ReleaseGarrison(sim, entity);
-                    sim.RemoveEntity(entity.Id);
-                }
-                forts.RemoveAt(i);
-            }
         }
 
         // ---------- 计时 ----------
@@ -333,53 +342,7 @@ namespace IronCurtain.Sim
                 if (st.SandbagUnitId != 0 && sim.Tick >= st.SandbagExpiresTick)
                     st.SandbagUnitId = 0;
             }
-
-            var forts = Rt(sim).Forts;
-            for (int i = forts.Count - 1; i >= 0; i--)
-            {
-                var f = forts[i];
-                var b = sim.GetEntity(f.EntityId);
-                if (b == null || b.Rubbled) { forts.RemoveAt(i); continue; }
-                if (sim.Tick >= f.NextPulseTick)
-                {
-                    f.NextPulseTick += Ticks(sim, 3.0);
-                    foreach (var e in sim.Entities.Values)
-                    {
-                        if (e.Side == b.Side || e.Kind != EntityKind.Unit || e.State == EntityState.Dead) continue;
-                        if (SimVec2.Distance(e.PosF, SimVec2.FromGrid(b.Pos)) <= 2f)
-                        {
-                            e.Hp -= (float)sim.Game.Tools.RamDamage;
-                            if (e.Hp <= 0) { e.Hp = 0; e.State = EntityState.Dead; }
-                        }
-                    }
-                }
-                if (sim.Tick >= f.ExpireTick)
-                {
-                    ReleaseGarrison(sim, b);
-                    sim.RemoveEntity(b.Id);
-                    forts.RemoveAt(i);
-                }
-            }
-        }
-
-        private static void ReleaseGarrison(SimCore sim, Entity fort)
-        {
-            foreach (var id in fort.GarrisonFormal.Concat(fort.GarrisonTemp).ToList())
-            {
-                var u = sim.GetEntity(id);
-                if (u == null) continue;
-                u.GarrisonBuildingId = 0;
-                u.TempGarrisonId = 0;
-                u.State = EntityState.Idle;
-                var free = FindFreeCellNear(sim, fort.Pos);
-                if (free.HasValue)
-                {
-                    u.Pos = free.Value;
-                    u.PosF = SimVec2.FromGrid(free.Value);
-                }
-            }
-            fort.GarrisonFormal.Clear();
-            fort.GarrisonTemp.Clear();
+            // 堡垒脉冲/到期已随道具拆分移至 ToolsSystem.Tick(SimCore.Step 在本系统之后逐 tick 调用)
         }
 
         // ---------- 效果查询 ----------
@@ -413,7 +376,29 @@ namespace IronCurtain.Sim
             var st = St(sim, e.Side);
             if (st.Active == HexId.Vengeance) b -= 0.05f * st.VengeanceExpiryTicks.Count;
             if (st.Active == HexId.HoldFast && NearOwnBuilding(sim, e, 10)) b -= 0.10f;
+            // 2026-09-16 制作人拍板:铁壁防线改为对重装军团生效 —— 承伤 -30%(数值为检测方按卡族
+            // 定位的默认值:介于 以逸待劳(±10%/30s) 与 沙包(-50%/单体带输出惩罚) 之间,待制作人终审)。
+            if (st.Active == HexId.IronWall && IsHeavyRegiment(sim, e)) b -= 0.30f;
             return b;
+        }
+
+        /// <summary>重装军团资格(2026-09-17 契约 3R 公开,铁壁防线表现用):
+        /// 主将 Tag 以「重装」开头(磐石·重装塔盾 / 镇岳·重装攻城);军团口径 = 主将 + 其士兵整团。
+        /// 纯函数:只读 Tag 与 Hero,无副作用。</summary>
+        public static bool IsHeavyRegimentOf(SimCore sim, Entity e) => IsHeavyRegiment(sim, e);
+
+        /// <summary>重装军团:主将为重装系英雄(配置 Tag 以「重装」开头:磐石·重装塔盾 / 镇岳·重装攻城)。
+        /// 军团口径 = 主将 + 其士兵整团生效(士兵随主将)。</summary>
+        private static bool IsHeavyRegiment(SimCore sim, Entity e)
+        {
+            if (e == null || sim.Game == null) return false;
+            var gen = e.IsSoldier ? sim.GetEntity(e.GeneralId) : e;
+            if (gen == null || gen.Hero == null) return false;
+            var heroes = sim.Game.Heroes;
+            int idx = (int)gen.Hero.Value;
+            if (heroes == null || idx < 0 || idx >= heroes.Length) return false;
+            var tag = heroes[idx].Tag;
+            return tag != null && tag.StartsWith("重装", System.StringComparison.Ordinal);
         }
 
         public static float DamageReductionOf(SimCore sim, Entity e)
@@ -431,10 +416,12 @@ namespace IronCurtain.Sim
 
         public static int PopCapBonusOf(SimCore sim, Side side)
         {
-            if (sim == null || sim.Game == null || side == Side.Neutral) return 0;
+            if (sim == null || side == Side.Neutral) return 0;
             if (St(sim, side).Active != HexId.RapidDeploy) return 0;
-            int baseCap = (int)sim.Game.Production.BasePopulation
-                        + sim.Game.Production.ResourcePointPopulation * sim.OwnedResourcePointsOf(side);
+            // 2026-09-16 三十七轮:旧公式(BasePopulation+资源点×5)是 v1.6 单英雄口径遗留,
+            // 与现行名额制(GeneralCap=8,GDD「常规对局名将上限 8(加时 +1)」)脱节;
+            // 现与 PopulationCapOf 同基,并由其真正接线 —— 此前本函数无人调用,效果从未生效。
+            int baseCap = sim.PopulationCapOverride ?? SimCore.GeneralCap;
             return (int)Math.Round(baseCap * 0.20);
         }
 
@@ -451,44 +438,9 @@ namespace IronCurtain.Sim
                 st.VengeanceExpiryTicks.Add(sim.Tick + Ticks(sim, 15.0));
         }
 
-        // ---------- 道具 ----------
-        public static bool UseRam(SimCore sim, Side side, int buildingId, out string error)
-        {
-            error = null;
-            if (sim == null || sim.Game == null) { error = "海克斯状态无效"; return false; }
-            if (side == Side.Neutral) { error = "阵营无效"; return false; }
-            if (!sim.Entities.TryGetValue(buildingId, out var b) || b.Kind != EntityKind.Building)
-            { error = "目标无效"; return false; }
-            if (b.Rubbled || b.Side == Side.Neutral || b.Side == side)
-            { error = "目标必须是敌方建筑"; return false; }
-            if (!sim.SpendEp(side, sim.Game.Ep.RamCost)) { error = "能量不足"; return false; }
-            DestroySystem.ApplyBuildingDamage(sim, b, (float)sim.Game.Tools.RamDamage, side);
-            return true;
-        }
-
-        public static bool UseFort(SimCore sim, Side side, GridPos cell, out string error)
-        {
-            error = null;
-            if (sim == null || sim.Game == null) { error = "海克斯状态无效"; return false; }
-            if (side == Side.Neutral) { error = "阵营无效"; return false; }
-            if (cell.Row < 0 || cell.Row >= LaneGrid.Rows || cell.Col < 0 || cell.Col >= LaneGrid.Cols)
-            { error = "目标无效:格子越界"; return false; }
-            if (CellOccupied(sim, cell)) { error = "目标无效:格子被占用"; return false; }
-            if (!sim.SpendEp(side, sim.Game.Ep.FortCost)) { error = "能量不足"; return false; }
-            var f = sim.SpawnEntity(side, EntityKind.Building, cell);
-            f.IsFort = true;
-            f.Building = null;
-            f.Hp = f.MaxHp = sim.Game.Tools.FortHp;
-            Rt(sim).Forts.Add(new HexRuntimeState.FortEntry
-            {
-                EntityId = f.Id, Side = side, FromHexCard = false,
-                ExpireTick = sim.Tick + Ticks(sim, sim.Game.Tools.FortDurationSeconds),
-                NextPulseTick = sim.Tick + Ticks(sim, 3.0)
-            });
-            return true;
-        }
-
         // ---------- 工具 ----------
+        // 2026-09-16 三十七轮:道具(UseRam/UseFort)、堡垒运行态(脉冲/到期/移除)、
+        // 放置与空格工具(CellOccupied/FindFreeCellNear)已整体拆至 ToolsSystem。
         private static bool NearOwnBuilding(SimCore sim, Entity e, int range)
         {
             foreach (var b in sim.Entities.Values)
@@ -496,69 +448,6 @@ namespace IronCurtain.Sim
                     && SimVec2.Distance(e.PosF, SimVec2.FromGrid(b.Pos)) <= range)
                     return true;
             return false;
-        }
-
-        private static bool CellOccupied(SimCore sim, GridPos cell)
-        {
-            foreach (var e in sim.Entities.Values)
-            {
-                if (e.Pos.Row != cell.Row || e.Pos.Col != cell.Col) continue;
-                // SpawnEntity keeps a building's grid reservation while it is rubble.
-                // Match that authority here so a failed fort spawn cannot occur after EP spend.
-                if (e.Kind == EntityKind.Building) return true;
-                if (e.State != EntityState.Dead && e.GarrisonBuildingId == 0) return true;
-            }
-            return false;
-        }
-
-        private static GridPos? FindFreeCellNear(SimCore sim, GridPos anchor)
-        {
-            for (int d = 0; d <= 10; d++)
-            {
-                for (int dr = 0; dr < LaneGrid.Rows; dr++)
-                {
-                    var c = new GridPos(dr, anchor.Col + d);
-                    if (c.Col > LaneGrid.Cols - 1) break;
-                    if (!CellOccupied(sim, c)) return c;
-                    var c2 = new GridPos(dr, anchor.Col - d);
-                    if (c2.Col >= 0 && !CellOccupied(sim, c2)) return c2;
-                }
-            }
-            return null;
-        }
-
-        private static GridPos? FindFreeCellNear(SimCore sim, Side side)
-        {
-            var home = sim.Entities.Values
-                .Where(e => e.Side == side && e.Kind == EntityKind.Building
-                            && e.Building == BuildingId.Base && !e.Rubbled)
-                .OrderBy(e => e.Id)
-                .FirstOrDefault();
-            GridPos basePos = home != null
-                ? home.Pos
-                : (side == Side.Blue ? new GridPos(3, 3) : new GridPos(3, LaneGrid.Cols - 4));
-            for (int d = 1; d <= LaneGrid.Cols - 2; d++)
-            {
-                int col = basePos.Col + (side == Side.Blue ? d : -d);
-                if (col < 0 || col > LaneGrid.Cols - 1) break;
-                for (int rowDistance = 0; rowDistance < LaneGrid.Rows; rowDistance++)
-                {
-                    int upper = basePos.Row + rowDistance;
-                    if (upper < LaneGrid.Rows)
-                    {
-                        var c = new GridPos(upper, col);
-                        if (!CellOccupied(sim, c)) return c;
-                    }
-                    if (rowDistance == 0) continue;
-                    int lower = basePos.Row - rowDistance;
-                    if (lower >= 0)
-                    {
-                        var c = new GridPos(lower, col);
-                        if (!CellOccupied(sim, c)) return c;
-                    }
-                }
-            }
-            return null;
         }
     }
 }

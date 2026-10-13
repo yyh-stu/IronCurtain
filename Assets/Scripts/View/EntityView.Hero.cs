@@ -88,23 +88,60 @@ namespace IronCurtain.View
         private sealed class WeaponSocketCfg
         {
             public string Model; public bool Left; public Vector3 Rot; public float Len; public float Grip;
-            public WeaponSocketCfg(string m, bool l, Vector3 r, float len, float grip)
-            { Model = m; Left = l; Rot = r; Len = len; Grip = grip; }
+            /// <summary>
+            /// 绕武器**自身纵轴**的滚转角(度)。纵轴对齐只决定"指向",滚转本来是不确定的
+            /// (见 AttachWeapons 注释);扁平件(盾)和弓弦这类"面朝向"就靠这个数定。
+            /// </summary>
+            public float RollDeg;
+            // ---- VR02/VR03(2026-09-21 返工单)语义化挂接 ----
+            /// <summary>挂接骨:Hand(默认,原行为)/ForeArm(盾贴前臂竖持)。</summary>
+            public Skt Bone;
+            /// <summary>socket 在挂骨局部空间的平移:掌心偏移(VR03)/前臂绑带点(VR02)。标定批处理产出。</summary>
+            public Vector3 SocketOffset;
+            /// <summary>三维握点(武器包围盒 min+size 比例);null=旧一维 Grip 沿最长轴。</summary>
+            public Vector3? GripVec;
+            /// <summary>
+            /// VR02:Bind 后首次动画求值时,把武器纵轴一次性对齐世界竖直并固化(默认 false)。
+            /// 标定基准坑:编辑器标定在绑定姿态下取样,与 runtime 待机姿态不同 → 静态欧拉失配
+            /// (实测差 60°)。校准只在首帧 LateUpdate 做一次,之后盾随臂局部固定 —— 攻击/走动
+            /// 产生合理倾斜,不构成"每帧硬锁世界竖直"。
+            /// </summary>
+            public bool CalibVertical;
+            public WeaponSocketCfg(string m, bool l, Vector3 r, float len, float grip, float rollDeg = 0f,
+                Skt bone = Skt.Hand, Vector3? socketOffset = null, Vector3? gripVec = null, bool calibVertical = false)
+            { Model = m; Left = l; Rot = r; Len = len; Grip = grip; RollDeg = rollDeg; Bone = bone; SocketOffset = socketOffset ?? Vector3.zero; GripVec = gripVec; CalibVertical = calibVertical; }
         }
+        /// <summary>VR02:武器挂接骨选择。</summary>
+        public enum Skt { Hand, ForeArm }
         private static readonly System.Collections.Generic.Dictionary<HeroId, WeaponSocketCfg[]> HeroWeapons
             = new System.Collections.Generic.Dictionary<HeroId, WeaponSocketCfg[]>
             {
                 // 握持标定(2026-09-12 全量扫描后按眼选档;Rot=手骨局部帧,武器纵轴对齐到该帧 +Y):
                 // 站立待机下 +Z ⇒ 竖直(器头朝上)、-Z ⇒ 竖直(器头朝下)、±X/±Y ⇒ 水平。
-                { HeroId.ZhenYue, new[] { new WeaponSocketCfg("镇岳_大锤", false, new Vector3(90f, 0f, 0f), 2.3f, 0.45f) } },
+                // 第 6 参 RollDeg = 绕武器自身纵轴的滚转(0=按模型原始朝向),修"面朝向"问题。
+                { HeroId.ZhenYue, new[] { new WeaponSocketCfg("镇岳_大锤", false, new Vector3(90f, 0f, 0f), 2.3f, 0.45f,
+                    // VR03(2026-09-21 返工单):socket 原点=手骨(腕关节) → 锤柄落在腕上、掌外漂移。
+                    // 标定(VrCalibBatch,已求值待机):掌心=腕沿指尖方向 0.124m+掌面方向 0.042m。
+                    // 配 ZhenYue_grip 握拳 mesh 变体(MeshGripFist),手指围柄不是穿腕。
+                    socketOffset: new Vector3(-0.0015f, 0.1238f, 0.0422f)) } },
                 { HeroId.PanShi, new[]
                     {
-                        new WeaponSocketCfg("磐石_盾", true, new Vector3(90f, 0f, 0f), 1.9f, 0.50f),
-                        new WeaponSocketCfg("磐石_大刀", false, new Vector3(-90f, 0f, 0f), 1.7f, 0.22f)
+                        // VR02(2026-09-21 返工单):盾从 LeftHand 单点改挂 LeftForeArm(贴臂本体)。
+                        // offset=-X 即臂外侧(局部 +X 世界朝上前方=身体内侧,推 -X 才向外);
+                        // Roll=180 由 roll0/90/180/270 四档特写判读选出(绑带连接可见、竖直、无穿模)。
+                        // CalibVertical=首帧动画求值后一次性对齐世界竖直(编辑器静态欧拉以绑定姿态为基准,
+                        // 与 runtime 待机姿态实测差 60°,已弃用);之后盾随臂局部固定,动作期合理倾斜。
+                        new WeaponSocketCfg("磐石_盾", true, new Vector3(314.8f, 45.3f, 270f), 1.9f, 0.50f, 180f,
+                            Skt.ForeArm, new Vector3(0f, 0.13f, -0.08f), null, true),   // 骨局部-Z=解剖外侧(实机dump:-X在runtime待机指向下后,盾"偏后"的根因;-Z 随臂固定)
+                        // 刀:握点 0.22→0.72 后特写确认手握在握柄上(柄与剑首在手上方、护手在下方),已正确
+                        new WeaponSocketCfg("磐石_大刀", false, new Vector3(-90f, 0f, 0f), 1.7f, 0.72f)
                     } },
                 { HeroId.DuanFeng, new[] { new WeaponSocketCfg("断峰_长矛", false, new Vector3(90f, 0f, 0f), 2.5f, 0.70f) } },
                 { HeroId.ZhuFeng, new[] { new WeaponSocketCfg("逐风_长枪", false, new Vector3(0f, 0f, 90f), 3.0f, 0.70f) } },
-                { HeroId.ZhuiRi, new[] { new WeaponSocketCfg("坠日_大弓", true, new Vector3(180f, 0f, 0f), 1.9f, 0.50f) } },
+                // 弓:原 Rot=(180,0,0) 落在"±X/±Y ⇒ 水平"档 → 弓臂横伸、弦横穿身体。
+                // 改 (90,0,0)(与锤/矛同档)后特写确认为**竖直**;但弦仍在身体外侧,
+                // 故滚转再翻 180°(180→0)把弦转到朝内(与出箭口同侧)。
+                { HeroId.ZhuiRi, new[] { new WeaponSocketCfg("坠日_大弓", true, new Vector3(90f, 0f, 0f), 1.9f, 0.50f, 0f) } },
                 { HeroId.XingLuo, new[] { new WeaponSocketCfg("星落_法杖", false, new Vector3(-90f, 0f, 0f), 2.0f, 0.60f) } },
             };
         /// <summary>握持标定扫描用覆盖(仅 Editor 标定工具设置;空=用配置表)。</summary>
@@ -122,6 +159,20 @@ namespace IronCurtain.View
             return m;
         }
 
+        /// <summary>
+        /// VR03(2026-09-21 返工单):把英雄 SMR 的网格换成握拳变体(Models/Heroes/{hero}_grip)。
+        /// mesh 级修改不经过骨骼 —— Animator 每帧蒙皮用的还是同一套权重/骨骼,握拳形状不会被覆盖。
+        /// 变体由 Editor 工具 MeshGripFist 从原 fbx 顶点卷曲生成;资产缺席则跳过(不影响其他英雄)。
+        /// </summary>
+        private static void ApplyGripMesh(HeroId hero, GameObject body)
+        {
+            var m = UnityEngine.Resources.Load<Mesh>("Models/Heroes/" + hero + "_grip");
+            if (m == null) return;
+            foreach (var smr in body.GetComponentsInChildren<SkinnedMeshRenderer>())
+                if (smr.sharedMesh != null && smr.sharedMesh.vertexCount == m.vertexCount)
+                    smr.sharedMesh = m;
+        }
+
         private static Transform HandBone(Animator anim, Transform root, bool left)
         {
             if (anim != null)
@@ -135,25 +186,65 @@ namespace IronCurtain.View
             return null;
         }
 
-        public static void AttachWeapons(HeroId hero, GameObject body)
+        /// <summary>VR02:按配置选挂骨(Hand 或 ForeArm,带名字扫描回退)。</summary>
+        private static Transform SocketBoneFor(Animator anim, Transform root, Skt bone, bool left)
         {
+            if (bone == Skt.ForeArm && anim != null)
+            {
+                var t = anim.GetBoneTransform(left ? HumanBodyBones.LeftLowerArm : HumanBodyBones.RightLowerArm);
+                if (t != null) return t;
+            }
+            if (bone == Skt.ForeArm)
+            {
+                string want = left ? "LeftForeArm" : "RightForeArm";
+                foreach (var x in root.GetComponentsInChildren<Transform>())
+                    if (x.name.Replace("mixamorig:", string.Empty).Contains(want)) return x;
+            }
+            return HandBone(anim, root, left);
+        }
+
+        /// <summary>W01:武器缺失计数(批处理/自检读取;0=全部就位)。reset 后可重复统计。</summary>
+        public static int MissingWeaponCount { get; private set; }
+        public static void ResetMissingWeaponCount() => MissingWeaponCount = 0;
+
+        public static List<Transform> AttachWeapons(HeroId hero, GameObject body)
+        {
+            var calibPending = new List<Transform>();
             WeaponSocketCfg[] cfgs;
-            if (!HeroWeapons.TryGetValue(hero, out cfgs)) return;
+            if (!HeroWeapons.TryGetValue(hero, out cfgs)) return calibPending;
             var anim = body.GetComponent<Animator>();
             foreach (var c in cfgs)
             {
                 var prefab = UnityEngine.Resources.Load<GameObject>("Models/Weapons/" + c.Model);
-                if (prefab == null) continue;
-                var hand = HandBone(anim, body.transform, c.Left);
-                if (hand == null) { Debug.LogWarning("[EntityView] no hand bone for " + c.Model); continue; }
+                if (prefab == null)
+                {
+                    // W01 修复:不再静默——记录错误并计数(批处理可检测 MissingWeaponCount>0 阻断)
+                    Debug.LogError("[EntityView] ★武器模型缺失: " + c.Model + " (hero=" + hero + ") 路径=Models/Weapons/" + c.Model);
+                    MissingWeaponCount++;
+                    continue;
+                }
+                var hand = SocketBoneFor(anim, body.transform, c.Bone, c.Left);
+                if (hand == null)
+                {
+                    Debug.LogError("[EntityView] ★挂骨缺失: " + c.Model + " (hero=" + hero + " bone=" + c.Bone + " left=" + c.Left + ")");
+                    MissingWeaponCount++;
+                    continue;
+                }
                 var socket = new GameObject("WS_" + c.Model);
                 socket.transform.SetParent(hand, false);
+                socket.transform.localPosition = c.SocketOffset;   // VR02/VR03:掌心偏移/前臂绑带点(骨局部)
                 socket.transform.localRotation = Quaternion.Euler(WeaponAimOverride ?? c.Rot);
                 var w = Instantiate(prefab, socket.transform);
                 w.name = c.Model;
                 w.transform.localRotation = prefab.transform.rotation; // 保留 fbx root 自带旋转(Blender X-90,同建筑坑)
                 var rr = w.GetComponentsInChildren<Renderer>();
-                if (rr.Length == 0) { Destroy(w); continue; }
+                if (rr.Length == 0)
+                {
+                    Debug.LogError("[EntityView] ★武器无渲染器: " + c.Model + " (hero=" + hero + ")");
+                    MissingWeaponCount++;
+                    Destroy(w);
+                    continue;
+                }
                 var b = rr[0].bounds;
                 for (int i = 1; i < rr.Length; i++) b.Encapsulate(rr[i].bounds);
                 float longest = Mathf.Max(b.size.x, Mathf.Max(b.size.y, b.size.z));
@@ -165,7 +256,16 @@ namespace IronCurtain.View
                 Vector3 la = LongAxisDirLocal(w.transform);
                 w.transform.localRotation = Quaternion.FromToRotation(w.transform.localRotation * la, Vector3.up)
                                           * w.transform.localRotation;
-                Vector3 anchor = GripAnchorLocal(w.transform, WeaponGripOverride >= 0f ? WeaponGripOverride : c.Grip);
+                // 2026-09-13 滚转修正(制作人报"磐石盾是横着的""坠日弓弦朝外"):
+                // 上面那步只确定纵轴**指向**,绕纵轴的滚转是**未定义**的 —— FromToRotation 在纵轴与
+                // +Y 近似同向/反向时会退化成任意取轴,结果不可复现。细长兵器看不出,扁平件(盾)和
+                // 弓弦这类"面朝向"就直接暴露。
+                // ★关键:追加的必须是**绕武器自身纵轴 la 的纯滚转**(post-multiply AngleAxis(deg, la)),
+                // 这样 la 的指向不变、上面的对齐不会被破坏。我第一版图省事又套了一次任意轴
+                // FromToRotation,结果把纵轴对齐整个转掉,盾反而变成横躺的 —— 教训记在这里。
+                if (Mathf.Abs(c.RollDeg) > 0.01f)
+                    w.transform.localRotation = w.transform.localRotation * Quaternion.AngleAxis(c.RollDeg, la);
+                Vector3 anchor = GripAnchorLocal(w.transform, WeaponGripOverride >= 0f ? WeaponGripOverride : c.Grip, c.GripVec);
                 w.transform.localPosition = -(w.transform.localRotation *
                     Vector3.Scale(w.transform.localScale, anchor));
                 var mat = WeaponMaterial(c.Model);
@@ -176,16 +276,29 @@ namespace IronCurtain.View
                         for (int k = 0; k < ms.Length; k++) ms[k] = mat;
                         rr[i].sharedMaterials = ms;
                     }
+                if (c.CalibVertical) calibPending.Add(socket.transform);
             }
+            return calibPending;
         }
 
-        /// <summary>武器握点在"武器自身空间"的坐标:局部包围盒最长轴上 grip 比例处(全程只读局部 TRS)。</summary>
-        private static Vector3 GripAnchorLocal(Transform weapon, float grip)
+        /// <summary>
+        /// 武器握点在"武器自身空间"的坐标:gripVec 非空时为包围盒 min+size*gripVec(三维);
+        /// 否则沿局部包围盒最长轴取 grip 比例(旧口径,其余英雄沿用)。全程只读局部 TRS。
+        /// </summary>
+        private static Vector3 GripAnchorLocal(Transform weapon, float grip, Vector3? gripVec)
         {
             bool any = false;
             Bounds box = new Bounds(Vector3.zero, Vector3.zero);
             AccumulateLocal(weapon, true, Matrix4x4.identity, ref box, ref any);
             if (!any) return Vector3.zero;
+            if (gripVec.HasValue)
+            {
+                Vector3 g = gripVec.Value;
+                return new Vector3(
+                    Mathf.Lerp(box.min.x, box.max.x, Mathf.Clamp01(g.x)),
+                    Mathf.Lerp(box.min.y, box.max.y, Mathf.Clamp01(g.y)),
+                    Mathf.Lerp(box.min.z, box.max.z, Mathf.Clamp01(g.z)));
+            }
             Vector3 size = box.size;
             int ax = (size.x >= size.y && size.x >= size.z) ? 0 : ((size.y >= size.z) ? 1 : 2);
             Vector3 axis = Vector3.zero; axis[ax] = 1f;
@@ -295,8 +408,27 @@ namespace IronCurtain.View
         private void LateUpdate()
         {
             // play 模式:动画更新后覆盖骑姿/补偿漂移;edit 模式(CaptureBatch)由 Tick 补调
+            VertCalibOnce();
             ApplyRidePose();
             CompensateAnimDrift();
+        }
+
+        // VR02:CalibVertical 件(盾)的一次性竖直校准。倒计时 2 帧 = 跳过 Bind 当帧,
+        // 保证至少经过一次完整 Animator 求值(runtime 待机姿态),再按当时世界竖直对齐并固化。
+        private int _vertCalibCountdown = -1;
+        private readonly List<Transform> _vertCalib = new List<Transform>();
+        private void VertCalibOnce()
+        {
+            if (_vertCalibCountdown < 0) return;
+            if (_vertCalibCountdown > 0) { _vertCalibCountdown--; return; }
+            foreach (var ws in _vertCalib)
+                if (ws != null)
+                {
+                    // 世界系最短弧:把武器纵轴(socket.up)转到竖直;绕纵轴滚转不变(面朝向保留)
+                    ws.rotation = Quaternion.FromToRotation(ws.up, Vector3.up) * ws.rotation;
+                }
+            _vertCalibCountdown = -1;
+            _vertCalib.Clear();
         }
 
         // 动画漂移补偿(2026-09-10):AI 动画骨骼带全局位移(非原地),模型会漂离脚下光环/血条。
@@ -353,7 +485,13 @@ namespace IronCurtain.View
                 _hips = _anim.GetBoneTransform(HumanBodyBones.Hips);
                 if (_hips != null) _hips0 = _hips.localPosition;
                 // 2026-09-10 武器分离件挂手骨;逐风骑战马(资产缺失静默跳过)
-                AttachWeapons(hero, body);
+                ApplyGripMesh(hero, body);
+                var calib = AttachWeapons(hero, body);
+                if (calib != null && calib.Count > 0)
+                {
+                    _vertCalib.AddRange(calib);
+                    _vertCalibCountdown = 2;
+                }
                 if (hero == HeroId.ZhuFeng) MountHorse(body);
             }
             AddGlowDisc(_model.transform, 0.7f); // 阵营环(2026-09-10 拍板,弃个体主色)

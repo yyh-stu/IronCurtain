@@ -151,7 +151,13 @@ namespace IronCurtain.Tests
             Assert.IsFalse(g.HasMoveTarget);
             sim.SetMoveTarget(g.Id, new GridPos(15, 120), true); // 玩家再下令
             Assert.IsFalse(g.RetreatHold);
-            Assert.IsTrue(TestUtil.RunUntil(sim, () => g.HasMoveTarget && g.AutoKind == 1, 20000)); // 自动层恢复接管
+            // 2026-09-14:自动层接管即可(索敌 AutoKind=1 或支援 AutoKind=2 都算接管)
+            // 2026-09-14:判据改成"真的接战了" —— 手动令解除撤退压制后,自动层/自动还击恢复接管。
+            // (`AutoKind` 不能当代理量:单位已经在武器射程内时按既定口径"不再前压",该字段故意不置位,
+            //  此时它由 CombatUpdate 直接开打,State=Attacking。)
+            Assert.IsTrue(TestUtil.RunUntil(sim,
+                () => g.State == EntityState.Attacking || g.AutoKind != 0, 6000),
+                "手动令解除后应恢复接战(态=" + g.State + " AutoKind=" + g.AutoKind + ")");
         }
 
         [Test]

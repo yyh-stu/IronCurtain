@@ -36,7 +36,11 @@ namespace IronCurtain.EditorTools
                 if (Application.isBatchMode) EditorApplication.Exit(1);
                 return;
             }
-            Loop(idle, true); Loop(walk, true); Loop(melee, true); Loop(bow, true); Loop(staff, true);
+            // A02 修复(2026-09-18 GPT 审查):攻击不再 loop=true —— idle/walk 循环合理,
+            // 攻击应该是"一击一周期"(进入→接触→收招)。非循环 + 攻击态自转换(exit time)重启,
+            // 每次攻击有清晰起始帧,不再像持续摆手。
+            Loop(idle, true); Loop(walk, true);
+            Loop(melee, false); Loop(bow, false); Loop(staff, false);
             Build("HeroAnimator", idle, walk, melee);
             Build("ZhuiRiAnimator", idle, walk, bow);
             Build("XingLuoAnimator", idle, walk, staff);
@@ -50,6 +54,7 @@ namespace IronCurtain.EditorTools
             string path = CtrlDir + "/" + name + ".controller";
             var ctrl = AnimatorController.CreateAnimatorControllerAtPath(path);
             ctrl.AddParameter("state", AnimatorControllerParameterType.Int);
+            ctrl.AddParameter("attack", AnimatorControllerParameterType.Trigger);   // A01:Sim 攻击同步
             var sIdle = ctrl.AddMotion(idle);
             var sWalk = ctrl.AddMotion(walk);
             var sAtk = ctrl.AddMotion(attack);
@@ -61,6 +66,16 @@ namespace IronCurtain.EditorTools
             Trans(ctrl, sWalk, sAtk, 2);
             Trans(ctrl, sAtk, sIdle, 0);
             Trans(ctrl, sAtk, sWalk, 1);
+            // A02:攻击态自转换(非循环 clip 播完后即重启,保持连续攻击有清晰起始帧)
+            var atkSelf = sAtk.AddTransition(sAtk);
+            atkSelf.hasExitTime = true;
+            atkSelf.exitTime = 1.0f;
+            atkSelf.duration = 0f;
+            // A01:攻击 Trigger 自转换(Sim 攻击冷却重置时 EntityView Fire → 立即从第一帧重播)
+            var atkTrig = sAtk.AddTransition(sAtk);
+            atkTrig.hasExitTime = false;
+            atkTrig.duration = 0f;
+            atkTrig.AddCondition(AnimatorConditionMode.If, 0f, "attack");
             Debug.Log("[heroanim] built " + path);
         }
 

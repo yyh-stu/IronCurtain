@@ -57,14 +57,10 @@ namespace IronCurtain.Sim
 
     public class ProductionCfg
     {
-        public double Pop1Seconds;
-        public double ZhenYueSeconds;
+        // 2026-09-17 死配置清理:v1.6 兵营时代遗留字段(Pop1Seconds/ZhenYueSeconds/QueuesPerBarracks)
+        // 与旧人口公式(BasePopulation/ResourcePointPopulation/Initial/MaxResourcePoints)已删 ——
+        // 现行口径 = ProductionSystem.GeneralProductionSeconds(20s 常量)+ ZhenYueUpgradedSeconds。
         public double ZhenYueUpgradedSeconds;
-        public int QueuesPerBarracks;
-        public int BasePopulation;
-        public int ResourcePointPopulation;
-        public int InitialOwnedResourcePoints;
-        public int MaxResourcePoints;
     }
 
     public class EpCfg
@@ -138,8 +134,8 @@ namespace IronCurtain.Sim
     {
         public double RamDamage;
         public int FortHp;
-        public int FortGarrison;
         public double FortDurationSeconds;
+        // 2026-09-17 死配置清理:FortGarrison 已删 —— 堡垒不可驻军(2026-09-11 裁决)后零引用。
     }
 
     public class TowerGarrisonCfg

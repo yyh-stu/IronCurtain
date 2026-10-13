@@ -57,7 +57,7 @@ namespace IronCurtain.View
 
             // URP 粒子材质
             var mr = GetComponent<ParticleSystemRenderer>();
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit"));
+            var mat = new Material(ViewAssets.FindShader("Universal Render Pipeline/Particles/Unlit"));
             mat.SetFloat("_Surface", 1f);
             mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
             mr.material = mat;

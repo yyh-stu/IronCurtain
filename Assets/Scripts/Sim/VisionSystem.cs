@@ -10,6 +10,8 @@ namespace IronCurtain.Sim
         public Side Side;
         public bool Rubbled;
         public int GarrisonCount;
+        /// <summary>2026-09-14:取这份快照的时刻(sim tick)。界面要标"信息获取时间"(制作人口径)。</summary>
+        public long Tick;
     }
 
     /// <summary>双方对称的视野/战争迷雾信息层。纯信息,不影响战斗/移动/索敌。M8.1b:建筑视野=半径圆盘(无椭圆过滤)+占地格标记;单位/精灵保持椭圆过滤。M8.2b:士兵视野 远程6/近战3。</summary>
@@ -68,7 +70,7 @@ namespace IronCurtain.Sim
             {
                 if (e.Kind != EntityKind.Unit || e.Side != side) continue;
                 if (e.State == EntityState.Dead || e.GarrisonBuildingId != 0) continue;
-                MarkDisc(st, sim.Tick, e.Pos, UnitRadius(sim, side, e, forwardCol), true);
+                MarkDisc(st, sim.Tick, e.Pos, UnitRadius(e, forwardCol), true);
             }
 
             // ---- 2) 建筑来源(M8.1b):半径圆盘(不做椭圆过滤)+占地格逐格标记 ----
@@ -116,29 +118,35 @@ namespace IronCurtain.Sim
                         MaxHp = e.MaxHp,
                         Side = e.Side,
                         Rubbled = e.Rubbled,
-                        GarrisonCount = e.GarrisonFormal.Count + e.GarrisonTemp.Count
+                        GarrisonCount = e.GarrisonFormal.Count + e.GarrisonTemp.Count,
+                        Tick = sim.Tick
                     };
                 }
             }
         }
 
-        /// <summary>建筑视野半径(2026-09-06 用户拍板在原值上扩大一倍):大本营 40、箭塔 24、其余 20。</summary>
-        static int BuildingVisionRadius(Entity b)
+        /// <summary>建筑视野半径(2026-09-06 用户拍板在原值上扩大一倍):大本营 40、箭塔 24、其余 20。
+        /// 2026-09-16 三十七轮补记改 public:临时阵地放置规则(最前己方建筑视野内可放)与此处同一口径。</summary>
+        public static int BuildingVisionRadius(Entity b)
         {
             if (b.Building == BuildingId.Base) return 40;
             if (b.Building == BuildingId.Tower) return 24;
             return 20; // Barracks / ResourcePoint / 堡垒
         }
 
-        static int UnitRadius(SimCore sim, Side side, Entity e, int forwardCol)
+        static int UnitRadius(Entity e, int forwardCol)
         {
-            // 士兵(M8.2b):远程 6 / 近战 3(远程判定与 DamageCalculator.IsRanged 同语义)
+            // 2026-09-14 制作人口径:**近战视野 8**;小兵视野 = 主将视野的一半;
+            // 例外一:**射手小兵视野 = 射手主将视野**(射手 9)。射手射程同时收到 8(见 gameconfig),
+            //   于是"射手在近战视野外开火"这条边界情况从数值上也不成立(8 ≤ 8)。
+            // 例外二(2026-09-14 制作人澄清"断峰 10 是专属被动"):**断峰=鹰眼 10**,
+            //   仅当它是己方最靠前的野战单位(不存在更靠敌方向者)时生效 —— 保留英雄特色。
+            bool ranged = e.Hero == HeroId.ZhuiRi || e.Hero == HeroId.XingLuo;
             if (e.IsSoldier)
-                return (e.Hero == HeroId.ZhuiRi || e.Hero == HeroId.XingLuo) ? 6 : 3;
-            // 鹰眼:断峰是己方最靠前的野战单位(不存在更靠敌方向者)→ 10
-            if (e.Hero == HeroId.DuanFeng && e.Pos.Col == forwardCol) return 10;
-            if (e.Hero == null) return 6; // 无英雄的裸单位按近战 6 格
-            return (e.Hero == HeroId.ZhuiRi || e.Hero == HeroId.XingLuo) ? 9 : 6; // 射手 9 / 近战(含断峰)6
+                return ranged ? 9 : 4;          // 射手兵 9(=主将) / 近战兵 4(=主将 8 的一半)
+            if (e.Hero == HeroId.DuanFeng && e.Pos.Col == forwardCol) return 10;   // 鹰眼(断峰专属被动)
+            if (e.Hero == null) return 8;       // 无英雄的裸单位按近战 8
+            return ranged ? 9 : 8;              // 射手主将 9 / 近战主将 8
         }
 
         static void TickSprite(SimCore sim, Side side, SideState st)

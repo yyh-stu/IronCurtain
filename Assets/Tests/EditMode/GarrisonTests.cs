@@ -128,20 +128,25 @@ public class GarrisonTests
     }
 
     [Test]
-    public void 主将入城被拒_仅士兵可驻军()
+    public void 主将与士兵可一起正式驻军_临时驻军仍只收士兵()
     {
         var g = Gen(Side.Blue, HeroId.PanShi, new GridPos(5, 122));
+        var ss = SoldiersOf(g).Take(3).ToList();
+        var ids = new List<int> { g.Id };
+        foreach (var x in ss) ids.Add(x.Id);
         string err;
-        bool okF = GarrisonSystem.EnterFormal(sim, new List<int> { g.Id }, blueBarracks.Id, out err);
-        Assert.IsTrue(okF, "调用不整体失败");
-        StringAssert.Contains("仅士兵可驻军", err, "正式入城应拒绝主将并提示");
-        Assert.AreEqual(0, blueBarracks.GarrisonFormal.Count, "主将不入正式列表");
-        Assert.AreEqual(0, g.GarrisonBuildingId, "主将不绑定建筑");
+        bool okF = GarrisonSystem.EnterFormal(sim, ids, blueBarracks.Id, out err);
+        Assert.IsTrue(okF, "主将+士兵一起正式入城应成功");
+        Assert.AreEqual(4, blueBarracks.GarrisonFormal.Count, "3 兵 + 主将 = 4 人在正式驻军里");
+        Assert.AreEqual(blueBarracks.Id, g.GarrisonBuildingId, "主将应绑定建筑");
+        // 出城:主将走城门站定(非士兵语义),城内减 1
+        bool okExit = GarrisonSystem.Exit(sim, blueBarracks.Id, HeroId.PanShi, out err);
+        Assert.IsTrue(okExit, "城内该主将应可出城");
+        Assert.AreEqual(3, blueBarracks.GarrisonFormal.Count, "出城后正式驻军减 1");
+        // 2026-09-14 制作人口径:「主将和他的兵团就是一个单位」→ 临时驻军同样不区分主将/士兵
         bool okT = GarrisonSystem.EnterTemp(sim, new List<int> { g.Id }, blueBarracks.Id, out err);
-        Assert.IsTrue(okT, "调用不整体失败");
-        StringAssert.Contains("仅士兵可驻军", err, "临时登记应拒绝主将并提示");
-        Assert.AreEqual(0, blueBarracks.GarrisonTemp.Count, "主将不入临时列表");
-        Assert.AreEqual(0, g.TempGarrisonId, "主将无临时登记");
+        Assert.IsTrue(okT, "临时登记应成功:" + err);
+        Assert.AreEqual(1, blueBarracks.GarrisonTemp.Count, "主将也可进临时驻军列表(旧'仅士兵可驻军'口径已删)");
     }
 
     [Test]

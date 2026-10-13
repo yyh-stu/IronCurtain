@@ -60,12 +60,15 @@ namespace IronCurtain.View
             go.transform.position = pos;
             go.transform.rotation = Quaternion.Euler(0f, yaw, 12f);
             go.transform.localScale = new Vector3(9f, 7f, 1f);
-            var m = new Material(Shader.Find("Sprites/Default")) { color = c };
+            var m = new Material(ViewAssets.FindShader("Sprites/Default")) { color = c };
             go.GetComponent<Renderer>().sharedMaterial = m;
         }
     }
+}
 
 #if UNITY_EDITOR
+namespace IronCurtain.View
+{
     /// <summary>BP 取证:进入 BP 后分段拍 Picking(带英雄卡/倒计时)与 Reveal(揭示浮层)与完成槽位。
     /// 环境变量 IC_BPCAP=1 触发(BpBootstrap 挂载)。</summary>
     public sealed class BpCaptureRunner : MonoBehaviour

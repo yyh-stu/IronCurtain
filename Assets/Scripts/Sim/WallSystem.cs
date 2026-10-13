@@ -22,7 +22,21 @@ namespace IronCurtain.Sim
         // 2026-09-11 制作人:魔法屏障不设大门 —— 自家穿过由判定放行,敌方被挡,故无门洞参数。
         public const int Panels = 5;              // 五段可击破面:上路/上草地/中路/下草地/下路
         public const float BreachHalf = 7f;       // 破口半宽 = 14 / 2
-        public const float WallHalf = 5f;         // 墙体半宽(实体感/攻击判定用)
+        // 2026-09-13 制作人:"为什么不能屏障占地多少、建模范围就是多少" —— 正解。
+        // 屏障建模是一张**零厚度曲面**(WallView: 贴 r=Radius,outPush 仅 0.006 防 z-fight),
+        // 而这里原来是 ±5 米 —— 于是单位在离可见屏障 5 米处就被挡住,看着像"被空气挡住";
+        // 攻击判定也受同一带影响,边界上还会出现"被挡却判不在墙上"(既打不着也过不去)。
+        // 现把逻辑带收到与建模一致(薄壳),并保留下面的贴墙容差兜住边界浮点。
+        public const float WallHalf = 0.6f;       // 墙体半宽 = 与建模一致(薄壳;原 5f)
+        public const float WallClickTolerance = 4f;   // 点击拆墙的拾取容差(独立,不再由墙带宽派生)
+        // 2026-09-14 制作人"磐石打不到屏障,还被挡着过不去" —— 真因是上一轮把贴墙容差加到了**阻挡侧**:
+        // `CanPass` 用 WallHitMargin 挡停单位 → 停在离薄壳 1.6m 处(视觉上"被空气挡住");
+        // 而伤害判定 `HitEnemyPanel` 用 0 容差(±0.6) → 停位永远不在命中带内 → 砍墙零伤害,
+        // 同时 SimCore 仍无条件发 DamageDealt(看着像"打了但没效果")。
+        // 现在口径拆清楚:**阻挡=薄壳本身**(走得到墙皮上),**命中/触发带=薄壳外扩 WallHitMargin**。
+        public const float WallHitMargin = 0.8f;  // 命中带外扩(米):需 ≥ 单位单帧步长(最快 0.3m)+余量
+        /// <summary>行军目的地:墙脚外侧一点点(必须落在命中带内,否则走过去也打不着)。</summary>
+        public const float WallFootOffset = WallHalf + 0.15f;
         public const float VisionRadius = 10f;    // 墙外视野
         public const float WallHp = 200f;         // 制作人 2026-09-11 拍板:每段(可击破面)200 血
 
@@ -189,19 +203,56 @@ namespace IronCurtain.Sim
         }
 
         /// <summary>点是否在该段屏障的弧带内(角距 ≤ 段半角,且半径差 ≤ 墙半宽)。</summary>
-        public static bool OnWall(Side side, int panel, SimVec2 p)
+        public static bool OnWall(Side side, int panel, SimVec2 p) => OnWall(side, panel, p, 0f);
+
+        /// <summary>
+        /// margin:外扩容差(米)。2026-09-13 制作人"磐石打不到屏障,还被挡着过不去":
+        /// 单位被 `CanPass` 挡停时,位置正好落在墙带**边缘** —— 前进被挡(下一格在带内=不可穿),
+        /// 而当前位置按不带容差的判定却"不在墙上" → 既打不着屏障、也过不去(边界 off-by-epsilon)。
+        /// 攻击/阻挡判定加一点外扩即可让"贴墙的单位"能出刀。
+        /// </summary>
+        public static bool OnWall(Side side, int panel, SimVec2 p, float margin)
         {
             var c = BaseCenter(side);
             float r = SimVec2.Distance(c, p);
-            if (Math.Abs(r - Radius) > WallHalf) return false;
+            if (Math.Abs(r - Radius) > WallHalf + margin) return false;
             return Math.Abs(AngleTo(side, panel, p)) <= PanelHalf(side, panel);
         }
 
         /// <summary>命中信息(owner=被打的守方,panel=段号)。2026-09-11 屏障特效:SimCore 据此发 WallDamaged/WallBroken。</summary>
         public struct WallHit { public Side Owner; public int Panel; }
 
-        /// <summary>攻击者 e 对位置 p 出刀时命中的敌方完好墙段(无命中返回 null)。</summary>
-        public static WallHit? HitEnemyPanel(Entity e, SimVec2 p)
+        /// <summary>攻击者 e 对位置 p 出刀时命中的敌方完好墙段(无命中返回 null)。
+        /// 命中带 = 薄壳外扩 `WallHitMargin`(见该常量注释:容差属于**命中侧**,不属于阻挡侧)。</summary>
+        /// <summary>
+        /// 2026-09-14(制作人:"攻击屏障时坠日要走到脸上才能攻击,他应该可以远程的"):
+        /// 单位**武器射程内**是否存在敌方完好墙段 —— 有就能直接开打,不必贴到薄壳上。
+        /// 判定= 沿"基地中心→单位"方向把命中点往外推到射程外沿,再用既有的命中带查询(薄壳外扩 margin)。
+        /// </summary>
+        public static WallHit? HitEnemyPanelWithin(Entity e, float range)
+        {
+            if (range <= 0f) return null;
+            foreach (Side owner in new[] { Side.Blue, Side.Red })
+            {
+                if (owner == e.Side) continue;
+                var c = BaseCenter(owner);
+                float len = SimVec2.Distance(c, e.PosF);
+                if (len < 0.01f) continue;
+                var dir = new SimVec2((e.PosF.X - c.X) / len, (e.PosF.Y - c.Y) / len);
+                // 单位可能在墙内或墙外:取"该方向上离单位最近、且在射程内"的环上点
+                float target = Radius + WallHitMargin;
+                if (System.Math.Abs(len - target) > range) continue;      // 环不在射程内
+                var p = new SimVec2(c.X + dir.X * target, c.Y + dir.Y * target);
+                var hit = HitEnemyPanel(e, p);
+                if (hit != null) return hit;
+            }
+            return null;
+        }
+
+        public static WallHit? HitEnemyPanel(Entity e, SimVec2 p) => HitEnemyPanel(e, p, WallHitMargin);
+
+        /// <summary>同上,显式指定命中带外扩(测试要能分别量"薄壳内/命中带内")。</summary>
+        public static WallHit? HitEnemyPanel(Entity e, SimVec2 p, float margin)
         {
             foreach (Side owner in new[] { Side.Blue, Side.Red })
             {
@@ -209,7 +260,7 @@ namespace IronCurtain.Sim
                 for (int panel = 0; panel < Panels; panel++)
                 {
                     if (IsBroken(owner, panel)) continue;
-                    if (OnWall(owner, panel, p)) return new WallHit { Owner = owner, Panel = panel };
+                    if (OnWall(owner, panel, p, margin)) return new WallHit { Owner = owner, Panel = panel };
                 }
             }
             return null;
@@ -235,9 +286,8 @@ namespace IronCurtain.Sim
 
         /// <summary>
         /// 通行判定:单位 side 想从 p 穿过 owner 的城墙。
-        /// 完好段:仅自家可过(走门洞,门=该段中心角 ±7 米,恰为本路位置);
-        /// 破段:人人可过(实际破口在段中心=本路,等效门洞敞开)。
-        /// 返回 true=可通行。
+        /// 阻挡带 = **薄壳本身**(±WallHalf),单位可以一路走到墙皮上 —— 这才是"屏障占地多少就能走到多少"。
+        /// 完好段:仅自家可过;破段:人人可过。返回 true=可通行。
         /// </summary>
         public static bool CanPass(Side side, SimVec2 p)
         {
@@ -252,6 +302,29 @@ namespace IronCurtain.Sim
                 }
             }
             return true;                                          // 不在任何墙上
+        }
+
+        /// <summary>
+        /// 带起点的通行判定:被 `SoftCollide`/`PushOutOfBuildings` 之类挤进薄壳的单位
+        /// (这些位移**不过墙判定**)原本会永久卡死 —— 单帧步长只有 0.2~0.3 米、薄壳有 1.2 米宽,
+        /// 之后每一步的落点都还在壳里 → 前进被挡、后退也被挡,一步都挪不出去。
+        /// 这里放行"从壳内往外挪"的那一步(只判方向,不要求一步就出壳)。
+        /// </summary>
+        public static bool CanPass(Side side, SimVec2 from, SimVec2 to)
+        {
+            if (CanPass(side, to)) return true;
+            foreach (Side owner in new[] { Side.Blue, Side.Red })
+            {
+                if (owner == side) continue;
+                var c = BaseCenter(owner);
+                if (SimVec2.Distance(c, to) <= SimVec2.Distance(c, from)) continue;   // 只放行"向外"
+                for (int panel = 0; panel < Panels; panel++)
+                {
+                    if (IsBroken(owner, panel)) continue;
+                    if (OnWall(owner, panel, from)) return true;   // 起点已在壳内且这一步向外 → 放行
+                }
+            }
+            return false;
         }
 
         /// <summary>城墙视野:点 p 是否被 owner 方任一完好段的"墙外 10 米"覆盖(段弧带外扩)。</summary>
@@ -289,13 +362,13 @@ namespace IronCurtain.Sim
                 for (int panel = 0; panel < Panels; panel++)
                 {
                     if (IsBroken(owner, panel)) continue;
-                    if (OnWall(owner, panel, e.PosF)) return true;
+                    if (OnWall(owner, panel, e.PosF, WallHitMargin)) return true;   // 贴墙也算(见 OnWall margin)
                 }
             }
             return false;
         }
 
-        /// <summary>点击拾取:point 是否落在 player 的敌方完好墙段上(点击判定容差 3 米)。</summary>
+        /// <summary>点击拾取:point 是否落在 player 的敌方完好墙段上(径向/角向都用点击容差,口径统一)。</summary>
         public static bool HitEnemyWall(SimCore sim, Side player, SimVec2 point)
         {
             if (sim == null || player == Side.Neutral) return false;
@@ -307,14 +380,16 @@ namespace IronCurtain.Sim
                     if (IsBroken(owner, panel)) continue;
                     var c = BaseCenter(owner);
                     float r = SimVec2.Distance(c, point);
-                    if (Math.Abs(r - Radius) > WallHalf + 3f) continue;
-                    if (Math.Abs(AngleTo(owner, panel, point)) <= PanelHalf(owner, panel) + 3f / Radius) return true;
+                    if (Math.Abs(r - Radius) > WallClickTolerance) continue;
+                    if (Math.Abs(AngleTo(owner, panel, point)) <= PanelHalf(owner, panel) + WallClickTolerance / Radius)
+                        return true;
                 }
             }
             return false;
         }
 
-        /// <summary>点击点吸附到最近可走的墙脚(行军目的地;沿半径方向退 6 米到墙外侧)。</summary>
+        /// <summary>点击点吸附到最近可走的墙脚(行军目的地;沿半径方向退到墙皮外侧一点点)。
+        /// 2026-09-14:原来退 6 米 —— 目的地在命中带外,军队走到那里只会站着,既不贴墙也打不到屏障。</summary>
         public static SimVec2 NearestWallPoint(Side attacker, SimVec2 point)
         {
             foreach (Side owner in new[] { Side.Blue, Side.Red })
@@ -324,7 +399,8 @@ namespace IronCurtain.Sim
                 float len = SimVec2.Distance(c, point);
                 if (len < 0.01f) continue;
                 var dir = new SimVec2((point.X - c.X) / len, (point.Y - c.Y) / len);
-                return new SimVec2(c.X + dir.X * (Radius + 6f), c.Y + dir.Y * (Radius + 6f));
+                float rr = Radius + WallFootOffset;
+                return new SimVec2(c.X + dir.X * rr, c.Y + dir.Y * rr);
             }
             return point;
         }

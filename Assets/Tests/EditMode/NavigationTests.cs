@@ -45,7 +45,9 @@ namespace IronCurtain.Tests
         public void T1_GeneralDetoursAroundBuilding()
         {
             var sim = NewSim();
-            sim.SpawnBuilding(Side.Red, BuildingId.Barracks, new GridPos(15, 110)); // x∈[108,113]
+            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 110)); // 用**大本营**当稳定障碍:永不可占领(兵营会被接触即占领,不是稳定障碍)
+            // 2026-09-14:「该兵营必须带驻军」 —— 否则蓝方单位一贴近就被「接触即占领」翻成蓝方,
+            // 它就从障碍变成"自家建筑"(自家建筑被卡 1s 可穿透) → 本用例的前提消失(实测踩到过)。
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 105));
             sim.SetMoveTarget(g.Id, new GridPos(15, 116)); // 直线穿建筑正中
 
@@ -121,7 +123,7 @@ namespace IronCurtain.Tests
         public void T4_StuckThresholdTiming()
         {
             var sim = NewSim();
-            sim.SpawnBuilding(Side.Red, BuildingId.Barracks, new GridPos(15, 110));
+            var bar = sim.SpawnBuilding(Side.Red, BuildingId.Base, new GridPos(15, 110));   // 稳定障碍:大本营永不可占领
             var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi, new GridPos(15, 105));
             sim.SetMoveTarget(g.Id, new GridPos(15, 116));
 

@@ -25,7 +25,7 @@ namespace IronCurtain.Tests
         private Entity SpawnWallAttacker()
         {
             // 红方单位顶在蓝中路段上(基地(8,80)+半径20 → 墙脚≈(28,80);GridPos=行,列)
-            var u = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(80, 30));
+            var u = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(80, 28));
             u.MoveSpeed = 2f; u.Attack = 30f; u.AttackIntervalSec = 1f; u.AttackCooldown = 0f;
             u.Range = 1; u.Hp = u.MaxHp = 100f;
             return u;
@@ -87,7 +87,7 @@ namespace IronCurtain.Tests
         [Test]
         public void HitEnemyPanel找段与跳过已破()
         {
-            var e = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(80, 30));
+            var e = sim.SpawnEntity(Side.Red, EntityKind.Unit, new GridPos(80, 28));
             e.Hp = e.MaxHp = 100f;
             var hit = WallSystem.HitEnemyPanel(e, e.PosF);
             Assert.IsNotNull(hit, "顶在蓝中段上应命中");

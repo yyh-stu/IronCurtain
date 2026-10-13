@@ -69,32 +69,47 @@ namespace IronCurtain.Tests
             Assert.IsFalse(rubble.CanCapture || rubble.CanDestroy);
             StringAssert.Contains("废墟", rubble.Status);
             _enemyTower.Rubbled = false;
-            _enemyTower.Sealed = true;
-            var sealedInfo = _model.Describe(_enemyTower.Id, selected);
-            Assert.IsFalse(sealedInfo.CanCapture || sealedInfo.CanDestroy);
-            StringAssert.Contains("封城", sealedInfo.Status);
+            var back = _model.Describe(_enemyTower.Id, selected);
+            Assert.IsTrue(back.CanCapture && back.CanDestroy);   // 废墟复原后恢复可操作(旧"封城"拦截已随字段删除)
         }
 
         [Test]
-        public void Describe_无选中主将时不显示动作()
+        public void Describe_无选中主将时命令仍可见_只是不点兵()
         {
+            // 2026-09-14 制作人:"**占领/摧毁是建筑的属性**,或者简单点说,**就是不用先框选**"
+            // → 旧口径("没框选就不给命令")已作废。现在:命令照样可用(可见可点),
+            //   区别只在"有没有把框选的兵团一起派出去"(SelectedGeneralCount),状态行如实写明。
             var info = _model.Describe(_enemyTower.Id, new int[0]);
             Assert.AreEqual(0, info.SelectedGeneralCount);
-            Assert.IsFalse(info.CanCapture || info.CanDestroy);
-            StringAssert.Contains("选择", info.Status);
+            Assert.IsTrue(info.CanCapture, "不用先框选也能下占领令(建筑属性)");
+            Assert.IsTrue(info.CanDestroy, "不用先框选也能下摧毁令(建筑属性)");
+            StringAssert.Contains("未框选", info.Status);
         }
 
         [Test]
-        public void Execute_零兵武将返回具体NoEligible反馈且不写意图()
+        public void Describe_有选中主将时命令可用且状态报兵团数()
         {
+            var sim = _sim;
+            var g = RegimentSystem.SpawnGeneral(sim, Side.Blue, HeroId.PanShi,
+                new GridPos(_enemyTower.Pos.Row, _enemyTower.Pos.Col - 6));
+            var info = _model.Describe(_enemyTower.Id, new[] { g.Id });
+            Assert.AreEqual(1, info.SelectedGeneralCount);
+            Assert.IsTrue(info.CanCapture && info.CanDestroy);
+            StringAssert.Contains("已选", info.Status);
+        }
+
+        [Test]
+        public void Execute_零兵武将可单独受令_写下意图并去集结点()
+        {
+            // 2026-09-14 制作人口径「主将和他的兵团就是一个单位」:士兵打光的**孤将**照样能受令
+            // (它自己进城,按交换力 10/12 结算)。旧用例断言"零兵武将必须被拒",与这条口径冲突,已改写。
             var result = _model.Execute(
                 _neutral.Id, new[] { _zeroSoldierGeneral.Id }, BuildingCommandAction.Capture);
 
-            Assert.IsFalse(result.Success);
-            Assert.AreEqual(SiegeOrderError.NoEligibleSoldiers, result.Error);
-            StringAssert.Contains("没有可下令士兵", result.Message);
-            Assert.AreEqual(SiegeIntent.None, _neutral.Intent);
-            Assert.IsFalse(_zeroSoldierGeneral.HasMoveTarget);
+            Assert.IsTrue(result.Success, "孤将应能受令:" + result.Message);
+            Assert.AreEqual(SiegeIntent.Capture, _neutral.Intent, "应写下占领意图");
+            Assert.IsTrue(_zeroSoldierGeneral.HasMoveTarget, "孤将应获行军令(去城外集结点)");
+            Assert.AreEqual(_neutral.Id, _zeroSoldierGeneral.TargetBuildingId, "孤将应带攻城标记");
         }
 
         [Test]
@@ -112,11 +127,17 @@ namespace IronCurtain.Tests
             StringAssert.Contains(result.SoldierCount.ToString(), result.Message);
             // 2026-09-09 制作人二次裁决:兵随主将——令下主将(标记+行军),士兵不受令随行,到位放兵
             Assert.IsTrue(general.HasMoveTarget, "主将应受令行军");
-            Assert.AreEqual(_enemyTower.Id, general.TargetBuildingId, "主将带兵团攻城标记(不参与交换)");
+            Assert.AreEqual(_enemyTower.Id, general.TargetBuildingId, "主将带兵团攻城标记(主将与兵团同一单位)");
             var st = SimVec2.FromGrid(general.MoveTarget);
             var bp = SimVec2.FromGrid(_enemyTower.Pos);
             float d = SimVec2.Distance(st, bp);
-            Assert.IsTrue(d > 3f && d < 12f, "集结点应贴近建筑外缘(碰撞半径+5),实际 " + d);
+            // 2026-09-15 口径修正(制作人"**还是不攻击建筑,全在发呆**"):**摧毁令**下主将也是打手,
+            // 集结点必须落在**它的攻击距离内**。旧口径一律用"碰撞半径+5"(箭塔=7.4 米),而近战要贴到
+            // 占地矩形边(≈2.5 米)→ 到了 7.4 米就停住、永远打不到 = 站桩发呆。
+            // 旧断言 `d > 3f && d < 12f`(语义是"停在城外 5 米")正是这个 bug 的编码,按新口径改写。
+            Assert.IsTrue(SimCore.InMeleeReachOfBuilding(_enemyTower, st),
+                "摧毁令的集结点必须落在主将打得到的位置:距塔心 " + d.ToString("F2")
+                + ",距占地矩形 " + SimVec2.Distance(st, BuildingFootprint.ClosestPoint(_enemyTower, st)).ToString("F2"));
             Assert.IsTrue(soldiers.All(s => !s.HasMoveTarget && s.TargetBuildingId == 0), "下令时士兵不受令(编队随行)");
             // 模拟主将抵达城外 → 放兵入交换
             general.HasMoveTarget = false;

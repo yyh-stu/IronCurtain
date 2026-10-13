@@ -310,7 +310,9 @@ namespace IronCurtain.View
                 card.style.alignItems = Align.Center;
 
                 var por = new Image();
-                var tex = UnityEngine.Resources.Load<Texture2D>("UI/portraits/" + kv.Key);
+                // 2026-09-17 制作人:"结算面板头像奇奇怪怪的,用 BP 头像(亲手选的)"
+                // —— BP 头像 = portraits_bp(八视图右前45°,与 BP 界面同源);旧 portraits 目录停用。
+                var tex = UnityEngine.Resources.Load<Texture2D>("UI/portraits_bp/" + kv.Key);
                 if (tex != null) por.image = tex;
                 por.style.width = 48; por.style.height = 48;
                 por.style.marginRight = 8;

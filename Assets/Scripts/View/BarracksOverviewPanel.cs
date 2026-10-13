@@ -24,6 +24,24 @@ namespace IronCurtain.View
         };
 
         /// <summary>M8.6 面板包围盒(屏幕坐标),供 SelectionSystem 拦截与道具面板跟随。</summary>
+        // 2026-09-13:与命令面板同款折叠/展开(折叠=底部居中,展开=屏幕中央)
+        private Button _header;
+        private VisualElement _body;
+        private bool _expanded;
+
+        public void SetExpanded(bool expanded)
+        {
+            _expanded = expanded;
+            ApplyExpanded();
+        }
+
+        private void ApplyExpanded()
+        {
+            if (_header == null) return;
+            _header.text = _expanded ? "总览 ▼" : "总览 ▲";
+            if (_body != null) _body.style.display = DisplayStyle.Flex;   // 中央框里始终展开(显隐由 UiRoot 管)
+        }
+
         public static Rect LastPanelRect = new Rect(10f, 10f, 360f, 0f);
 
         private BarracksOverviewModel _model;
@@ -44,15 +62,18 @@ namespace IronCurtain.View
         {
             _root = new VisualElement { name = "BarracksOverview" };
             _root.AddToClassList("panel");
-            _root.style.position = Position.Absolute;
-            _root.style.left = 12;
-            _root.style.top = 12;
-            _root.style.width = 372;
 
-            var title = UiKit.MakeLabel("总览", "label-title");
-            _root.Add(title);
+            // 2026-09-13 制作人:"兵营总览也放下去" —— 与三个命令面板同一套:
+            // 折叠态=底部居中入口条上的按钮,展开态=屏幕中央;箭头 折叠 ▲ / 展开 ▼。
+            _header = UiKit.MakeButton("总览 ▲", () => SetExpanded(!_expanded));
+            _header.style.width = 118;
+            _body = new VisualElement();
+            _body.style.marginTop = 6;
+            _root.Add(_body);
+
+            // 2026-09-13:面板内不再放重复的"总览"标题 —— 中央框的标题行已经给了(抓帧图里出现过两次)
             _population = UiKit.MakeLabel("");
-            _root.Add(_population);
+            _body.Add(_population);
 
             var poolRow = new VisualElement();
             poolRow.style.flexDirection = FlexDirection.Row;
@@ -73,25 +94,42 @@ namespace IronCurtain.View
             });
             btn.style.width = 76;
             poolRow.Add(btn);
-            _root.Add(poolRow);
+            _body.Add(poolRow);
 
             _blocksHost = new VisualElement();
             _blocksHost.style.marginTop = 6;
-            _root.Add(_blocksHost);
+            _body.Add(_blocksHost);
 
             _feedback = UiKit.MakeLabel("", "feedback-ok");
             _feedback.style.marginTop = 4;
-            _root.Add(_feedback);
+            _body.Add(_feedback);
 
-            parent.Add(_root);
+            // 2026-09-13 修正:此前这句 parent.Add(_root) 把面板直接挂回 Screen,
+            // 于是它被正常流式排在屏幕上方、铺满宽度**常显**(制作人三次报"上面的框还在");
+            // 而 RegisterCenterEntry 又被落到 ApplyExpanded 里 → 每帧重复注册入口按钮。
+            // 现在只在这里注册一次:折叠=底部入口,展开=中央框。
+            UiRoot.Current.RegisterCenterEntry("总览", _root);
         }
+
+        /// <summary>2026-09-14 供实机自检:本面板累计重建正文的次数(正常应为 0 或极少)。
+        /// 制作人报"面板不稳定、点一下才恢复、这一下不算数"的根因就是"每帧/每秒重建正文"。</summary>
+        public static int Rebuilds;
 
         private void Update()
         {
             if (_model == null || _root == null) return;
             _population.text = "人口 将 " + _model.PopulationOf() + "/" + _model.PopulationCapOf();
             _pool.text = "补兵池 " + _model.ReinforcePoolOf() + "/" + _model.ReinforcePoolCap();
-            RebuildBlocks(_model.DescribeBlocks());
+            // 2026-09-13 修"点将领生产没反应/没反馈":原来这里**每帧无条件**重建全部区块,
+            // 而 RebuildBlocks 会 Clear + 重建"将:英雄"按钮 —— 按钮每帧被销毁,点击永远落不到
+            // 稳定元素上。改为只有**结构**变化才重建(键里排除逐帧跳动的 Progress),
+            // 进度条改由 RefreshProgress 走元素引用逐帧刷新,动画不受影响。
+            // 2026-09-14 制作人:"产兵我快速按下三个将名时…似乎每个指令发出都有延迟" ——
+            // 根因是这里原先"排队数一变就 Clear+重建全部区块(含'将:英雄'按钮)" → 快速连点会点在
+            // **已销毁的按钮**上,那一下不算数。现在改成**只建一次、原地刷新**:
+            // 区块在其主基地存续期内**永不销毁**,按钮元素恒定,点击永远落在活元素上(零重建)。
+            var blocks = _model.DescribeBlocks();
+            SyncBlocks(blocks);
 
             if (_lastFeedback != null && Time.unscaledTime < _feedbackUntil)
             {
@@ -102,16 +140,84 @@ namespace IronCurtain.View
             else _feedback.text = "";
         }
 
-        private void RebuildBlocks(List<BarracksOverviewModel.BlockInfo> blocks)
+        private static string BlocksKeyOf(List<BarracksOverviewModel.BlockInfo> blocks)
         {
-            _blocksHost.Clear();
-            foreach (var block in blocks)
-                _blocksHost.Add(BuildBlock(block));
+            var sb = new System.Text.StringBuilder();
+            for (int b = 0; b < blocks.Count; b++)
+            {
+                var blk = blocks[b];
+                sb.Append(blk.BarracksId).Append(':').Append((int)blk.State).Append('|');
+                for (int i = 0; i < blk.Slots.Length; i++)
+                {
+                    var sl = blk.Slots[i];
+                    sb.Append(sl.Current.HasValue ? (int)sl.Current.Value : -1).Append(',')
+                      .Append(sl.WaitingForSpawn ? 1 : 0).Append(',')
+                      .Append(sl.PendingCount).Append(',');
+                }
+                sb.Append(';');
+            }
+            return sb.ToString();
         }
 
-        private VisualElement BuildBlock(BarracksOverviewModel.BlockInfo block)
+        /// <summary>每个槽一行(元素恒定):文本/进度/取消按钮全部原地更新,不重建。</summary>
+        private sealed class SlotRow
         {
-            bool destroyed = block.State == BarracksOverviewModel.BlockState.Destroyed;
+            public Label Name;
+            public VisualElement Shell;
+            public VisualElement Fill;
+            public Label Pending;
+            public Button Cancel;
+            public bool CancelShown;
+        }
+
+        /// <summary>每个主基地一个区块(元素恒定)。</summary>
+        private sealed class BlockView
+        {
+            public VisualElement Host;
+            public Label DestroyedTag;
+            public readonly List<SlotRow> Slots = new List<SlotRow>();
+            public VisualElement HeroHost;
+            public string HeroKey;
+        }
+
+        private readonly Dictionary<int, BlockView> _views = new Dictionary<int, BlockView>();
+        private readonly List<int> _staleIds = new List<int>();
+
+        /// <summary>按基地 id 对齐区块:新增基地才建元素,消失的基地才销毁 —— 其余一律原地刷新。</summary>
+        private void SyncBlocks(List<BarracksOverviewModel.BlockInfo> blocks)
+        {
+            _staleIds.Clear();
+            foreach (var id in _views.Keys)
+            {
+                bool alive = false;
+                for (int i = 0; i < blocks.Count; i++) if (blocks[i].BarracksId == id) { alive = true; break; }
+                if (!alive) _staleIds.Add(id);
+            }
+            for (int i = 0; i < _staleIds.Count; i++)
+            {
+                var v = _views[_staleIds[i]];
+                if (v.Host.parent != null) v.Host.parent.Remove(v.Host);
+                _views.Remove(_staleIds[i]);
+            }
+            for (int b = 0; b < blocks.Count; b++)
+            {
+                var blk = blocks[b];
+                BlockView view;
+                if (!_views.TryGetValue(blk.BarracksId, out view))
+                {
+                    view = CreateBlock(blk);
+                    _views[blk.BarracksId] = view;
+                    _blocksHost.Add(view.Host);
+                }
+                UpdateBlock(view, blk);
+            }
+        }
+
+        /// <summary>建一次(基地出生时建,之后不再重建)。</summary>
+        private BlockView CreateBlock(BarracksOverviewModel.BlockInfo block)
+        {
+            Rebuilds++;   // 只在**真的建元素**时 +1(原地刷新不计)
+            var view = new BlockView();
             var host = new VisualElement();
             host.style.marginTop = 6;
             host.style.paddingTop = 6;
@@ -121,116 +227,164 @@ namespace IronCurtain.View
             var head = new VisualElement();
             head.style.flexDirection = FlexDirection.Row;
             head.style.alignItems = Align.Center;
-            var idLabel = UiKit.MakeLabel("主基地 #" + block.BarracksId, "label-title");
-            head.Add(idLabel);
-            if (destroyed)
-            {
-                var d = UiKit.MakeLabel("已摧毁 · 不可生产", "feedback-err");
-                d.style.marginLeft = 8;
-                head.Add(d);
-            }
+            head.Add(UiKit.MakeLabel("主基地 #" + block.BarracksId, "label-title"));
+            view.DestroyedTag = UiKit.MakeLabel("已摧毁 · 不可生产", "feedback-err");
+            view.DestroyedTag.style.marginLeft = 8;
+            view.DestroyedTag.style.display = DisplayStyle.None;
+            head.Add(view.DestroyedTag);
             host.Add(head);
 
             for (int i = 0; i < block.Slots.Length; i++)
-                host.Add(BuildSlot(block, i, destroyed));
-
-            if (!destroyed)
-                host.Add(BuildHeroButtons(block.BarracksId));
-            return host;
-        }
-
-        private VisualElement BuildSlot(BarracksOverviewModel.BlockInfo block, int index, bool destroyed)
-        {
-            var slot = block.Slots[index];
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginTop = 3;
-
-            string heroText;
-            if (destroyed) heroText = "—";
-            else if (slot.WaitingForSpawn) heroText = HeroNameOf(slot.Current) + "(等位)";
-            else heroText = slot.Current.HasValue ? HeroNameOf(slot.Current) : "空闲";
-            var slotLabel = UiKit.MakeLabel("槽" + index + ":" + heroText);
-            slotLabel.style.width = 104;
-            row.Add(slotLabel);
-
-            // 生产进度条(绿);空闲/摧毁=空槽底
-            var shell = new VisualElement();
-            shell.AddToClassList("hpbar-shell");
-            shell.style.width = 150;
-            shell.style.marginRight = 6;
-            var fill = new VisualElement();
-            fill.AddToClassList("hpbar-fill");
-            if (!destroyed && slot.Current.HasValue && slot.TotalSeconds > 0f)
             {
-                float frac = Mathf.Clamp01(slot.Progress / ProductionSystem.GeneralProductionSeconds);
-                fill.style.width = Length.Percent(frac * 100f);
-                fill.style.backgroundColor = new Color(0.30f, 0.85f, 0.40f);
-            }
-            else fill.style.width = 0;
-            shell.Add(fill);
-            row.Add(shell);
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.alignItems = Align.Center;
+                row.style.marginTop = 3;
 
-            if (!destroyed && slot.PendingCount > 0)
-            {
-                var p = UiKit.MakeLabel("×" + slot.PendingCount, "label-dim");
-                p.style.width = 30;
-                row.Add(p);
-            }
+                var sr = new SlotRow();
+                sr.Name = UiKit.MakeLabel("");
+                sr.Name.style.width = 104;
+                row.Add(sr.Name);
 
-            var spacer = new VisualElement(); spacer.style.flexGrow = 1; row.Add(spacer);
-            if (!destroyed && (slot.Current.HasValue || slot.PendingCount > 0))
-            {
-                var cancel = UiKit.MakeButton("取消", () =>
+                sr.Shell = new VisualElement();
+                sr.Shell.AddToClassList("hpbar-shell");
+                sr.Shell.style.width = 150;
+                sr.Shell.style.marginRight = 6;
+                sr.Fill = new VisualElement();
+                sr.Fill.AddToClassList("hpbar-fill");
+                sr.Fill.style.width = 0;
+                sr.Shell.Add(sr.Fill);
+                row.Add(sr.Shell);
+
+                sr.Pending = UiKit.MakeLabel("");
+                sr.Pending.style.width = 30;
+                sr.Pending.style.display = DisplayStyle.None;
+                row.Add(sr.Pending);
+
+                var spacer = new VisualElement();
+                spacer.style.flexGrow = 1;
+                row.Add(spacer);
+
+                int slotIndex = i;
+                sr.Cancel = UiKit.MakeButton("取消", () =>
                 {
-                    string result = _model.Cancel(block.BarracksId, index);
+                    string result = _model.Cancel(block.BarracksId, slotIndex);
                     Report(result, "已取消");
 #if UNITY_EDITOR
-                    InputAudit.Log("production_cancel building=" + block.BarracksId + " slot=" + index
+                    InputAudit.Log("production_cancel building=" + block.BarracksId + " slot=" + slotIndex
                         + " result=" + ResultForLog(result));
 #endif
                 });
-                cancel.style.width = 56;
-                row.Add(cancel);
+                sr.Cancel.style.width = 56;
+                sr.Cancel.style.display = DisplayStyle.None;
+                row.Add(sr.Cancel);
+                host.Add(row);
+                view.Slots.Add(sr);
             }
-            return row;
+
+            view.HeroHost = new VisualElement();
+            host.Add(view.HeroHost);
+            view.Host = host;
+            return view;
         }
 
-        private VisualElement BuildHeroButtons(int buildingId)
+        /// <summary>原地刷新一个区块(不动元素结构,除非"可生产英雄集合"变了)。</summary>
+        private void UpdateBlock(BlockView view, BarracksOverviewModel.BlockInfo block)
         {
-            var host = new VisualElement();
-            for (int row = 0; row < 2; row++)
+            bool destroyed = block.State == BarracksOverviewModel.BlockState.Destroyed;
+            view.DestroyedTag.style.display = destroyed ? DisplayStyle.Flex : DisplayStyle.None;
+
+            for (int i = 0; i < view.Slots.Count && i < block.Slots.Length; i++)
             {
-                var r = new VisualElement();
-                r.style.flexDirection = FlexDirection.Row;
-                r.style.alignItems = Align.Center;
-                r.style.marginTop = 3;
-                for (int col = 0; col < 3; col++)
+                var sr = view.Slots[i];
+                var slot = block.Slots[i];
+                bool producing = !destroyed && slot.Current.HasValue && slot.TotalSeconds > 0f;
+                string heroText;
+                if (destroyed) heroText = "—";
+                else if (slot.WaitingForSpawn) heroText = HeroNameOf(slot.Current) + "(等位)";
+                else heroText = slot.Current.HasValue ? HeroNameOf(slot.Current) : "空闲";
+                sr.Name.text = "槽" + i + ":" + heroText;
+
+                if (producing)
+                    sr.Fill.style.width = Length.Percent(
+                        Mathf.Clamp01(slot.Progress / ProductionSystem.GeneralProductionSeconds) * 100f);
+                else sr.Fill.style.width = 0;
+                sr.Fill.style.backgroundColor = new Color(0.30f, 0.85f, 0.40f);
+
+                bool showPending = !destroyed && slot.PendingCount > 0;
+                sr.Pending.text = showPending ? ("×" + slot.PendingCount) : "";
+                sr.Pending.style.display = showPending ? DisplayStyle.Flex : DisplayStyle.None;
+
+                bool showCancel = !destroyed && (slot.Current.HasValue || slot.PendingCount > 0);
+                if (showCancel != sr.CancelShown)
                 {
-                    int idx = row * 3 + col;
-                    var hero = HeroOrder[idx];
-                    var chip = new VisualElement();
-                    chip.style.width = 8; chip.style.height = 18;
-                    chip.style.marginRight = 4;
-                    chip.style.backgroundColor = HeroColors[idx];
-                    r.Add(chip);
-                    var b = UiKit.MakeButton("将:" + HeroNames[idx], () =>
-                    {
-                        string result = _model.StartProduction(buildingId, hero);
-                        Report(result, "已加入生产");
-#if UNITY_EDITOR
-                        InputAudit.Log("production_click building=" + buildingId + " hero=" + hero
-                            + " result=" + ResultForLog(result));
-#endif
-                    });
-                    b.style.width = 96;
-                    b.style.flexShrink = 0;
-                    r.Add(b);
+                    sr.CancelShown = showCancel;
+                    sr.Cancel.style.display = showCancel ? DisplayStyle.Flex : DisplayStyle.None;
                 }
-                host.Add(r);
             }
-            return host;
+
+            // 英雄按钮:只在"可生产英雄集合"变化时重建(换边/BP 才会变,不是每帧)
+            var producible = ProducibleHeroes();
+            string heroKey = destroyed ? "dead" : string.Join(",", producible);
+            if (heroKey != view.HeroKey)
+            {
+                view.HeroKey = heroKey;
+                Rebuilds++;   // 英雄按钮集合变了才重建
+                view.HeroHost.Clear();
+                if (!destroyed) BuildHeroButtons(view.HeroHost, block.BarracksId, producible);
+            }
+        }
+
+        private void BuildHeroButtons(VisualElement host, int buildingId, List<HeroId> producible)
+        {
+            // 2026-09-14 制作人:"AI 对局中,总览应该是**玩家选择的三个英雄**,而不是六英雄"。
+            // 有 BP 选将结果时只列那 3 个(练习场无 BP → 仍是六个都可生产)。
+            for (int i = 0; i < producible.Count; i++)
+            {
+                if (i % 3 == 0)
+                {
+                    var r0 = new VisualElement();
+                    r0.style.flexDirection = FlexDirection.Row;
+                    r0.style.alignItems = Align.Center;
+                    r0.style.marginTop = 3;
+                    host.Add(r0);
+                }
+                var rowEl = host[host.childCount - 1];
+                var hero = producible[i];
+                int idx = System.Array.IndexOf(HeroOrder, hero);
+                if (idx < 0) idx = 0;
+                var chip = new VisualElement();
+                chip.style.width = 8; chip.style.height = 18;
+                chip.style.marginRight = 4;
+                chip.style.backgroundColor = HeroColors[idx];
+                rowEl.Add(chip);
+                var b = UiKit.MakeButton("将:" + HeroNames[idx], () =>
+                {
+                    string result = _model.StartProduction(buildingId, hero);
+                    Report(result, "已加入生产");
+#if UNITY_EDITOR
+                    InputAudit.Log("production_click building=" + buildingId + " hero=" + hero
+                        + " result=" + ResultForLog(result));
+#endif
+                });
+                b.style.width = 96;
+                b.style.flexShrink = 0;
+                rowEl.Add(b);
+            }
+        }
+
+        /// <summary>本局**玩家可生产**的英雄:走过 BP 就是自己选的那 3 个,否则(练习场/默认开局)六个全开放。
+        /// 制作人 2026-09-14:"AI 对局中总览应该是玩家选择的三个英雄,而不是六英雄"。</summary>
+        private static System.Collections.Generic.List<HeroId> ProducibleHeroes()
+        {
+            var picks = AppFlow.PlayerSide == Side.Red ? AppFlow.BpRedPicks : AppFlow.BpBluePicks;
+            var list = new System.Collections.Generic.List<HeroId>();
+            if (picks != null)
+                for (int i = 0; i < picks.Count; i++)
+                    if (!list.Contains(picks[i])) list.Add(picks[i]);   // BP 同方三张不重复,这里再兜一道
+            if (list.Count > 0) return list;
+            list.AddRange(HeroOrder);
+            return list;
         }
 
         private void Report(string error, string success)
@@ -256,7 +410,7 @@ namespace IronCurtain.View
 
         private void LateUpdate()
         {
-            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 拦截桥 + 道具面板跟随
+            if (_root != null) LastPanelRect = UiKit.VisibleRectOrZero(_root);  // 2026-09-15:隐藏/关闭的面板不再留幽灵拦截区(拦截桥 + 道具面板跟随)
         }
 
         private void OnDisable() => LastPanelRect = Rect.zero;

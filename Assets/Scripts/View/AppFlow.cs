@@ -51,10 +51,24 @@ namespace IronCurtain.View
         public static void EnterBattle() => SceneManager.LoadScene(BattleScenePath);
 
         /// <summary>练习场重载式换边:翻转操控阵营后重载战斗场景。</summary>
+        /// <summary>
+        /// 2026-09-13 制作人:"训练场换边不是重新载入,是换个边继续"。
+        /// 改为**原地换边**:保留当前对局(兵力/比分/时间继续),只把视图/输入层按新阵营重建
+        /// (见 GameBootstrap.BuildView/TeardownView)。找不到在跑的 bootstrap 时兜底走旧重载路径。
+        /// </summary>
         public static void SwitchPracticeSide()
         {
             PlayerSide = PlayerSide == Side.Blue ? Side.Red : Side.Blue;
-            SceneManager.LoadScene(BattleScenePath);
+            // 2026-09-13/14 制作人口径(三次明确):"训练场换边不是重载,是换个边继续"、"只切换阵营和视野状态,
+            // **不要改相机位置**" → 原地换边;相机与 CameraRig 一律不拆、不重建、不归位(见 GameBootstrap.TeardownView)。
+            var boot = UnityEngine.Object.FindFirstObjectByType<GameBootstrap>();
+            if (boot != null && boot.Sim != null)
+            {
+                UnityEngine.Debug.Log("[AppFlow] 原地换边 side=" + PlayerSide + "(保留对局)");
+                boot.RequestSideRebuild();
+                return;
+            }
+            SceneManager.LoadScene(BattleScenePath);   // 兜底:找不到实例才走重载
         }
     }
 }

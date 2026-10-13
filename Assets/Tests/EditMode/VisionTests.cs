@@ -38,17 +38,24 @@ public class VisionTests
     void Run(int ticks) { for (int i = 0; i < ticks; i++) sim.Step(); }
 
     [Test]
-    public void 单位视野半径_近战6格_射手9格()
+    public void 单位视野半径_近战8格_射手9格()
     {
+        // 2026-09-14 制作人口径:近战视野 8(原 6)、射手 9 不变,射手射程收到 8(见 gameconfig)。
         var blueMelee = MakeUnit(Side.Blue, HeroId.PanShi, 15, 113);
-        var red = MakeUnit(Side.Red, HeroId.DuanFeng, 15, 119);
-        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "曼哈顿 6 格应在近战视野内");
-        red.Pos = new GridPos(15, 120); sim.Step();
-        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "曼哈顿 7 格超出近战视野");
+        var red = MakeUnit(Side.Red, HeroId.DuanFeng, 15, 121);
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "欧氏 8 格应在近战视野内");
+        red.Pos = new GridPos(15, 122); sim.Step();
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "欧氏 9 格超出近战视野");
 
-        var blueShooter = MakeUnit(Side.Blue, HeroId.ZhuiRi, 16, 113);
-        red.Pos = new GridPos(15, 121); sim.Step();
-        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "曼哈顿 9 格应在射手视野内");
+        // 射手主将 9:把近战单位挪远(先腾格,否则出生点过近),只留射手判定
+        blueMelee.PosF = SimVec2.FromGrid(new GridPos(10, 10));
+        blueMelee.Pos = new GridPos(10, 10);
+        sim.Step();
+        var blueShooter = MakeUnit(Side.Blue, HeroId.ZhuiRi, 15, 113);
+        red.Pos = new GridPos(15, 122); sim.Step();
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "欧氏 9 格应在射手视野内");
+        red.Pos = new GridPos(15, 123); sim.Step();
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "欧氏 10 格超出射手视野");
     }
 
     [Test]
@@ -87,14 +94,21 @@ public class VisionTests
     [Test]
     public void 鹰眼_断峰为己方最靠前野战单位时视野10格()
     {
-        var panShi = MakeUnit(Side.Blue, HeroId.PanShi, 15, 120); // 先放磐石(更靠前)
-        var duanFeng = MakeUnit(Side.Blue, HeroId.DuanFeng, 15, 118); // 后放断峰 → 从未独处,鹰眼不闪光
-        var red = MakeUnit(Side.Red, HeroId.PanShi, 15, 127);
-        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id),
-            "磐石(Col12)在前,断峰视野被压到 6;磐石覆盖到 Col18,故 Col19 不可见");
+        // 2026-09-14 制作人澄清:「断峰 10 是**专属被动**」→ 保留(原按"近战统一 8"删掉过,已还原)。
+        // 判据分两段,规避"谁在最前"的歧义:①只有断峰在场(它就是最靠前)→ 视野 10;
+        // ②在它前方补一名磐石 → 断峰不再是"己方最靠前野战单位" → 视野回落到近战通用值 8。
+        var duanFeng = MakeUnit(Side.Blue, HeroId.DuanFeng, 15, 118);
+        var red = MakeUnit(Side.Red, HeroId.PanShi, 15, 128);   // 距断峰 10(欧氏)
+        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id),
+            "断峰为最靠前野战单位 → 鹰眼 10:10 格应可见");
 
-        panShi.State = EntityState.Dead; sim.Step(); // 移除磐石 → 鹰眼激活
-        Assert.IsTrue(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id), "鹰眼激活后断峰视野 10,Col19 可见");
+        var panShi = MakeUnit(Side.Blue, HeroId.PanShi, 15, 119);   // 站到断峰前方
+        red.PosF = SimVec2.FromGrid(new GridPos(20, 128));           // 换行,避免旧格标记
+        red.Pos = new GridPos(20, 128);
+        for (int i = 0; i < 35; i++) sim.Step();                     // 视野保鲜 3 秒过期
+        Assert.IsFalse(VisionSystem.IsUnitVisible(sim, Side.Blue, red.Id),
+            "磐石在最前 → 断峰视野回落 8,10 格外不可见(磐石 8 也够不到)");
+        Assert.IsNotNull(panShi);
     }
 
     [Test]

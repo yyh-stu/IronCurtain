@@ -1,0 +1,53 @@
+== DumpHandRig 2026-09-21 02:14:58 ==
+
+########## PanShi (Assets/Resources/Models/Heroes/PanShi.fbx) ##########
+骨骼节点总数=31
+-- 含 hand/finger/thumb/index/middle/ring/pinky 语义的骨骼 --
+  Armature/root/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm/LeftHand
+  Armature/root/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm/LeftHand/LeftHand_end
+  Armature/root/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand
+  Armature/root/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand/RightHand_end
+-- 手部直接子节点(判断手掌可分指程度) --
+  LeftHand 子节点(1):
+    -> LeftHand_end (childCount=0)
+  RightHand 子节点(1):
+    -> RightHand_end (childCount=0)
+-- Avatar 人形映射(实例化后 GetBoneTransform) --
+  LeftHand → LeftHand
+  RightHand → RightHand
+  LeftLowerArm → LeftForeArm
+  RightLowerArm → RightForeArm
+  Hips → Hips
+-- SMR: node_0.001 bones=23 verts=20798 weights=20798
+    [权重] LeftHand idx=10 影响顶点数(>0.1)=2284 最大权重=1.00
+    [权重] RightHand idx=14 影响顶点数(>0.1)=2427 最大权重=1.00
+
+########## ZhenYue (Assets/Resources/Models/Heroes/ZhenYue.fbx) ##########
+骨骼节点总数=31
+-- 含 hand/finger/thumb/index/middle/ring/pinky 语义的骨骼 --
+  Armature/root/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm/LeftHand
+  Armature/root/Hips/Spine/Spine1/Spine2/LeftShoulder/LeftArm/LeftForeArm/LeftHand/LeftHand_end
+  Armature/root/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand
+  Armature/root/Hips/Spine/Spine1/Spine2/RightShoulder/RightArm/RightForeArm/RightHand/RightHand_end
+-- 手部直接子节点(判断手掌可分指程度) --
+  LeftHand 子节点(1):
+    -> LeftHand_end (childCount=0)
+  RightHand 子节点(1):
+    -> RightHand_end (childCount=0)
+-- Avatar 人形映射(实例化后 GetBoneTransform) --
+  LeftHand → LeftHand
+  RightHand → RightHand
+  LeftLowerArm → LeftForeArm
+  RightLowerArm → RightForeArm
+  Hips → Hips
+-- SMR: node_0.001 bones=23 verts=23395 weights=23395
+    [权重] LeftHand idx=10 影响顶点数(>0.1)=1050 最大权重=1.00
+    [权重] RightHand idx=14 影响顶点数(>0.1)=1267 最大权重=1.00
+
+########## 武器 磐石_盾 (Assets/Resources/Models/Weapons/磐石_盾.fbx) ##########
+  renderer=磐石_盾 verts=314362 子节点数=0
+  根旋转(导入预设法内)=(90.0, 0.0, 0.0)
+
+########## 武器 镇岳_大锤 (Assets/Resources/Models/Weapons/镇岳_大锤.fbx) ##########
+  renderer=镇岳_大锤 verts=300123 子节点数=0
+  根旋转(导入预设法内)=(90.0, 0.0, 0.0)

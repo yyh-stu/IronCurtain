@@ -138,7 +138,7 @@ namespace IronCurtain.View
 
         private void LateUpdate()
         {
-            if (_root != null) LastPanelRect = UiKit.WorldRect(_root);   // 输入拦截桥
+            if (_root != null) LastPanelRect = UiKit.VisibleRectOrZero(_root);   // 输入拦截桥
         }
 
         private void OnDisable() => LastPanelRect = Rect.zero;

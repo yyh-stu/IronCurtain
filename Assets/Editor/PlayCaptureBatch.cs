@@ -86,6 +86,22 @@ namespace IronCurtain.EditorTools
             EditorApplication.EnterPlaymode();
         }
 
+        // 2026-09-13 新增:**UI 离屏抓帧**(把 UITK 面板渲到贴图存 PNG,批处理可用、不弹窗)。
+        // 用途:让改 UI 的人能自己看图验证叠层/位置,而不是靠实机反复来回。
+        //   Unity.exe -batchmode -projectPath <proj> -executeMethod IronCurtain.EditorTools.PlayCaptureBatch.UiShot -logFile <log>
+        // 产物:D:/DevTools/shots/uishot_*.png
+        [MenuItem("IronCurtain/UI Shot Batch")]
+        public static void UiShot()
+        {
+            if (!File.Exists("Assets/Scenes/Main.unity"))
+                IronCurtainSceneTools.CreateMainScene();
+            EditorSceneManager.OpenScene("Assets/Scenes/Main.unity");
+            Directory.CreateDirectory("D:/DevTools/shots");
+            SessionState.SetInt("ic.mode", 2);      // 正常 AI 对局:对局内 HUD 全量存在
+            SessionState.SetBool("ic.uishot", true);
+            EditorApplication.EnterPlaymode();
+        }
+
         private static void EnsureMenuScene()
         {
             if (!File.Exists("Assets/Scenes/Menu.unity")) IronCurtainSceneTools.CreateMenuScene();

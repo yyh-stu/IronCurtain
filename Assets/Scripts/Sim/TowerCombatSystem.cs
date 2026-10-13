@@ -17,7 +17,14 @@ namespace IronCurtain.Sim
             if (sim == null) throw new ArgumentNullException(nameof(sim));
 
             foreach (var tower in sim.Entities.Values
-                         .Where(e => e.Kind == EntityKind.Building && e.Building == BuildingId.Tower)
+                         .Where(e => e.Kind == EntityKind.Building && e.Building == BuildingId.Tower
+                                     // 2026-09-15 制作人:"**被摧毁的箭塔还是会攻击,有点抽象**"。
+                                     // 这里原来**完全不看 `Rubbled`** → 已被拆成废墟的箭塔照常开火
+                                     // (探针实测:塔变废墟、驻军清 0、`Side=Neutral` 之后,5 秒仍打掉红单位 20.2 血)。
+                                     // 更歪的是:废墟的 `Side` 被置成 `Neutral`,而找目标那条过滤是
+                                     // `if (e.Side == tower.Side) continue;` —— 中立塔拦不住任何一方,
+                                     // 于是**废墟会对敌我双方开火**。废墟就是一堆石头,不该有任何主动行为。
+                                     && !e.Rubbled)
                          .OrderBy(e => e.Id)
                          .ToList())
             {
@@ -82,7 +89,7 @@ namespace IronCurtain.Sim
             // 主目标
             float dmg = DamageCalculator.CalculateDamage(tower, mainTarget, sim.Game, false);
             dmg = ScaleBase(dmg, cfgB.Attack, attack);
-            ApplyDamage(mainTarget, dmg);
+            ApplyDamage(sim, tower, mainTarget, dmg);
 
             // 溅射半径 = SplashRange + (满员时 +SplashRangeBonus)
             int splashRadius = cfgB.SplashRange;
@@ -101,7 +108,7 @@ namespace IronCurtain.Sim
                 {
                     float d = DamageCalculator.CalculateDamage(tower, e, sim.Game, false);
                     d = ScaleBase(d, cfgB.Attack, cfgB.SplashDamage);
-                    ApplyDamage(e, d);
+                    ApplyDamage(sim, tower, e, d);
                 }
             }
         }
@@ -125,7 +132,7 @@ namespace IronCurtain.Sim
         }
 
         /// <summary>先扣护盾,再扣血;血量归零标记 Dead。逻辑照抄 SimCore.ApplyAttack 的护盾顺序。</summary>
-        private static void ApplyDamage(Entity e, float damage)
+        private static void ApplyDamage(SimCore sim, Entity tower, Entity e, float damage)
         {
             if (damage <= 0f) return;
             float remain = damage;
@@ -144,6 +151,11 @@ namespace IronCurtain.Sim
                     e.State = EntityState.Dead;
                 }
             }
+            // 2026-09-13 补发伤害事件。原实现按类注释"只做数值变更,不发事件",导致箭塔开火在表现层
+            // **完全静默**:无弹道、无受击闪白、无飘字、无音效 —— 制作人据此判定"敌方箭塔不攻击我方军队"
+            // (实测它在打,只是看不见)。单位攻击(SimCore.ApplyAttack)一直是发事件的,塔这里漏了。
+            // 已确认 Sim 侧没有 DamageDealt 监听者,补发只驱动表现层,不影响结算。
+            sim.Emit(new SimEvent(sim.Tick, SimEventType.DamageDealt, e.Id, damage, tower.Id));
         }
     }
 }

@@ -87,7 +87,7 @@ namespace IronCurtain.Tests
             GiveOneEp(sim, Side.Blue);
             var model = new ToolCommandModel(sim, Side.Blue);
             int before = sim.EntityCount;
-            var cell = new GridPos(2, 100);
+            var cell = new GridPos(80, 10);   // 2026-09-16 三十七轮补记:换己方大本营区域内的合法格(放置规则=三路+己方广场+最前建筑视野)
 
             var success = model.UseFort(cell);
             Assert.IsTrue(success.Success, success.Message);
@@ -140,7 +140,7 @@ namespace IronCurtain.Tests
             var b = NewSim(88);
             GiveOneEp(a, Side.Red);
             GiveOneEp(b, Side.Red);
-            var cell = new GridPos(1, 180);
+            var cell = new GridPos(80, 258);  // 2026-09-16 三十七轮补记:红方大本营区域内的合法格(对称性用红方放)
             Assert.IsTrue(new ToolCommandModel(a, Side.Red).UseFort(cell).Success);
             Assert.IsTrue(new ToolCommandModel(b, Side.Red).UseFort(cell).Success);
             var fa = a.Entities.Values.Single(e => e.IsFort);
